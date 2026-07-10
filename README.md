@@ -1,88 +1,58 @@
 # LockNote
 
-A secure note-taking app with folder organization and password protection.
-
-## Setup Instructions
-
-### 1. Create Supabase Project
-
-1. Go to [supabase.com](https://supabase.com) and create a free account
-2. Create a new project
-3. Go to SQL Editor and run the schema from `src/config/schema.sql`
-4. Go to Settings > API and copy:
-   - Project URL
-   - Anon/Public Key
-
-### 2. Configure Environment
-
-Open `src/config/supabase.js` and replace:
-- `YOUR_SUPABASE_URL` with your project URL
-- `YOUR_SUPABASE_ANON_KEY` with your anon key
-
-### 3. Run the App
-
-```bash
-# Install dependencies
-npm install
-
-# Start the app
-npm start
-```
-
-## Database Schema
-
-### Tables
-
-**folders**
-- id (UUID, primary key)
-- user_id (UUID, foreign key to auth.users)
-- name (TEXT)
-- password_hash (TEXT, nullable)
-- created_at (TIMESTAMP)
-- updated_at (TIMESTAMP)
-
-**notes**
-- id (UUID, primary key)
-- user_id (UUID, foreign key to auth.users)
-- folder_id (UUID, foreign key to folders, nullable)
-- title (TEXT)
-- content (TEXT)
-- password_hash (TEXT, nullable)
-- is_pinned (BOOLEAN)
-- created_at (TIMESTAMP)
-- updated_at (TIMESTAMP)
+A local, offline note-taking app with folder organization and per-item password protection. Built with Expo / React Native.
 
 ## Features
 
-- Anonymous authentication
-- Create/edit/delete folders
-- Create/edit/delete notes
-- Password protection for folders and notes
-- Pull-to-refresh
-- Clean, minimal UI
+- Folders and notes, with notes nested in folders or at the root
+- Optional password lock on any folder or note (SHA-256 gated — see [Security](#security))
+- Auto-save while editing (debounced)
+- Full-text search across notes (native)
+- Soft delete (items are flagged, not immediately purged)
+- Runs on iOS, Android, and web
 
-## Project Structure
+## Requirements
+
+- Node.js 18+
+- Expo CLI (`npx expo`)
+
+## Run
+
+```bash
+npm install
+npm start        # then press i / a / w for iOS, Android, web
+```
+
+No account, backend, or configuration needed — all data is stored locally on the device.
+
+## Storage
+
+Data lives entirely on-device. There is no server or sync:
+
+- **iOS / Android** — SQLite (`expo-sqlite`), database file `locknote.db`
+- **Web** — AsyncStorage (localStorage), via `*.web.js` repo variants
+
+## Security
+
+Password protection is **access gating, not encryption**. A folder/note password is stored as a SHA-256 hash and checked before opening the item. Note contents are stored in plaintext in the local database. Anyone with direct access to the device's storage can read notes regardless of a lock. Do not treat this as secure storage for sensitive data.
+
+## Project layout
 
 ```
+App.js                    # Entry: initializes DB, renders navigator
 src/
-├── config/
-│   ├── supabase.js      # Supabase client configuration
-│   └── schema.sql       # Database schema
-├── contexts/
-│   └── AuthContext.js    # Authentication state management
+├── db/
+│   ├── sqlite.js          # SQLite init + schema (native)
+│   ├── folderRepo.js      # Folder CRUD (native, SQLite)
+│   ├── folderRepo.web.js  # Folder CRUD (web, AsyncStorage)
+│   ├── noteRepo.js        # Note CRUD + search (native, SQLite)
+│   └── noteRepo.web.js    # Note CRUD + search (web, AsyncStorage)
 ├── navigation/
-│   └── AppNavigator.js  # Navigation setup
-├── screens/
-│   ├── HomeScreen.js    # Main screen with folders and root notes
-│   ├── FolderScreen.js  # Notes inside a folder
-│   ├── NoteEditorScreen.js  # Create/edit notes
-│   └── SettingsScreen.js    # App settings
-├── components/
-│   ├── FolderItem.js    # Folder list item
-│   ├── NoteItem.js      # Note list item
-│   └── PasswordModal.js # Password verification modal
-├── services/
-│   └── api.js           # Supabase API operations
+│   └── AppNavigator.js    # Bottom tabs (Home stack + Settings)
+├── screens/               # Home, Folder, NoteEditor, Settings
+├── components/            # FolderItem, NoteItem, PasswordModal
 └── utils/
-    └── crypto.js        # Password hashing utilities
+    └── crypto.js          # SHA-256 password hashing
 ```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together and [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for current status and the todo list.
