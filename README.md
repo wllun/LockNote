@@ -55,4 +55,4 @@ src/
     └── crypto.js          # SHA-256 password hashing
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together and [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for current status and the todo list.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together, [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for current status and the todo list, and [docs/ROADMAP.md](docs/ROADMAP.md) for the phased product plan.

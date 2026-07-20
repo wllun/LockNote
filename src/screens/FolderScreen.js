@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
+  Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
@@ -12,8 +13,12 @@ import { noteRepo } from '../db/noteRepo';
 import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
 import { hashPassword } from '../utils/crypto';
+import { radius, shadow, useTheme } from '../theme';
 
 const FolderScreen = ({ route, navigation }) => {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const { folderId, folderName } = route.params;
   const [notes, setNotes] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,6 +57,15 @@ const FolderScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleToggleNotePin = async (note) => {
+    try {
+      await noteRepo.update(note.id, { is_pinned: !note.is_pinned });
+      loadNotes();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update pin');
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', loadNotes);
     return unsubscribe;
@@ -62,20 +76,37 @@ const FolderScreen = ({ route, navigation }) => {
       <FlatList
         data={notes}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <NoteItem note={item} onPress={() => handleNotePress(item)} />
+        contentContainerStyle={styles.listContent}
+        renderItem={({ item, index }) => (
+          <NoteItem
+            note={item}
+            index={index}
+            onPress={() => handleNotePress(item)}
+            onTogglePin={() => handleToggleNotePin(item)}
+          />
         )}
-        ListEmptyComponent={null}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="document-text-outline" size={32} color={colors.textTertiary} />
+            <Text style={styles.emptyText}>No notes in this folder</Text>
+            <Text style={styles.emptyHint}>Tap + to create one</Text>
+          </View>
+        }
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
         }
       />
 
       <TouchableOpacity
         style={styles.fab}
         onPress={handleCreateNote}
+        activeOpacity={0.8}
       >
-        <Ionicons name="add" size={24} color="white" />
+        <Ionicons name="add" size={28} color={colors.card} />
       </TouchableOpacity>
 
       <PasswordModal
@@ -89,32 +120,53 @@ const FolderScreen = ({ route, navigation }) => {
           setPasswordModal({ visible: false, note: null });
           navigation.navigate('NoteEditor', { noteId: passwordModal.note.id });
         }}
+        onReset={async () => {
+          await noteRepo.update(passwordModal.note.id, { password: null });
+          loadNotes();
+        }}
       />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    listContent: {
+      padding: 16,
+      paddingBottom: 100,
+      flexGrow: 1,
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    emptyText: {
+      color: colors.textSecondary,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    emptyHint: {
+      color: colors.textTertiary,
+      fontSize: 13,
+    },
+    fab: {
+      position: 'absolute',
+      right: 20,
+      bottom: 24,
+      width: 58,
+      height: 58,
+      borderRadius: radius.full,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...shadow.fab,
+    },
+  });
 
 export default FolderScreen;

@@ -10,7 +10,7 @@ export const folderRepo = {
   async getAll() {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM folders WHERE is_deleted = 0 ORDER BY created_at DESC`
+      `SELECT * FROM folders WHERE is_deleted = 0 ORDER BY is_pinned DESC, created_at DESC`
     );
   },
 
@@ -52,6 +52,10 @@ export const folderRepo = {
       fields.push('password = ?');
       values.push(passwordHash);
     }
+    if (updates.is_pinned !== undefined) {
+      fields.push('is_pinned = ?');
+      values.push(updates.is_pinned ? 1 : 0);
+    }
 
     if (fields.length === 0) return await this.getById(id);
 
@@ -87,5 +91,13 @@ export const folderRepo = {
       [folderId]
     );
     return result?.count || 0;
+  },
+
+  async search(query) {
+    const db = getDB();
+    return await db.getAllAsync(
+      `SELECT * FROM folders WHERE is_deleted = 0 AND name LIKE ? ORDER BY is_pinned DESC, created_at DESC`,
+      [`%${query}%`]
+    );
   },
 };

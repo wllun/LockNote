@@ -10,14 +10,14 @@ export const noteRepo = {
   async getRootNotes() {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE folder_id IS NULL AND is_deleted = 0 ORDER BY updated_at DESC`
+      `SELECT * FROM notes WHERE folder_id IS NULL AND is_deleted = 0 ORDER BY is_pinned DESC, updated_at DESC`
     );
   },
 
   async getByFolderId(folderId) {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 ORDER BY updated_at DESC`,
+      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 ORDER BY is_pinned DESC, updated_at DESC`,
       [folderId]
     );
   },
@@ -68,6 +68,10 @@ export const noteRepo = {
       fields.push('password = ?');
       values.push(passwordHash);
     }
+    if (updates.is_pinned !== undefined) {
+      fields.push('is_pinned = ?');
+      values.push(updates.is_pinned ? 1 : 0);
+    }
 
     if (fields.length === 0) return await this.getById(id);
 
@@ -99,7 +103,7 @@ export const noteRepo = {
   async search(query) {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY updated_at DESC`,
+      `SELECT * FROM notes WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY is_pinned DESC, updated_at DESC`,
       [`%${query}%`, `%${query}%`]
     );
   },

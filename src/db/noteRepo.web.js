@@ -23,14 +23,14 @@ export const noteRepo = {
     const notes = await getStorage();
     return notes
       .filter((n) => n.folder_id === null && !n.is_deleted)
-      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at));
   },
 
   async getByFolderId(folderId) {
     const notes = await getStorage();
     return notes
       .filter((n) => n.folder_id === folderId && !n.is_deleted)
-      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at));
   },
 
   async getById(id) {
@@ -51,6 +51,7 @@ export const noteRepo = {
       content,
       password: passwordHash,
       is_deleted: 0,
+      is_pinned: 0,
       created_at: timestamp,
       updated_at: timestamp,
     };
@@ -71,6 +72,9 @@ export const noteRepo = {
     if (updates.password !== undefined) {
       const passwordHash = updates.password ? await hashPassword(updates.password) : null;
       notes[index].password = passwordHash;
+    }
+    if (updates.is_pinned !== undefined) {
+      notes[index].is_pinned = updates.is_pinned ? 1 : 0;
     }
     notes[index].updated_at = now();
 
@@ -103,6 +107,6 @@ export const noteRepo = {
           (n.title.toLowerCase().includes(query.toLowerCase()) ||
             n.content.toLowerCase().includes(query.toLowerCase()))
       )
-      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at));
   },
 };

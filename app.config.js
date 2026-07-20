@@ -7,7 +7,7 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
-    userInterfaceStyle: "light",
+    userInterfaceStyle: "automatic",
     newArchEnabled: true,
     splash: {
       image: "./assets/splash-icon.png",
@@ -18,6 +18,7 @@ export default {
       supportsTablet: true,
     },
     android: {
+      package: "com.locknote.app",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff",
@@ -30,6 +31,9 @@ export default {
     extra: {
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+      eas: {
+        projectId: "7d5a673d-6949-45ae-9f32-c6fd926b6af3",
+      },
     },
     plugins: [
       "expo-sqlite",

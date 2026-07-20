@@ -1,6 +1,6 @@
 # Architecture
 
-LockNote is a single-user, offline Expo / React Native app. No backend, no auth, no network. UI talks to a thin repository layer that abstracts over two platform-specific storage backends.
+LockNote is a single-user, local-first Expo / React Native app. Note/folder data has no backend and never leaves the device — UI talks to a thin repository layer that abstracts over two platform-specific storage backends. Account auth is the one piece that talks to the network (see [Auth](#auth) below); it does not touch note/folder data.
 
 ## Layers
 
@@ -28,10 +28,11 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 
 ## Navigation
 
-`AppNavigator` = bottom tab navigator with two tabs:
+`AppNavigator` = bottom tab navigator with three tabs:
 
 - **Home** (native stack): `HomeScreen` → `FolderScreen` → `NoteEditorScreen`
 - **Settings** (native stack): `SettingsScreen`
+- **Profile** (native stack): `ProfileTabScreen` → `AuthScreen` (logged out) or `ProfileScreen` (logged in), switched via `useAuth()`
 
 Screens reload their data on the navigation `focus` event (listener registered in `useEffect`, cleaned up on unmount) rather than holding shared state — so returning from the editor reflects edits without a store.
 
@@ -61,7 +62,15 @@ This is **gating, not encryption** — note `content` is stored in cleartext. Se
 
 `NoteEditorScreen` creates the note row first (empty), then navigates into it by `noteId`. Title/content changes trigger a debounced (800ms) `noteRepo.update`. The debounce timer is cleared on unmount and before delete.
 
+## Auth
+
+Supabase is used for account auth only (Phase 2 of [ROADMAP.md](ROADMAP.md)) — it is not a data store, and note/folder content never leaves the device.
+
+- `src/services/supabaseClient.js` — the client, configured with AsyncStorage as the session storage adapter so a login survives app restarts. Reads `supabaseUrl`/`supabaseAnonKey` from `Constants.expoConfig.extra` (populated from `.env` via `app.config.js`), not `process.env` directly.
+- `src/context/AuthContext.js` — `AuthProvider` (wraps the app in `App.js`) subscribes to `supabase.auth.onAuthStateChange` and exposes `{ session, loading }` via `useAuth()`.
+- `AuthScreen` handles both sign-up and sign-in in one screen (a mode toggle, not two navigator screens). On sign-up, if Supabase's "confirm email" setting is on, no session comes back immediately — the screen shows a "check your email" message and flips to sign-in mode; if it's off, a session comes back right away and `onAuthStateChange` flips the Profile tab over on its own.
+- `react-native-url-polyfill/auto` is imported first in `index.js` — required because Hermes' native `URL` implementation is incomplete and `@supabase/supabase-js` depends on it.
+
 ## Notable state
 
-- **Supabase is vestigial.** `@supabase/supabase-js` is still a dependency and `app.config.js` still injects `SUPABASE_URL` / `SUPABASE_ANON_KEY` from `.env` into `expo.extra`, but no code imports or uses Supabase. The app was migrated to local storage. See [PROJECT_STATE.md](PROJECT_STATE.md).
 - **New Architecture** is enabled (`newArchEnabled: true`), with `react-native-reanimated` 4 and `react-native-screens`.

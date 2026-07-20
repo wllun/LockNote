@@ -23,7 +23,7 @@ export const folderRepo = {
     const folders = await getStorage();
     return folders
       .filter((f) => !f.is_deleted)
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.created_at) - new Date(a.created_at));
   },
 
   async getById(id) {
@@ -42,6 +42,7 @@ export const folderRepo = {
       name,
       password: passwordHash,
       is_deleted: 0,
+      is_pinned: 0,
       created_at: timestamp,
       updated_at: timestamp,
     };
@@ -62,6 +63,9 @@ export const folderRepo = {
     if (updates.password !== undefined) {
       const passwordHash = updates.password ? await hashPassword(updates.password) : null;
       folders[index].password = passwordHash;
+    }
+    if (updates.is_pinned !== undefined) {
+      folders[index].is_pinned = updates.is_pinned ? 1 : 0;
     }
     folders[index].updated_at = now();
 
@@ -89,5 +93,13 @@ export const folderRepo = {
     const { noteRepo } = require('./noteRepo.web');
     const notes = await noteRepo.getByFolderId(folderId);
     return notes.length;
+  },
+
+  async search(query) {
+    const folders = await getStorage();
+    const q = query.toLowerCase();
+    return folders
+      .filter((f) => !f.is_deleted && f.name.toLowerCase().includes(q))
+      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.created_at) - new Date(a.created_at));
   },
 };

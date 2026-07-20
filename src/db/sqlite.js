@@ -29,6 +29,7 @@ export const initDB = async () => {
       name TEXT NOT NULL,
       password TEXT,
       is_deleted INTEGER DEFAULT 0,
+      is_pinned INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -40,6 +41,7 @@ export const initDB = async () => {
       content TEXT DEFAULT '',
       password TEXT,
       is_deleted INTEGER DEFAULT 0,
+      is_pinned INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
@@ -49,6 +51,15 @@ export const initDB = async () => {
     CREATE INDEX IF NOT EXISTS idx_notes_is_deleted ON notes(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_folders_is_deleted ON folders(is_deleted);
   `);
+
+  // Migrate is_pinned onto DBs created before this column existed.
+  // ponytail: pragma-guarded ALTER TABLE — no migration framework for a two-table app.
+  for (const table of ['folders', 'notes']) {
+    const cols = await db.getAllAsync(`PRAGMA table_info(${table})`);
+    if (!cols.some((c) => c.name === 'is_pinned')) {
+      await db.execAsync(`ALTER TABLE ${table} ADD COLUMN is_pinned INTEGER DEFAULT 0`);
+    }
+  }
 
   return db;
 };
