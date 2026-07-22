@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify LockNote Task"
+  short_description: "Run LockNote checks before completing code work"
+  default_prompt: "Use $verify-locknote-task to validate the current LockNote changes before completion."

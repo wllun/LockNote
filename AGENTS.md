@@ -22,6 +22,12 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making structural chang
 - Repositories generate IDs and timestamps. IDs use the existing base-36 format and timestamps are ISO strings; do not rely on database defaults.
 - The note editor uses an 800 ms debounced auto-save. Clear pending timers on unmount and before destructive actions.
 
+## Before completing code changes
+
+- Run `npm.cmd test` on Windows (`npm test` on macOS/Linux).
+- Fix task-related failures and rerun the command. Do not report completion until it passes.
+- If an unrelated pre-existing failure prevents a pass, report the exact failure instead of skipping or weakening the check.
+
 ## Avoid
 
 - Do not add Supabase or other network code without explicit direction. The Supabase dependency and environment variables are vestigial; see [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
