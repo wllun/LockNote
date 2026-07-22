@@ -30,6 +30,15 @@ Product plan across phases. For what's implemented right now in detail, see [PRO
 - [ ] Folder in folder (nesting)
 - [ ] App icon & name change
 
+## Phase 6 — Add menu and note types
+
+When the user presses the Add button, let them choose one of these note types:
+
+- [ ] Note — plaintext
+- [ ] Checklist — checkbox listing
+- [ ] Expense Record — date, remark, amount
+- [ ] Reminder — plaintext with notification settings
+
 ## Additional / backlog (unphased)
 
 - [X] Pin — already shipped free in Phase 1 scope; decide which tier it belongs to
@@ -38,5 +47,3 @@ Product plan across phases. For what's implemented right now in detail, see [PRO
 - [ ] Sort
 - [ ] Trash (currently soft-delete with no trash UI — see PROJECT_STATE)
 - [ ] Archive
-- [ ] Reminder task
-- [ ] Checklist (with checkbox)
