@@ -7,7 +7,7 @@ import { useTheme } from '../theme';
 
 const ProfileTabScreen = () => {
   const colors = useTheme();
-  const { session, loading } = useAuth();
+  const { session, loading, recoveringPassword } = useAuth();
 
   if (loading) {
     return (
@@ -17,7 +17,7 @@ const ProfileTabScreen = () => {
     );
   }
 
-  return session ? <ProfileScreen /> : <AuthScreen />;
+  return session && !recoveringPassword ? <ProfileScreen /> : <AuthScreen />;
 };
 
 const styles = StyleSheet.create({

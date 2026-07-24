@@ -22,6 +22,12 @@ _Snapshot: 2026-07-09. Check off items as they land._
 ### Supabase (now active — not vestigial)
 - [X] Revived for account auth (Phase 2 of ROADMAP.md). `src/services/supabaseClient.js` creates the client (AsyncStorage-backed session persistence); `src/context/AuthContext.js` exposes `useAuth()` app-wide.
 - [X] Profile tab — `AuthScreen` (email/password sign up + sign in, one screen with a mode toggle) shown when logged out; `ProfileScreen` (email, member-since date, Sync Notes stub, Sign Out) shown when logged in.
+- [X] Account password recovery — sign-in sends a Supabase reset email; `locknote://reset-password` opens an in-app new-password form.
+- [ ] Add stronger email and password validation.
+- [X] Add user-friendly network and Supabase configuration error handling.
+- [X] Add automated authentication tests (11 cases covering errors, callbacks, redirects, and Supabase request wrappers).
+- [ ] Verify registration, email confirmation, login persistence, password reset, and sign-out end-to-end on Android, iOS, and web. Android and iOS simulator binaries compile successfully on EAS; web production export and local HTTP runtime pass. Interactive cloud-device verification is blocked until EAS Simulator is enabled for the Expo account.
+- [X] Email confirmation returns to `locknote://auth-confirm` on native and the corresponding app URL on web.
 - [ ] Sync Notes is a stub (`Alert` only) — no premium gating, no actual note/folder sync to Supabase yet.
 - Note content itself still never leaves the device — only auth (email/password) talks to the network.
 

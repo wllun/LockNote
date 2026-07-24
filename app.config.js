@@ -4,6 +4,7 @@ export default {
   expo: {
     name: "LockNote",
     slug: "LockNote",
+    scheme: "locknote",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -15,6 +16,7 @@ export default {
       backgroundColor: "#ffffff",
     },
     ios: {
+      bundleIdentifier: "com.locknote.app",
       supportsTablet: true,
     },
     android: {

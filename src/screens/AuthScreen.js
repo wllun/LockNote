@@ -10,21 +10,44 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../services/supabaseClient';
+import * as Linking from 'expo-linking';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
+import {
+  sendPasswordReset,
+  signIn,
+  signUp,
+  updatePassword,
+} from '../services/authService.mjs';
+import { useAuth } from '../context/AuthContext';
+import { getAuthErrorMessage } from '../utils/auth.mjs';
 import { radius, shadow, useTheme } from '../theme';
 
 const AuthScreen = () => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const {
+    recoveringPassword,
+    finishPasswordRecovery,
+    authLinkError,
+    clearAuthLinkError,
+  } = useAuth();
 
-  const [mode, setMode] = useState('signIn'); // 'signIn' | 'signUp'
+  const [mode, setMode] = useState('signIn'); // 'signIn' | 'signUp' | 'forgot'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const isSignUp = mode === 'signUp';
+  const isForgot = mode === 'forgot';
+
+  const resetMessages = () => {
+    setError('');
+    setInfo('');
+    clearAuthLinkError();
+  };
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -36,11 +59,13 @@ const AuthScreen = () => {
     setInfo('');
     try {
       if (isSignUp) {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email: email.trim(),
+        const data = await signUp(
+          supabase.auth,
+          isSupabaseConfigured,
+          email,
           password,
-        });
-        if (signUpError) throw signUpError;
+          Linking.createURL('auth-confirm')
+        );
         // No session back means email confirmation is required before sign-in works.
         // If a session came back, the auth listener will flip to the Profile screen on its own.
         if (!data.session) {
@@ -48,18 +73,67 @@ const AuthScreen = () => {
           setMode('signIn');
         }
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (signInError) throw signInError;
+        await signIn(supabase.auth, isSupabaseConfigured, email, password);
       }
     } catch (err) {
-      setError(err.message || 'Something went wrong');
+      setError(getAuthErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Enter your email address');
+      return;
+    }
+    setSubmitting(true);
+    resetMessages();
+    try {
+      await sendPasswordReset(
+        supabase.auth,
+        isSupabaseConfigured,
+        email,
+        Linking.createURL('reset-password')
+      );
+      setInfo('Check your email for a password reset link.');
+    } catch (err) {
+      setError(getAuthErrorMessage(err, 'Unable to send the reset email. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (!password) {
+      setError('Enter a new password');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    setSubmitting(true);
+    resetMessages();
+    try {
+      await updatePassword(supabase.auth, isSupabaseConfigured, password);
+      setPassword('');
+      setConfirmPassword('');
+      finishPasswordRecovery();
+    } catch (err) {
+      setError(getAuthErrorMessage(err, 'Unable to update your password. Please try again.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const title = recoveringPassword
+    ? 'Choose New Password'
+    : isForgot
+      ? 'Reset Password'
+      : isSignUp
+        ? 'Create Account'
+        : 'Welcome Back';
 
   return (
     <KeyboardAvoidingView
@@ -70,14 +144,18 @@ const AuthScreen = () => {
         <View style={styles.iconCircle}>
           <Ionicons name="person-circle-outline" size={40} color={colors.primary} />
         </View>
-        <Text style={styles.title}>{isSignUp ? 'Create Account' : 'Welcome Back'}</Text>
+        <Text style={styles.title}>{title}</Text>
         <Text style={styles.subtitle}>
-          {isSignUp
-            ? 'Sign up to sync your notes across devices'
-            : 'Sign in to sync your notes across devices'}
+          {recoveringPassword
+            ? 'Enter the new password you want to use'
+            : isForgot
+              ? 'We will email you a secure reset link'
+              : isSignUp
+                ? 'Sign up to sync your notes across devices'
+                : 'Sign in to sync your notes across devices'}
         </Text>
 
-        <TextInput
+        {!recoveringPassword && <TextInput
           style={styles.input}
           placeholder="Email"
           placeholderTextColor={colors.textTertiary}
@@ -89,10 +167,10 @@ const AuthScreen = () => {
           autoCapitalize="none"
           keyboardType="email-address"
           autoComplete="email"
-        />
-        <TextInput
+        />}
+        {!isForgot && <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder={recoveringPassword ? 'New password' : 'Password'}
           placeholderTextColor={colors.textTertiary}
           value={password}
           onChangeText={(t) => {
@@ -100,36 +178,71 @@ const AuthScreen = () => {
             setError('');
           }}
           secureTextEntry
-          autoComplete={isSignUp ? 'new-password' : 'password'}
-        />
+          autoComplete={isSignUp || recoveringPassword ? 'new-password' : 'password'}
+        />}
+        {recoveringPassword && <TextInput
+          style={styles.input}
+          placeholder="Confirm new password"
+          placeholderTextColor={colors.textTertiary}
+          value={confirmPassword}
+          onChangeText={(t) => {
+            setConfirmPassword(t);
+            setError('');
+          }}
+          secureTextEntry
+          autoComplete="new-password"
+        />}
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {info ? <Text style={styles.info}>{info}</Text> : null}
+        {!recoveringPassword && !isSignUp && !isForgot && (
+          <TouchableOpacity
+            onPress={() => {
+              setMode('forgot');
+              resetMessages();
+            }}
+            activeOpacity={0.7}
+            style={styles.forgotButton}
+          >
+            <Text style={styles.switchModeText}>Forgot password?</Text>
+          </TouchableOpacity>
+        )}
+
+        {error || authLinkError
+          ? <Text selectable style={styles.error}>{error || authLinkError}</Text>
+          : null}
+        {info ? <Text selectable style={styles.info}>{info}</Text> : null}
 
         <TouchableOpacity
           style={styles.submitButton}
-          onPress={handleSubmit}
+          onPress={recoveringPassword ? handleUpdatePassword : isForgot ? handleForgotPassword : handleSubmit}
           disabled={submitting}
+          accessibilityState={{ disabled: submitting }}
           activeOpacity={0.8}
         >
           <Text style={styles.submitButtonText}>
-            {submitting ? 'Please wait...' : isSignUp ? 'Sign Up' : 'Sign In'}
+            {submitting
+              ? 'Please wait...'
+              : recoveringPassword
+                ? 'Update Password'
+                : isForgot
+                  ? 'Send Reset Link'
+                  : isSignUp
+                    ? 'Sign Up'
+                    : 'Sign In'}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        {!recoveringPassword && <TouchableOpacity
           onPress={() => {
-            setMode(isSignUp ? 'signIn' : 'signUp');
-            setError('');
-            setInfo('');
+            setMode(isSignUp || isForgot ? 'signIn' : 'signUp');
+            resetMessages();
           }}
           activeOpacity={0.7}
           style={styles.switchModeButton}
         >
           <Text style={styles.switchModeText}>
-            {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+            {isSignUp || isForgot ? 'Back to sign in' : "Don't have an account? Sign up"}
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -208,6 +321,10 @@ const makeStyles = (colors) =>
     },
     switchModeButton: {
       marginTop: 18,
+    },
+    forgotButton: {
+      alignSelf: 'flex-end',
+      marginBottom: 4,
     },
     switchModeText: {
       color: colors.primary,

@@ -7,11 +7,25 @@ import Constants from 'expo-constants';
 
 const { supabaseUrl, supabaseAnonKey } = Constants.expoConfig?.extra ?? {};
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+const hasValidUrl = (() => {
+  try {
+    return ['http:', 'https:'].includes(new URL(supabaseUrl).protocol);
+  } catch {
+    return false;
+  }
+})();
+
+export const isSupabaseConfigured = hasValidUrl && Boolean(supabaseAnonKey);
+
+export const supabase = createClient(
+  isSupabaseConfigured ? supabaseUrl : 'https://invalid.supabase.co',
+  isSupabaseConfigured ? supabaseAnonKey : 'invalid-anon-key',
+  {
+    auth: {
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  }
+);
