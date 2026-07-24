@@ -19,8 +19,20 @@ import {
   updatePassword,
 } from '../services/authService.mjs';
 import { useAuth } from '../context/AuthContext';
-import { getAuthErrorMessage, validatePasswordConfirmation } from '../utils/auth.mjs';
+import {
+  getAuthErrorMessage,
+  normalizeEmail,
+  validateEmail,
+  validatePassword,
+  validatePasswordConfirmation,
+} from '../utils/auth.mjs';
 import { radius, shadow, useTheme } from '../theme';
+
+const emptyFieldErrors = {
+  email: '',
+  password: '',
+  confirmation: '',
+};
 
 const AuthScreen = () => {
   const colors = useTheme();
@@ -36,6 +48,7 @@ const AuthScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fieldErrors, setFieldErrors] = useState(emptyFieldErrors);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -46,20 +59,22 @@ const AuthScreen = () => {
   const resetMessages = () => {
     setError('');
     setInfo('');
+    setFieldErrors(emptyFieldErrors);
     clearAuthLinkError();
   };
 
   const handleSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError('Enter your email and password');
+    const validationErrors = {
+      email: validateEmail(email),
+      password: isSignUp ? validatePassword(password) : (!password ? 'Enter your password' : ''),
+      confirmation: isSignUp
+        ? validatePasswordConfirmation(password, confirmPassword)
+        : '',
+    };
+    setFieldErrors(validationErrors);
+    setError('');
+    if (Object.values(validationErrors).some(Boolean)) {
       return;
-    }
-    if (isSignUp) {
-      const confirmationError = validatePasswordConfirmation(password, confirmPassword);
-      if (confirmationError) {
-        setError(confirmationError);
-        return;
-      }
     }
     setSubmitting(true);
     setError('');
@@ -92,8 +107,10 @@ const AuthScreen = () => {
   };
 
   const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      setError('Enter your email address');
+    const emailError = validateEmail(email);
+    setFieldErrors({ ...emptyFieldErrors, email: emailError });
+    setError('');
+    if (emailError) {
       return;
     }
     setSubmitting(true);
@@ -114,13 +131,15 @@ const AuthScreen = () => {
   };
 
   const handleUpdatePassword = async () => {
-    if (!password) {
-      setError('Enter a new password');
-      return;
-    }
+    const passwordError = validatePassword(password);
     const confirmationError = validatePasswordConfirmation(password, confirmPassword);
-    if (confirmationError) {
-      setError(confirmationError);
+    setFieldErrors({
+      ...emptyFieldErrors,
+      password: passwordError,
+      confirmation: confirmationError,
+    });
+    setError('');
+    if (passwordError || confirmationError) {
       return;
     }
     setSubmitting(true);
@@ -165,43 +184,68 @@ const AuthScreen = () => {
                 : 'Sign in to sync your notes across devices'}
         </Text>
 
-        {!recoveringPassword && <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={colors.textTertiary}
-          value={email}
-          onChangeText={(t) => {
-            setEmail(t);
-            setError('');
-          }}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          autoComplete="email"
-        />}
-        {!isForgot && <TextInput
-          style={styles.input}
-          placeholder={recoveringPassword ? 'New password' : 'Password'}
-          placeholderTextColor={colors.textTertiary}
-          value={password}
-          onChangeText={(t) => {
-            setPassword(t);
-            setError('');
-          }}
-          secureTextEntry
-          autoComplete={isSignUp || recoveringPassword ? 'new-password' : 'password'}
-        />}
-        {(isSignUp || recoveringPassword) && <TextInput
-          style={styles.input}
-          placeholder={recoveringPassword ? 'Confirm new password' : 'Confirm password'}
-          placeholderTextColor={colors.textTertiary}
-          value={confirmPassword}
-          onChangeText={(t) => {
-            setConfirmPassword(t);
-            setError('');
-          }}
-          secureTextEntry
-          autoComplete="new-password"
-        />}
+        {!recoveringPassword && (
+          <View style={styles.field}>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={colors.textTertiary}
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                setFieldErrors((current) => ({ ...current, email: '' }));
+                setError('');
+              }}
+              onBlur={() => setEmail(normalizeEmail(email))}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+            />
+            {fieldErrors.email
+              ? <Text selectable style={styles.fieldError}>{fieldErrors.email}</Text>
+              : null}
+          </View>
+        )}
+        {!isForgot && (
+          <View style={styles.field}>
+            <TextInput
+              style={styles.input}
+              placeholder={recoveringPassword ? 'New password' : 'Password'}
+              placeholderTextColor={colors.textTertiary}
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                setFieldErrors((current) => ({ ...current, password: '' }));
+                setError('');
+              }}
+              secureTextEntry
+              autoComplete={isSignUp || recoveringPassword ? 'new-password' : 'password'}
+            />
+            {fieldErrors.password
+              ? <Text selectable style={styles.fieldError}>{fieldErrors.password}</Text>
+              : null}
+          </View>
+        )}
+        {(isSignUp || recoveringPassword) && (
+          <View style={styles.field}>
+            <TextInput
+              style={styles.input}
+              placeholder={recoveringPassword ? 'Confirm new password' : 'Confirm password'}
+              placeholderTextColor={colors.textTertiary}
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                setFieldErrors((current) => ({ ...current, confirmation: '' }));
+                setError('');
+              }}
+              secureTextEntry
+              autoComplete="new-password"
+            />
+            {fieldErrors.confirmation
+              ? <Text selectable style={styles.fieldError}>{fieldErrors.confirmation}</Text>
+              : null}
+          </View>
+        )}
 
         {!recoveringPassword && !isSignUp && !isForgot && (
           <TouchableOpacity
@@ -298,11 +342,20 @@ const makeStyles = (colors) =>
       backgroundColor: colors.card,
       borderRadius: radius.md,
       padding: 14,
-      marginBottom: 12,
       fontSize: 16,
       color: colors.text,
       alignSelf: 'stretch',
       ...shadow.card,
+    },
+    field: {
+      alignSelf: 'stretch',
+      gap: 6,
+      marginBottom: 12,
+    },
+    fieldError: {
+      color: colors.danger,
+      fontSize: 12,
+      paddingHorizontal: 2,
     },
     error: {
       color: colors.danger,

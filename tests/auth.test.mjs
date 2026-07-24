@@ -3,7 +3,10 @@ import test from 'node:test';
 import {
   AUTH_CONFIGURATION_ERROR,
   getAuthErrorMessage,
+  normalizeEmail,
   parseAuthCallback,
+  validateEmail,
+  validatePassword,
   validatePasswordConfirmation,
 } from '../src/utils/auth.mjs';
 import {
@@ -39,7 +42,21 @@ test('does not expose unexpected technical errors', () => {
   );
 });
 
-test('requires matching password confirmation for registration and reset forms', () => {
+test('trims and lowercases email addresses', () => {
+  assert.equal(normalizeEmail('  Person@Example.COM '), 'person@example.com');
+});
+
+test('rejects invalid email formats before authentication requests', () => {
+  assert.equal(validateEmail('not-an-email'), 'Enter a valid email address');
+  assert.equal(validateEmail('person@example.com'), '');
+});
+
+test('requires passwords with at least 8 characters', () => {
+  assert.equal(validatePassword('short'), 'Password must be at least 8 characters');
+  assert.equal(validatePassword('long-enough'), '');
+});
+
+test('rejects missing or mismatched password confirmation', () => {
   assert.equal(validatePasswordConfirmation('secret', ''), 'Confirm your password');
   assert.equal(validatePasswordConfirmation('secret', 'different'), 'Passwords do not match');
   assert.equal(validatePasswordConfirmation('secret', 'secret'), '');
@@ -94,7 +111,7 @@ test('sign in trims email and delegates to Supabase auth', async () => {
     },
   };
 
-  const data = await signIn(auth, true, '  person@example.com ', 'secret');
+  const data = await signIn(auth, true, '  Person@Example.COM ', 'secret');
   assert.deepEqual(received, { email: 'person@example.com', password: 'secret' });
   assert.equal(data.session.id, 'session');
 });
@@ -108,7 +125,8 @@ test('sign up includes the email-confirmation app redirect', async () => {
     },
   };
 
-  await signUp(auth, true, 'person@example.com', 'secret', 'locknote://auth-confirm');
+  await signUp(auth, true, 'Person@Example.COM', 'password', 'locknote://auth-confirm');
+  assert.equal(received.email, 'person@example.com');
   assert.equal(received.options.emailRedirectTo, 'locknote://auth-confirm');
 });
 
@@ -125,7 +143,7 @@ test('password reset and update use the expected Supabase methods', async () => 
     },
   };
 
-  await sendPasswordReset(auth, true, ' person@example.com ', 'locknote://reset-password');
+  await sendPasswordReset(auth, true, ' Person@Example.COM ', 'locknote://reset-password');
   await updatePassword(auth, true, 'new-secret');
 
   assert.deepEqual(calls, [
@@ -146,6 +164,38 @@ test('service rejects missing configuration before making a request', async () =
   await assert.rejects(
     signIn(auth, false, 'person@example.com', 'secret'),
     (error) => error.code === AUTH_CONFIGURATION_ERROR
+  );
+  assert.equal(called, false);
+});
+
+test('service rejects invalid email before contacting Supabase', async () => {
+  let called = false;
+  const auth = {
+    signInWithPassword: async () => {
+      called = true;
+      return { data: {}, error: null };
+    },
+  };
+
+  await assert.rejects(
+    signIn(auth, true, 'invalid-email', 'password'),
+    { message: 'Enter a valid email address' }
+  );
+  assert.equal(called, false);
+});
+
+test('service rejects short new passwords before contacting Supabase', async () => {
+  let called = false;
+  const auth = {
+    signUp: async () => {
+      called = true;
+      return { data: {}, error: null };
+    },
+  };
+
+  await assert.rejects(
+    signUp(auth, true, 'person@example.com', 'short', 'locknote://auth-confirm'),
+    { message: 'Password must be at least 8 characters' }
   );
   assert.equal(called, false);
 });

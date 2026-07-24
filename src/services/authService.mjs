@@ -1,4 +1,10 @@
-import { AUTH_CONFIGURATION_ERROR } from '../utils/auth.mjs';
+import {
+  AUTH_CONFIGURATION_ERROR,
+  AUTH_VALIDATION_ERROR,
+  normalizeEmail,
+  validateEmail,
+  validatePassword,
+} from '../utils/auth.mjs';
 
 const assertConfigured = (configured) => {
   if (!configured) {
@@ -14,15 +20,26 @@ const unwrap = async (request) => {
   return result.data;
 };
 
+const assertValid = (message) => {
+  if (message) {
+    const error = new Error(message);
+    error.code = AUTH_VALIDATION_ERROR;
+    throw error;
+  }
+};
+
 export const signIn = async (auth, configured, email, password) => {
   assertConfigured(configured);
-  return await unwrap(auth.signInWithPassword({ email: email.trim(), password }));
+  assertValid(validateEmail(email));
+  return await unwrap(auth.signInWithPassword({ email: normalizeEmail(email), password }));
 };
 
 export const signUp = async (auth, configured, email, password, emailRedirectTo) => {
   assertConfigured(configured);
+  assertValid(validateEmail(email));
+  assertValid(validatePassword(password));
   return await unwrap(auth.signUp({
-    email: email.trim(),
+    email: normalizeEmail(email),
     password,
     options: { emailRedirectTo },
   }));
@@ -30,10 +47,12 @@ export const signUp = async (auth, configured, email, password, emailRedirectTo)
 
 export const sendPasswordReset = async (auth, configured, email, redirectTo) => {
   assertConfigured(configured);
-  return await unwrap(auth.resetPasswordForEmail(email.trim(), { redirectTo }));
+  assertValid(validateEmail(email));
+  return await unwrap(auth.resetPasswordForEmail(normalizeEmail(email), { redirectTo }));
 };
 
 export const updatePassword = async (auth, configured, password) => {
   assertConfigured(configured);
+  assertValid(validatePassword(password));
   return await unwrap(auth.updateUser({ password }));
 };

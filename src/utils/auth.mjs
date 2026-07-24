@@ -16,6 +16,24 @@ const CONFIG_PATTERNS = [
 ];
 
 export const AUTH_CONFIGURATION_ERROR = 'AUTH_CONFIGURATION_ERROR';
+export const AUTH_VALIDATION_ERROR = 'AUTH_VALIDATION_ERROR';
+
+export const normalizeEmail = (email) => email.trim().toLowerCase();
+
+export const validateEmail = (email) => {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return 'Enter your email address';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    return 'Enter a valid email address';
+  }
+  return '';
+};
+
+export const validatePassword = (password) => {
+  if (!password) return 'Enter your password';
+  if (password.length < 8) return 'Password must be at least 8 characters';
+  return '';
+};
 
 export const validatePasswordConfirmation = (password, confirmation) => {
   if (!confirmation) return 'Confirm your password';
@@ -27,6 +45,9 @@ export const getAuthErrorMessage = (error, fallback = 'Something went wrong. Ple
   const code = String(error?.code ?? '').toLowerCase();
   const message = String(error?.message ?? '').toLowerCase();
 
+  if (error?.code === AUTH_VALIDATION_ERROR) {
+    return error.message;
+  }
   if (error?.code === AUTH_CONFIGURATION_ERROR || CONFIG_PATTERNS.some((x) => message.includes(x))) {
     return 'Account services are not configured correctly. Please contact support.';
   }
@@ -52,7 +73,7 @@ export const getAuthErrorMessage = (error, fallback = 'Something went wrong. Ple
     return 'New account registration is currently unavailable.';
   }
   if (message.includes('password should be at least') || message.includes('weak password')) {
-    return 'Choose a stronger password with at least 6 characters.';
+    return 'Choose a stronger password with at least 8 characters.';
   }
   if (message.includes('same password') || message.includes('different from the old password')) {
     return 'Choose a password different from your current password.';
