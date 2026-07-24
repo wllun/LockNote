@@ -4,6 +4,7 @@ import {
   AUTH_CONFIGURATION_ERROR,
   getAuthErrorMessage,
   parseAuthCallback,
+  validatePasswordConfirmation,
 } from '../src/utils/auth.mjs';
 import {
   sendPasswordReset,
@@ -36,6 +37,12 @@ test('does not expose unexpected technical errors', () => {
     getAuthErrorMessage(new Error('Internal GoTrue stack detail'), 'Please try again.'),
     'Please try again.'
   );
+});
+
+test('requires matching password confirmation for registration and reset forms', () => {
+  assert.equal(validatePasswordConfirmation('secret', ''), 'Confirm your password');
+  assert.equal(validatePasswordConfirmation('secret', 'different'), 'Passwords do not match');
+  assert.equal(validatePasswordConfirmation('secret', 'secret'), '');
 });
 
 test('parses implicit password-recovery callback tokens', () => {

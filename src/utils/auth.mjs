@@ -17,6 +17,12 @@ const CONFIG_PATTERNS = [
 
 export const AUTH_CONFIGURATION_ERROR = 'AUTH_CONFIGURATION_ERROR';
 
+export const validatePasswordConfirmation = (password, confirmation) => {
+  if (!confirmation) return 'Confirm your password';
+  if (password !== confirmation) return 'Passwords do not match';
+  return '';
+};
+
 export const getAuthErrorMessage = (error, fallback = 'Something went wrong. Please try again.') => {
   const code = String(error?.code ?? '').toLowerCase();
   const message = String(error?.message ?? '').toLowerCase();

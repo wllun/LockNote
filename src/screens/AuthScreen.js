@@ -19,7 +19,7 @@ import {
   updatePassword,
 } from '../services/authService.mjs';
 import { useAuth } from '../context/AuthContext';
-import { getAuthErrorMessage } from '../utils/auth.mjs';
+import { getAuthErrorMessage, validatePasswordConfirmation } from '../utils/auth.mjs';
 import { radius, shadow, useTheme } from '../theme';
 
 const AuthScreen = () => {
@@ -54,6 +54,13 @@ const AuthScreen = () => {
       setError('Enter your email and password');
       return;
     }
+    if (isSignUp) {
+      const confirmationError = validatePasswordConfirmation(password, confirmPassword);
+      if (confirmationError) {
+        setError(confirmationError);
+        return;
+      }
+    }
     setSubmitting(true);
     setError('');
     setInfo('');
@@ -71,6 +78,8 @@ const AuthScreen = () => {
         if (!data.session) {
           setInfo('Account created. Check your email to confirm, then sign in.');
           setMode('signIn');
+          setPassword('');
+          setConfirmPassword('');
         }
       } else {
         await signIn(supabase.auth, isSupabaseConfigured, email, password);
@@ -109,8 +118,9 @@ const AuthScreen = () => {
       setError('Enter a new password');
       return;
     }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+    const confirmationError = validatePasswordConfirmation(password, confirmPassword);
+    if (confirmationError) {
+      setError(confirmationError);
       return;
     }
     setSubmitting(true);
@@ -180,9 +190,9 @@ const AuthScreen = () => {
           secureTextEntry
           autoComplete={isSignUp || recoveringPassword ? 'new-password' : 'password'}
         />}
-        {recoveringPassword && <TextInput
+        {(isSignUp || recoveringPassword) && <TextInput
           style={styles.input}
-          placeholder="Confirm new password"
+          placeholder={recoveringPassword ? 'Confirm new password' : 'Confirm password'}
           placeholderTextColor={colors.textTertiary}
           value={confirmPassword}
           onChangeText={(t) => {
@@ -234,6 +244,8 @@ const AuthScreen = () => {
         {!recoveringPassword && <TouchableOpacity
           onPress={() => {
             setMode(isSignUp || isForgot ? 'signIn' : 'signUp');
+            setPassword('');
+            setConfirmPassword('');
             resetMessages();
           }}
           activeOpacity={0.7}
