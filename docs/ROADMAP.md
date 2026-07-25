@@ -34,7 +34,7 @@ Product plan across phases. For what's implemented right now in detail, see [PRO
 
 When the user presses the Add button, let them choose one of these note types:
 
-- [ ] Note — plaintext
+- [X] Note — plaintext (type picker available from root and folder add buttons)
 - [ ] Checklist — checkbox listing
 - [ ] Expense Record — date, remark, amount
 - [ ] Reminder — plaintext with notification settings

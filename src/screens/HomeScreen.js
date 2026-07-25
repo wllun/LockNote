@@ -17,6 +17,7 @@ import { hashPassword } from '../utils/crypto';
 import FolderItem from '../components/FolderItem';
 import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
+import NoteTypeModal from '../components/NoteTypeModal';
 import { radius, shadow, useTheme } from '../theme';
 
 const HomeScreen = ({ navigation }) => {
@@ -28,6 +29,7 @@ const HomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showFolderModal, setShowFolderModal] = useState(false);
+  const [showNoteTypeModal, setShowNoteTypeModal] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [folderPassword, setFolderPassword] = useState('');
   const [passwordModal, setPasswordModal] = useState({ visible: false, item: null, type: '' });
@@ -110,6 +112,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleCreateRootNote = async () => {
+    setShowNoteTypeModal(false);
     try {
       const note = await noteRepo.create(null, '', '');
       navigation.navigate('NoteEditor', { noteId: note.id });
@@ -316,8 +319,10 @@ const HomeScreen = ({ navigation }) => {
       {!searching && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={handleCreateRootNote}
+          onPress={() => setShowNoteTypeModal(true)}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Create new"
         >
           <Ionicons name="add" size={28} color={colors.card} />
         </TouchableOpacity>
@@ -365,6 +370,14 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      <NoteTypeModal
+        visible={showNoteTypeModal}
+        onClose={() => setShowNoteTypeModal(false)}
+        onSelect={(type) => {
+          if (type === 'note') handleCreateRootNote();
+        }}
+      />
 
       <PasswordModal
         visible={passwordModal.visible}

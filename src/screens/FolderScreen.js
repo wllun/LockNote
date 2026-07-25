@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { noteRepo } from '../db/noteRepo';
 import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
+import NoteTypeModal from '../components/NoteTypeModal';
 import { hashPassword } from '../utils/crypto';
 import { radius, shadow, useTheme } from '../theme';
 
@@ -22,6 +23,7 @@ const FolderScreen = ({ route, navigation }) => {
   const { folderId, folderName } = route.params;
   const [notes, setNotes] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [showNoteTypeModal, setShowNoteTypeModal] = useState(false);
   const [passwordModal, setPasswordModal] = useState({ visible: false, note: null });
 
   const loadNotes = useCallback(async () => {
@@ -41,6 +43,7 @@ const FolderScreen = ({ route, navigation }) => {
   };
 
   const handleCreateNote = async () => {
+    setShowNoteTypeModal(false);
     try {
       const note = await noteRepo.create(folderId, '', '');
       navigation.navigate('NoteEditor', { noteId: note.id });
@@ -103,11 +106,21 @@ const FolderScreen = ({ route, navigation }) => {
 
       <TouchableOpacity
         style={styles.fab}
-        onPress={handleCreateNote}
+        onPress={() => setShowNoteTypeModal(true)}
         activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel="Create new"
       >
         <Ionicons name="add" size={28} color={colors.card} />
       </TouchableOpacity>
+
+      <NoteTypeModal
+        visible={showNoteTypeModal}
+        onClose={() => setShowNoteTypeModal(false)}
+        onSelect={(type) => {
+          if (type === 'note') handleCreateNote();
+        }}
+      />
 
       <PasswordModal
         visible={passwordModal.visible}
