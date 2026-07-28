@@ -72,6 +72,7 @@ _Snapshot: 2026-07-09. Check off items as they land._
 
 When the user presses the Add button, let them choose one of these note types:
 
+- [X] Add selection popup on both the Home and Folder Add buttons (unsupported types are clearly marked as coming soon)
 - [ ] Note — plaintext
 - [ ] Checklist — checkbox listing
 - [ ] Expense Record — date, remark, amount
