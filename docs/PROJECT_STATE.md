@@ -75,7 +75,7 @@ When the user presses the Add button, let them choose one of these note types:
 - [X] Add selection popup on both the Home and Folder Add buttons (unsupported types are clearly marked as coming soon)
 - [ ] Note — plaintext
 - [ ] Checklist — checkbox listing
-- [ ] Expense Record — date, remark, amount
+- [X] Expense Record — titled multi-row table with direct date/remark/amount entry, row controls, running total, local persistence, list summaries, password/pin support, and 800 ms autosave
 - [ ] Reminder — plaintext with notification settings
 
 ### Additional / backlog (unphased)

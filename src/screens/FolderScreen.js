@@ -15,6 +15,10 @@ import PasswordModal from '../components/PasswordModal';
 import CreateNoteTypeModal from '../components/create-note-type-modal';
 import { hashPassword } from '../utils/crypto';
 import { radius, shadow, useTheme } from '../theme';
+import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
+
+const editorRouteFor = (note) =>
+  note.note_type === EXPENSE_NOTE_TYPE ? 'ExpenseRecordEditor' : 'NoteEditor';
 
 const FolderScreen = ({ route, navigation }) => {
   const colors = useTheme();
@@ -42,12 +46,17 @@ const FolderScreen = ({ route, navigation }) => {
     loadNotes();
   };
 
-  const handleCreateNote = async () => {
+  const handleCreateNote = async (type = 'note') => {
     try {
-      const note = await noteRepo.create(folderId, '', '');
-      navigation.navigate('NoteEditor', { noteId: note.id });
+      const note = await noteRepo.create(folderId, '', '', null, type);
+      navigation.navigate(editorRouteFor(note), { noteId: note.id });
     } catch (error) {
-      Alert.alert('Error', 'Failed to create note');
+      Alert.alert(
+        'Error',
+        type === EXPENSE_NOTE_TYPE
+          ? 'Failed to create expense record'
+          : 'Failed to create note'
+      );
     }
   };
 
@@ -55,7 +64,7 @@ const FolderScreen = ({ route, navigation }) => {
     if (note.password) {
       setPasswordModal({ visible: true, note });
     } else {
-      navigation.navigate('NoteEditor', { noteId: note.id });
+      navigation.navigate(editorRouteFor(note), { noteId: note.id });
     }
   };
 
@@ -128,7 +137,9 @@ const FolderScreen = ({ route, navigation }) => {
         }}
         onVerified={() => {
           setPasswordModal({ visible: false, note: null });
-          navigation.navigate('NoteEditor', { noteId: passwordModal.note.id });
+          navigation.navigate(editorRouteFor(passwordModal.note), {
+            noteId: passwordModal.note.id,
+          });
         }}
         onReset={async () => {
           await noteRepo.update(passwordModal.note.id, { password: null });

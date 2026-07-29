@@ -33,7 +33,7 @@ const NOTE_TYPES = [
     title: 'Expense Record',
     description: 'Record a date, remark, and amount',
     icon: 'receipt-outline',
-    available: false,
+    available: true,
   },
   {
     id: 'reminder',

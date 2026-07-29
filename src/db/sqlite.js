@@ -39,6 +39,7 @@ export const initDB = async () => {
       folder_id TEXT,
       title TEXT DEFAULT '',
       content TEXT DEFAULT '',
+      note_type TEXT NOT NULL DEFAULT 'note',
       password TEXT,
       is_deleted INTEGER DEFAULT 0,
       is_pinned INTEGER DEFAULT 0,
@@ -59,6 +60,12 @@ export const initDB = async () => {
     if (!cols.some((c) => c.name === 'is_pinned')) {
       await db.execAsync(`ALTER TABLE ${table} ADD COLUMN is_pinned INTEGER DEFAULT 0`);
     }
+  }
+
+  // Existing databases predate multiple note types.
+  const noteColumns = await db.getAllAsync('PRAGMA table_info(notes)');
+  if (!noteColumns.some((column) => column.name === 'note_type')) {
+    await db.execAsync(`ALTER TABLE notes ADD COLUMN note_type TEXT NOT NULL DEFAULT 'note'`);
   }
 
   return db;

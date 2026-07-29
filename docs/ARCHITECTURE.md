@@ -42,7 +42,12 @@ Two tables / collections. Timestamps are ISO strings; IDs are generated client-s
 
 **folders**: `id, name, password, is_deleted, created_at, updated_at`
 
-**notes**: `id, folder_id (nullable → root note), title, content, password, is_deleted, created_at, updated_at`
+**notes**: `id, folder_id (nullable → root note), title, content, note_type, password, is_deleted, created_at, updated_at`
+
+`note_type` defaults to `note` for existing/plaintext notes. Expense notes use
+`expense`; their editable table rows (`date`, `remark`, and `amount`) are stored
+as versioned JSON in `content` and edited by `ExpenseRecordEditorScreen`. The
+note's `title` remains in the normal title column.
 
 On native, `notes.folder_id` has `ON DELETE CASCADE` and there are indexes on `folder_id` and both `is_deleted` columns.
 
@@ -60,7 +65,10 @@ This is **gating, not encryption** — note `content` is stored in cleartext. Se
 
 ## Editor auto-save
 
-`NoteEditorScreen` creates the note row first (empty), then navigates into it by `noteId`. Title/content changes trigger a debounced (800ms) `noteRepo.update`. The debounce timer is cleared on unmount and before delete.
+`NoteEditorScreen` and `ExpenseRecordEditorScreen` create the note row first
+(empty), then navigate into it by `noteId`. Field changes trigger a debounced
+(800ms) `noteRepo.update`. The debounce timer is cleared on unmount and before
+delete.
 
 ## Auth
 

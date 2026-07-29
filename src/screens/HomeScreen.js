@@ -19,6 +19,10 @@ import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
 import CreateNoteTypeModal from '../components/create-note-type-modal';
 import { radius, shadow, useTheme } from '../theme';
+import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
+
+const editorRouteFor = (note) =>
+  note.note_type === EXPENSE_NOTE_TYPE ? 'ExpenseRecordEditor' : 'NoteEditor';
 
 const HomeScreen = ({ navigation }) => {
   const colors = useTheme();
@@ -111,12 +115,17 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleCreateRootNote = async () => {
+  const handleCreateRootNote = async (type = 'note') => {
     try {
-      const note = await noteRepo.create(null, '', '');
-      navigation.navigate('NoteEditor', { noteId: note.id });
+      const note = await noteRepo.create(null, '', '', null, type);
+      navigation.navigate(editorRouteFor(note), { noteId: note.id });
     } catch (error) {
-      Alert.alert('Error', 'Failed to create note');
+      Alert.alert(
+        'Error',
+        type === EXPENSE_NOTE_TYPE
+          ? 'Failed to create expense record'
+          : 'Failed to create note'
+      );
     }
   };
 
@@ -132,7 +141,7 @@ const HomeScreen = ({ navigation }) => {
     if (note.password) {
       setPasswordModal({ visible: true, item: note, type: 'note' });
     } else {
-      navigation.navigate('NoteEditor', { noteId: note.id });
+      navigation.navigate(editorRouteFor(note), { noteId: note.id });
     }
   };
 
@@ -141,7 +150,7 @@ const HomeScreen = ({ navigation }) => {
     if (type === 'folder') {
       navigation.navigate('Folder', { folderId: item.id, folderName: item.name });
     } else {
-      navigation.navigate('NoteEditor', { noteId: item.id });
+      navigation.navigate(editorRouteFor(item), { noteId: item.id });
     }
   };
 
