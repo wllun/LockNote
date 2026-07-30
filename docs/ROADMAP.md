@@ -36,7 +36,8 @@ When the user presses the Add button, let them choose one of these note types:
 
 - [ ] Note — plaintext
 - [ ] Checklist — checkbox listing
-- [ ] Expense Record — date, remark, amount
+- [X] Expense Record — titled multi-row date, remark, and amount table with automatic totals
+- [ ] Expense Record currency selection — currently fixed to RM; consider a per-note currency selector and currency-aware formatting throughout the editor and note summaries
 - [ ] Reminder — plaintext with notification settings
 
 ## Additional / backlog (unphased)
