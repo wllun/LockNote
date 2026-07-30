@@ -6,7 +6,6 @@ import { radius, shadow, useTheme } from '../theme';
 import {
   calculateExpenseTotal,
   EXPENSE_NOTE_TYPE,
-  expenseRowHasContent,
   formatExpenseAmount,
   parseExpenseNote,
 } from '../utils/expense-record.mjs';
@@ -29,16 +28,12 @@ const NoteItem = ({ note, onPress, onTogglePin, index = 0 }) => {
 
   const locked = !!note.password;
   const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
-  const expenseRows = isExpense
-    ? parseExpenseNote(note.content).rows.filter(expenseRowHasContent)
-    : [];
+  const expenseRows = isExpense ? parseExpenseNote(note.content).rows : [];
   const displayTitle = isExpense
     ? note.title.trim() || 'Expense Record'
     : note.title || 'Untitled';
   const preview = isExpense
-    ? expenseRows.length
-      ? `${expenseRows.length} ${expenseRows.length === 1 ? 'entry' : 'entries'} • ${formatExpenseAmount(calculateExpenseTotal(expenseRows))}`
-      : 'No expense entries yet'
+    ? `RM ${formatExpenseAmount(calculateExpenseTotal(expenseRows))}`
     : note.content || 'No content';
 
   const handlePinPress = (e) => {

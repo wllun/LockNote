@@ -17,7 +17,6 @@ import { noteRepo } from '../db/noteRepo';
 import {
   calculateExpenseTotal,
   createExpenseRow,
-  expenseRowHasContent,
   formatExpenseAmount,
   isExpenseNoteEmpty,
   normalizeExpenseAmountInput,
@@ -56,8 +55,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     deleted: false,
   });
 
-  const populatedRows = rows.filter(expenseRowHasContent);
-  const total = calculateExpenseTotal(populatedRows);
+  const total = calculateExpenseTotal(rows);
   const invalidAmountCount = rows.filter(
     (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
   ).length;
@@ -374,17 +372,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             </View>
 
             <View style={styles.heroStats}>
-              <View style={styles.statBlock}>
-                <View style={styles.statIcon}>
-                  <Ionicons name="list-outline" size={17} color={colors.primary} />
-                </View>
-                <View>
-                  <Text style={styles.statValue}>{populatedRows.length}</Text>
-                  <Text style={styles.statLabel}>
-                    {populatedRows.length === 1 ? 'Entry' : 'Entries'}
-                  </Text>
-                </View>
-              </View>
               <View style={styles.totalBlock}>
                 <Text style={styles.totalLabel}>RUNNING TOTAL</Text>
                 <Text style={styles.totalText}>{formatExpenseAmount(total)}</Text>
@@ -738,35 +725,11 @@ const makeStyles = (colors) =>
     heroStats: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-end',
       gap: 12,
       borderTopWidth: 1,
       borderTopColor: colors.border,
       paddingTop: 14,
-    },
-    statBlock: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    statIcon: {
-      width: 34,
-      height: 34,
-      borderRadius: radius.sm,
-      backgroundColor: colors.card,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    statValue: {
-      color: colors.text,
-      fontSize: 18,
-      fontWeight: '800',
-      fontVariant: ['tabular-nums'],
-    },
-    statLabel: {
-      color: colors.textSecondary,
-      fontSize: 11,
-      fontWeight: '600',
     },
     totalBlock: {
       alignItems: 'flex-end',
