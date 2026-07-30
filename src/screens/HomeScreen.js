@@ -24,6 +24,13 @@ import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
 const editorRouteFor = (note) =>
   note.note_type === EXPENSE_NOTE_TYPE ? 'ExpenseRecordEditor' : 'NoteEditor';
 
+const getFolderNoteCounts = async (folderList) => {
+  const countEntries = await Promise.all(
+    folderList.map(async (folder) => [folder.id, await folderRepo.getNoteCount(folder.id)])
+  );
+  return Object.fromEntries(countEntries);
+};
+
 const HomeScreen = ({ navigation }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -39,6 +46,7 @@ const HomeScreen = ({ navigation }) => {
   const [passwordModal, setPasswordModal] = useState({ visible: false, item: null, type: '' });
   const [query, setQuery] = useState('');
   const [results, setResults] = useState({ folders: [], notes: [] });
+  const [folderNoteCounts, setFolderNoteCounts] = useState({});
 
   const loadData = useCallback(async () => {
     try {
@@ -46,8 +54,10 @@ const HomeScreen = ({ navigation }) => {
         folderRepo.getAll(),
         noteRepo.getRootNotes(),
       ]);
+      const noteCounts = await getFolderNoteCounts(foldersData);
       setFolders(foldersData);
       setNotes(notesData);
+      setFolderNoteCounts(noteCounts);
     } catch (error) {
       Alert.alert('Error', 'Failed to load data');
     } finally {
@@ -66,7 +76,9 @@ const HomeScreen = ({ navigation }) => {
   const runSearch = useCallback(async (q) => {
     try {
       const [f, n] = await Promise.all([folderRepo.search(q), noteRepo.search(q)]);
+      const noteCounts = await getFolderNoteCounts(f);
       setResults({ folders: f, notes: n });
+      setFolderNoteCounts((current) => ({ ...current, ...noteCounts }));
     } catch (error) {
       setResults({ folders: [], notes: [] });
     }
@@ -82,7 +94,11 @@ const HomeScreen = ({ navigation }) => {
     (async () => {
       try {
         const [f, n] = await Promise.all([folderRepo.search(q), noteRepo.search(q)]);
-        if (!cancelled) setResults({ folders: f, notes: n });
+        const noteCounts = await getFolderNoteCounts(f);
+        if (!cancelled) {
+          setResults({ folders: f, notes: n });
+          setFolderNoteCounts((current) => ({ ...current, ...noteCounts }));
+        }
       } catch (error) {
         if (!cancelled) setResults({ folders: [], notes: [] });
       }
@@ -219,6 +235,7 @@ const HomeScreen = ({ navigation }) => {
               <FolderItem
                 key={folder.id}
                 folder={folder}
+                noteCount={folderNoteCounts[folder.id] ?? 0}
                 index={index}
                 onPress={() => handleFolderPress(folder)}
                 onTogglePin={() => handleToggleFolderPin(folder)}
@@ -269,6 +286,7 @@ const HomeScreen = ({ navigation }) => {
             <FolderItem
               key={folder.id}
               folder={folder}
+              noteCount={folderNoteCounts[folder.id] ?? 0}
               index={index}
               onPress={() => handleFolderPress(folder)}
               onTogglePin={() => handleToggleFolderPin(folder)}

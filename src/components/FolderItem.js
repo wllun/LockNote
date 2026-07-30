@@ -8,7 +8,7 @@ import { radius, shadow, useTheme } from '../theme';
 const entering = (index) =>
   Platform.OS === 'web' ? undefined : FadeInDown.duration(220).delay(Math.min(index * 40, 240));
 
-const FolderItem = ({ folder, onPress, onTogglePin, index = 0 }) => {
+const FolderItem = ({ folder, noteCount = 0, onPress, onTogglePin, index = 0 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -24,9 +24,17 @@ const FolderItem = ({ folder, onPress, onTogglePin, index = 0 }) => {
         onPress={onPress}
         onLongPress={onTogglePin}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${folder.name}, ${noteCount} ${noteCount === 1 ? 'note' : 'notes'}`}
+        accessibilityHint="Opens this folder"
       >
         <View style={styles.iconContainer}>
           <Ionicons name="folder" size={22} color={colors.folder} />
+          <View style={styles.noteCountBadge}>
+            <Text style={styles.noteCountText} accessible={false}>
+              {noteCount}
+            </Text>
+          </View>
         </View>
         <View style={styles.content}>
           <Text style={styles.name} numberOfLines={1}>
@@ -74,7 +82,29 @@ const makeStyles = (colors) =>
       backgroundColor: colors.folderSoft,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 12,
+      marginRight: 18,
+      position: 'relative',
+    },
+    noteCountBadge: {
+      position: 'absolute',
+      right: -6,
+      bottom: -6,
+      minWidth: 22,
+      height: 22,
+      paddingHorizontal: 5,
+      borderRadius: radius.full,
+      borderWidth: 2,
+      borderColor: colors.card,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    noteCountText: {
+      color: colors.card,
+      fontSize: 12,
+      lineHeight: 14,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
     },
     content: {
       flex: 1,
