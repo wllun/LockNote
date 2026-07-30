@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
   Text,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +29,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [content, setContent] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
@@ -218,45 +220,17 @@ const NoteEditorScreen = ({ route, navigation }) => {
           />
         </View>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={handleTogglePin}
-            style={[styles.headerButton, isPinned && styles.headerButtonActive]}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={isPinned ? 'Unpin note' : 'Pin note'}
-          >
-            <Ionicons
-              name={isPinned ? 'pin' : 'pin-outline'}
-              size={20}
-              color={isPinned ? colors.primary : colors.textSecondary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowLockModal(true)}
-            style={[styles.headerButton, hasPassword && styles.headerButtonActive]}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={
-              hasPassword ? 'Manage note password' : 'Set note password'
-            }
-          >
-            <Ionicons
-              name={hasPassword ? 'lock-closed' : 'lock-open-outline'}
-              size={20}
-              color={hasPassword ? colors.folder : colors.textSecondary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleDelete}
-            style={[styles.headerButton, styles.deleteHeaderButton]}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Delete note"
-          >
-            <Ionicons name="trash-outline" size={20} color={colors.danger} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={() => setShowActionsMenu(true)}
+          style={styles.headerButton}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="More note actions"
+          accessibilityHint="Shows pin, password, and delete actions"
+          accessibilityState={{ expanded: showActionsMenu }}
+        >
+          <Ionicons name="ellipsis-vertical" size={22} color={colors.text} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.contentArea}>
@@ -285,6 +259,90 @@ const NoteEditorScreen = ({ route, navigation }) => {
           {NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()}
         </Text>
       </View>
+
+      <Modal
+        visible={showActionsMenu}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowActionsMenu(false)}
+      >
+        <View style={styles.actionsMenuOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowActionsMenu(false)}
+            accessible={false}
+          />
+          <View
+            style={[styles.actionsMenu, { top: insets.top + 60 }]}
+            accessibilityViewIsModal
+          >
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionsMenuItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                setShowActionsMenu(false);
+                handleTogglePin();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={isPinned ? 'Unpin note' : 'Pin note'}
+            >
+              <Ionicons
+                name={isPinned ? 'pin' : 'pin-outline'}
+                size={20}
+                color={isPinned ? colors.primary : colors.textSecondary}
+              />
+              <Text style={styles.actionsMenuText}>
+                {isPinned ? 'Unpin note' : 'Pin note'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionsMenuItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                setShowActionsMenu(false);
+                setShowLockModal(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                hasPassword ? 'Manage note password' : 'Set note password'
+              }
+            >
+              <Ionicons
+                name={hasPassword ? 'lock-closed' : 'lock-open-outline'}
+                size={20}
+                color={hasPassword ? colors.folder : colors.textSecondary}
+              />
+              <Text style={styles.actionsMenuText}>
+                {hasPassword ? 'Password protection' : 'Lock note'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionsMenuItem,
+                styles.actionsMenuDeleteItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                setShowActionsMenu(false);
+                handleDelete();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete note"
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
+              <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>
+                Delete note
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={showLockModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
@@ -370,10 +428,6 @@ const makeStyles = (colors) =>
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    headerActions: {
-      flexDirection: 'row',
-      gap: 4,
-    },
     headerButton: {
       width: 44,
       height: 44,
@@ -381,12 +435,6 @@ const makeStyles = (colors) =>
       backgroundColor: colors.background,
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    headerButtonActive: {
-      backgroundColor: colors.folderSoft,
-    },
-    deleteHeaderButton: {
-      backgroundColor: colors.dangerSoft,
     },
     headerTitleField: {
       flex: 1,
@@ -434,6 +482,45 @@ const makeStyles = (colors) =>
       color: colors.textTertiary,
     },
     characterCounterNearLimit: {
+      color: colors.danger,
+      fontWeight: '600',
+    },
+    actionsMenuOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(15,23,42,0.12)',
+    },
+    actionsMenu: {
+      position: 'absolute',
+      right: 12,
+      width: 244,
+      overflow: 'hidden',
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
+      ...shadow.card,
+    },
+    actionsMenuItem: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      backgroundColor: colors.card,
+    },
+    actionsMenuItemPressed: {
+      backgroundColor: colors.inputBg,
+    },
+    actionsMenuDeleteItem: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    actionsMenuText: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.text,
+    },
+    actionsMenuDeleteText: {
       color: colors.danger,
       fontWeight: '600',
     },
