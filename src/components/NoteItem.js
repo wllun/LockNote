@@ -3,6 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { radius, shadow, useTheme } from '../theme';
+import {
+  calculateExpenseTotal,
+  EXPENSE_NOTE_TYPE,
+  formatExpenseAmount,
+  parseExpenseNote,
+} from '../utils/expense-record.mjs';
 
 // ponytail: entering animations are native-only — reanimated web leaves items visibility:hidden
 const entering = (index) =>
@@ -21,6 +27,14 @@ const NoteItem = ({ note, onPress, onTogglePin, index = 0 }) => {
   };
 
   const locked = !!note.password;
+  const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
+  const expenseRows = isExpense ? parseExpenseNote(note.content).rows : [];
+  const displayTitle = isExpense
+    ? note.title.trim() || 'Expense Record'
+    : note.title || 'Untitled';
+  const preview = isExpense
+    ? `RM ${formatExpenseAmount(calculateExpenseTotal(expenseRows))}`
+    : note.content || 'No content';
 
   const handlePinPress = (e) => {
     e.stopPropagation?.();
@@ -37,8 +51,14 @@ const NoteItem = ({ note, onPress, onTogglePin, index = 0 }) => {
       >
         <View style={styles.header}>
           <Text style={styles.title} numberOfLines={1}>
-            {note.title || 'Untitled'}
+            {displayTitle}
           </Text>
+          {isExpense && (
+            <View style={styles.typeBadge}>
+              <Ionicons name="receipt-outline" size={12} color={colors.primary} />
+              <Text style={styles.typeBadgeText}>Expense</Text>
+            </View>
+          )}
           {locked && (
             <View style={styles.lockBadge}>
               <Ionicons name="lock-closed" size={12} color={colors.folder} />
@@ -58,7 +78,7 @@ const NoteItem = ({ note, onPress, onTogglePin, index = 0 }) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.preview} numberOfLines={2}>
-          {locked ? 'Locked note' : note.content || 'No content'}
+          {locked ? (isExpense ? 'Locked expense record' : 'Locked note') : preview}
         </Text>
         <Text style={styles.date}>{formatDate(note.updated_at)}</Text>
       </TouchableOpacity>
@@ -94,6 +114,20 @@ const makeStyles = (colors) =>
       backgroundColor: colors.folderSoft,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    typeBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.primarySoft,
+      borderRadius: radius.full,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    typeBadgeText: {
+      color: colors.primary,
+      fontSize: 11,
+      fontWeight: '700',
     },
     pinButton: {
       padding: 2,

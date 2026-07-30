@@ -17,7 +17,12 @@ import { hashPassword } from '../utils/crypto';
 import FolderItem from '../components/FolderItem';
 import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
+import CreateNoteTypeModal from '../components/create-note-type-modal';
 import { radius, shadow, useTheme } from '../theme';
+import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
+
+const editorRouteFor = (note) =>
+  note.note_type === EXPENSE_NOTE_TYPE ? 'ExpenseRecordEditor' : 'NoteEditor';
 
 const HomeScreen = ({ navigation }) => {
   const colors = useTheme();
@@ -28,6 +33,7 @@ const HomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showFolderModal, setShowFolderModal] = useState(false);
+  const [showNoteTypeModal, setShowNoteTypeModal] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [folderPassword, setFolderPassword] = useState('');
   const [passwordModal, setPasswordModal] = useState({ visible: false, item: null, type: '' });
@@ -109,12 +115,17 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleCreateRootNote = async () => {
+  const handleCreateRootNote = async (type = 'note') => {
     try {
-      const note = await noteRepo.create(null, '', '');
-      navigation.navigate('NoteEditor', { noteId: note.id });
+      const note = await noteRepo.create(null, '', '', null, type);
+      navigation.navigate(editorRouteFor(note), { noteId: note.id });
     } catch (error) {
-      Alert.alert('Error', 'Failed to create note');
+      Alert.alert(
+        'Error',
+        type === EXPENSE_NOTE_TYPE
+          ? 'Failed to create expense record'
+          : 'Failed to create note'
+      );
     }
   };
 
@@ -130,7 +141,7 @@ const HomeScreen = ({ navigation }) => {
     if (note.password) {
       setPasswordModal({ visible: true, item: note, type: 'note' });
     } else {
-      navigation.navigate('NoteEditor', { noteId: note.id });
+      navigation.navigate(editorRouteFor(note), { noteId: note.id });
     }
   };
 
@@ -139,7 +150,7 @@ const HomeScreen = ({ navigation }) => {
     if (type === 'folder') {
       navigation.navigate('Folder', { folderId: item.id, folderName: item.name });
     } else {
-      navigation.navigate('NoteEditor', { noteId: item.id });
+      navigation.navigate(editorRouteFor(item), { noteId: item.id });
     }
   };
 
@@ -316,12 +327,20 @@ const HomeScreen = ({ navigation }) => {
       {!searching && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={handleCreateRootNote}
+          onPress={() => setShowNoteTypeModal(true)}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Add note"
         >
           <Ionicons name="add" size={28} color={colors.card} />
         </TouchableOpacity>
       )}
+
+      <CreateNoteTypeModal
+        visible={showNoteTypeModal}
+        onClose={() => setShowNoteTypeModal(false)}
+        onSelect={handleCreateRootNote}
+      />
 
       <Modal visible={showFolderModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>

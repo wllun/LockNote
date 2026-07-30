@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import FolderScreen from '../screens/FolderScreen';
 import NoteEditorScreen from '../screens/NoteEditorScreen';
+import ExpenseRecordEditorScreen from '../screens/ExpenseRecordEditorScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProfileTabScreen from '../screens/ProfileTabScreen';
 import { useTheme, useThemeMode } from '../theme';
@@ -29,6 +30,11 @@ const HomeStack = ({ screenOptions }) => (
     <Stack.Screen
       name="NoteEditor"
       component={NoteEditorScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="ExpenseRecordEditor"
+      component={ExpenseRecordEditorScreen}
       options={{ headerShown: false }}
     />
   </Stack.Navigator>

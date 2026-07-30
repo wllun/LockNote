@@ -30,7 +30,7 @@ export const noteRepo = {
     );
   },
 
-  async create(folderId = null, title = '', content = '', password = null) {
+  async create(folderId = null, title = '', content = '', password = null, noteType = 'note') {
     const db = getDB();
     const { hashPassword } = require('../utils/crypto');
     const id = generateId();
@@ -38,8 +38,8 @@ export const noteRepo = {
     const passwordHash = password ? await hashPassword(password) : null;
 
     await db.runAsync(
-      `INSERT INTO notes (id, folder_id, title, content, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, folderId, title, content, passwordHash, timestamp, timestamp]
+      `INSERT INTO notes (id, folder_id, title, content, note_type, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, folderId, title, content, noteType, passwordHash, timestamp, timestamp]
     );
 
     return await this.getById(id);
@@ -62,6 +62,10 @@ export const noteRepo = {
     if (updates.folder_id !== undefined) {
       fields.push('folder_id = ?');
       values.push(updates.folder_id);
+    }
+    if (updates.note_type !== undefined) {
+      fields.push('note_type = ?');
+      values.push(updates.note_type);
     }
     if (updates.password !== undefined) {
       const passwordHash = updates.password ? await hashPassword(updates.password) : null;
