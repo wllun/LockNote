@@ -373,7 +373,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
             <View style={styles.heroStats}>
               <View style={styles.totalBlock}>
-                <Text style={styles.totalLabel}>RUNNING TOTAL</Text>
+                <Text style={styles.totalLabel}>TOTAL</Text>
                 <Text style={styles.totalText}>{formatExpenseAmount(total)}</Text>
               </View>
             </View>
