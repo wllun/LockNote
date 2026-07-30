@@ -5,6 +5,7 @@ import {
   createExpenseRow,
   expenseRowHasContent,
   isExpenseNoteEmpty,
+  normalizeExpenseAmountInput,
   parseExpenseAmount,
   parseExpenseNote,
   sanitizeExpenseAmountInput,
@@ -21,7 +22,10 @@ test('serializes and parses multiple expense rows', () => {
 
   assert.deepEqual(parseExpenseNote(serializeExpenseNote(rows)), {
     sourceVersion: 2,
-    rows,
+    rows: [
+      { ...rows[0], amount: '98.00' },
+      { ...rows[1], amount: '89.00' },
+    ],
   });
 });
 
@@ -81,6 +85,14 @@ test('calculates a total while ignoring incomplete or invalid amounts', () => {
   ];
 
   assert.equal(calculateExpenseTotal(rows), 187.5);
+});
+
+test('normalizes valid expense amounts to two decimal places', () => {
+  assert.equal(normalizeExpenseAmountInput('95'), '95.00');
+  assert.equal(normalizeExpenseAmountInput('95.5'), '95.50');
+  assert.equal(normalizeExpenseAmountInput('95.'), '95.00');
+  assert.equal(normalizeExpenseAmountInput(''), '');
+  assert.equal(normalizeExpenseAmountInput('invalid'), 'invalid');
 });
 
 test('detects populated rows and abandoned empty expense notes', () => {

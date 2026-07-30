@@ -65,7 +65,10 @@ export const parseExpenseNote = (content) => {
 export const serializeExpenseNote = (rows) =>
   JSON.stringify({
     version: 2,
-    rows: normalizeRows(rows),
+    rows: normalizeRows(rows).map((row) => ({
+      ...row,
+      amount: normalizeExpenseAmountInput(row.amount),
+    })),
   });
 
 export const expenseRowHasContent = (row) =>
@@ -101,6 +104,14 @@ export const parseExpenseAmount = (value) => {
   const normalized = input.replace(/,/g, '');
   const amount = Number(normalized);
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
+};
+
+export const normalizeExpenseAmountInput = (value) => {
+  const input = String(value ?? '').trim();
+  if (!input) return '';
+
+  const amount = parseExpenseAmount(input.endsWith('.') ? input.slice(0, -1) : input);
+  return amount === null ? input : amount.toFixed(2);
 };
 
 export const calculateExpenseTotal = (rows) =>

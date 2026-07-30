@@ -20,6 +20,7 @@ import {
   expenseRowHasContent,
   formatExpenseAmount,
   isExpenseNoteEmpty,
+  normalizeExpenseAmountInput,
   parseExpenseAmount,
   parseExpenseNote,
   sanitizeExpenseAmountInput,
@@ -67,7 +68,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       if (!note) return;
 
       const parsed = parseExpenseNote(note.content);
-      const loadedRows = parsed.rows.length ? parsed.rows : [createExpenseRow()];
+      const loadedRows = (
+        parsed.rows.length ? parsed.rows : [createExpenseRow()]
+      ).map((row) => ({
+        ...row,
+        amount: normalizeExpenseAmountInput(row.amount),
+      }));
       const legacyRemark = parsed.rows[0]?.remark.trim();
       const loadedTitle =
         parsed.sourceVersion === 1 && note.title.trim() === legacyRemark
@@ -156,6 +162,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       focusCell(nextRow.id, 'date');
     } else {
       addRow(true);
+    }
+  };
+
+  const handleAmountBlur = (row) => {
+    setFocusedCell(null);
+    const normalizedAmount = normalizeExpenseAmountInput(row.amount);
+    if (normalizedAmount !== row.amount) {
+      handleRowChange(row.id, 'amount', normalizedAmount);
     }
   };
 
@@ -393,7 +407,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             <View style={[styles.tableRow, styles.tableHeader]}>
               <Text style={[styles.headerCell, styles.dateColumn]}>Date</Text>
               <Text style={[styles.headerCell, styles.remarkColumn]}>Remark</Text>
-              <Text style={[styles.headerCell, styles.amountColumn]}>Amount</Text>
+              <Text style={[styles.headerCell, styles.amountColumn]}>Amount (RM)</Text>
               <View style={styles.actionColumn} />
             </View>
 
@@ -478,7 +492,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     keyboardType="decimal-pad"
                     returnKeyType="next"
                     onFocus={() => setFocusedCell(`${row.id}:amount`)}
-                    onBlur={() => setFocusedCell(null)}
+                    onBlur={() => handleAmountBlur(row)}
                     onSubmitEditing={() => focusNextRow(index)}
                     selectTextOnFocus
                     accessibilityLabel={`Amount for expense row ${index + 1}`}
