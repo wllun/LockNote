@@ -286,13 +286,26 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
-        <View style={styles.headerTitle}>
-          <View style={styles.headerTitleIcon}>
-            <Ionicons name="receipt-outline" size={16} color={colors.primary} />
-          </View>
-          <Text style={styles.headerTitleText} numberOfLines={1}>
-            Expense Ledger
-          </Text>
+        <View
+          style={[
+            styles.headerTitleField,
+            focusedCell === 'title' && styles.headerTitleFieldFocused,
+          ]}
+        >
+          <Ionicons name="receipt-outline" size={18} color={colors.primary} />
+          <TextInput
+            style={styles.headerTitleInput}
+            value={title}
+            onChangeText={handleTitleChange}
+            onFocus={() => setFocusedCell('title')}
+            onBlur={() => setFocusedCell(null)}
+            placeholder="Expense title"
+            placeholderTextColor={colors.textTertiary}
+            returnKeyType="next"
+            onSubmitEditing={() => focusCell(rows[0].id, 'date')}
+            accessibilityLabel="Expense note title"
+            accessibilityHint="Edits the title of this expense note"
+          />
         </View>
 
         <View style={styles.headerActions}>
@@ -346,36 +359,15 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         contentInsetAdjustmentBehavior="automatic"
       >
         <View style={styles.editorContent}>
-          <View style={styles.heroCard}>
-            <View style={styles.heroTitleRow}>
-              <View style={styles.heroIcon}>
-                <Ionicons name="wallet-outline" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.heroTitleText}>
-                <Text style={styles.eyebrow}>EXPENSE LEDGER</Text>
-                <TextInput
-                  style={[
-                    styles.titleInput,
-                    focusedCell === 'title' && styles.titleInputFocused,
-                  ]}
-                  value={title}
-                  onChangeText={handleTitleChange}
-                  onFocus={() => setFocusedCell('title')}
-                  onBlur={() => setFocusedCell(null)}
-                  placeholder="Expense Jun 2026"
-                  placeholderTextColor={colors.textTertiary}
-                  returnKeyType="next"
-                  onSubmitEditing={() => focusCell(rows[0].id, 'date')}
-                  accessibilityLabel="Expense note title"
-                />
-              </View>
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryIcon}>
+              <Ionicons name="wallet-outline" size={22} color={colors.primary} />
             </View>
-
-            <View style={styles.heroStats}>
-              <View style={styles.totalBlock}>
-                <Text style={styles.totalLabel}>TOTAL</Text>
-                <Text style={styles.totalText}>{formatExpenseAmount(total)}</Text>
-              </View>
+            <View style={styles.summaryContent}>
+              <Text style={styles.totalLabel}>TOTAL</Text>
+              <Text style={styles.totalText}>
+                RM {formatExpenseAmount(total)}
+              </Text>
             </View>
           </View>
 
@@ -628,8 +620,8 @@ const makeStyles = (colors) =>
       borderBottomColor: colors.border,
     },
     headerButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       borderRadius: radius.full,
       backgroundColor: colors.background,
       justifyContent: 'center',
@@ -638,29 +630,36 @@ const makeStyles = (colors) =>
     headerButtonActive: {
       backgroundColor: colors.folderSoft,
     },
-    headerTitle: {
+    headerTitleField: {
       flex: 1,
+      minWidth: 0,
+      height: 44,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
+      gap: 8,
+      paddingHorizontal: 11,
+      backgroundColor: colors.inputBg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
     },
-    headerTitleIcon: {
-      width: 30,
-      height: 30,
-      borderRadius: radius.sm,
+    headerTitleFieldFocused: {
+      borderColor: colors.primary,
       backgroundColor: colors.primarySoft,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
-    headerTitleText: {
+    headerTitleInput: {
+      flex: 1,
+      minWidth: 0,
+      height: 42,
+      paddingVertical: 0,
       color: colors.text,
       fontSize: 16,
       fontWeight: '700',
+      outlineStyle: 'none',
     },
     headerActions: {
       flexDirection: 'row',
-      gap: 6,
+      gap: 4,
     },
     deleteHeaderButton: {
       backgroundColor: colors.dangerSoft,
@@ -677,67 +676,28 @@ const makeStyles = (colors) =>
       maxWidth: 920,
       gap: 16,
     },
-    heroCard: {
-      backgroundColor: colors.primarySoft,
-      borderWidth: 1,
-      borderColor: colors.primary,
-      borderRadius: radius.lg,
-      padding: 18,
-      gap: 18,
-      overflow: 'hidden',
-    },
-    heroTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 14,
-    },
-    heroIcon: {
-      width: 50,
-      height: 50,
-      borderRadius: radius.md,
-      backgroundColor: colors.card,
-      alignItems: 'center',
-      justifyContent: 'center',
-      ...shadow.card,
-    },
-    heroTitleText: {
-      flex: 1,
-    },
-    eyebrow: {
-      color: colors.primary,
-      fontSize: 10,
-      fontWeight: '800',
-      letterSpacing: 1.4,
-    },
-    titleInput: {
-      color: colors.text,
-      fontSize: 25,
-      fontWeight: '800',
-      paddingHorizontal: 0,
-      paddingTop: 3,
-      paddingBottom: 5,
-      borderBottomWidth: 2,
-      borderBottomColor: 'transparent',
-    },
-    titleInputFocused: {
-      borderBottomColor: colors.primary,
-    },
-    heroStats: {
+    summaryCard: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-end',
       gap: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      paddingTop: 14,
+      backgroundColor: colors.primarySoft,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: radius.lg,
+      paddingHorizontal: 16,
+      paddingVertical: 13,
     },
-    totalBlock: {
-      alignItems: 'flex-end',
-      backgroundColor: colors.card,
+    summaryIcon: {
+      width: 42,
+      height: 42,
       borderRadius: radius.md,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      minWidth: 118,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    summaryContent: {
+      alignItems: 'flex-end',
     },
     totalLabel: {
       color: colors.textTertiary,

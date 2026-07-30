@@ -26,6 +26,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [isPinned, setIsPinned] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
+  const [isTitleFocused, setIsTitleFocused] = useState(false);
   const saveTimeout = useRef(null);
   const contentRef = useRef(null);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
@@ -181,14 +182,42 @@ const NoteEditorScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           style={styles.headerButton}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
+
+        <View
+          style={[
+            styles.headerTitleField,
+            isTitleFocused && styles.headerTitleFieldFocused,
+          ]}
+        >
+          <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+          <TextInput
+            style={styles.headerTitleInput}
+            placeholder="Note title"
+            placeholderTextColor={colors.textTertiary}
+            value={title}
+            onChangeText={handleTitleChange}
+            onFocus={() => setIsTitleFocused(true)}
+            onBlur={() => setIsTitleFocused(false)}
+            blurOnSubmit
+            returnKeyType="next"
+            onSubmitEditing={() => contentRef.current?.focus()}
+            accessibilityLabel="Note title"
+            accessibilityHint="Edits the title of this note"
+          />
+        </View>
+
         <View style={styles.headerActions}>
           <TouchableOpacity
             onPress={handleTogglePin}
             style={[styles.headerButton, isPinned && styles.headerButtonActive]}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={isPinned ? 'Unpin note' : 'Pin note'}
           >
             <Ionicons
               name={isPinned ? 'pin' : 'pin-outline'}
@@ -200,6 +229,10 @@ const NoteEditorScreen = ({ route, navigation }) => {
             onPress={() => setShowLockModal(true)}
             style={[styles.headerButton, hasPassword && styles.headerButtonActive]}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={
+              hasPassword ? 'Manage note password' : 'Set note password'
+            }
           >
             <Ionicons
               name={hasPassword ? 'lock-closed' : 'lock-open-outline'}
@@ -209,25 +242,16 @@ const NoteEditorScreen = ({ route, navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleDelete}
-            style={styles.headerButton}
+            style={[styles.headerButton, styles.deleteHeaderButton]}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Delete note"
           >
             <Ionicons name="trash-outline" size={20} color={colors.danger} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <TextInput
-        style={styles.titleInput}
-        placeholder="Title"
-        placeholderTextColor={colors.textTertiary}
-        value={title}
-        onChangeText={handleTitleChange}
-        multiline
-        blurOnSubmit
-        returnKeyType="next"
-        onSubmitEditing={() => contentRef.current?.focus()}
-      />
       <TextInput
         ref={contentRef}
         style={styles.contentInput}
@@ -237,7 +261,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         onChangeText={handleContentChange}
         multiline
         textAlignVertical="top"
-        autoFocus={!title}
+        accessibilityLabel="Note content"
       />
 
       <Modal visible={showLockModal} animationType="fade" transparent>
@@ -317,17 +341,20 @@ const makeStyles = (colors) =>
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      gap: 8,
       paddingHorizontal: 12,
       paddingVertical: 8,
+      backgroundColor: colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
     },
     headerActions: {
       flexDirection: 'row',
-      gap: 8,
+      gap: 4,
     },
     headerButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       borderRadius: radius.full,
       backgroundColor: colors.background,
       justifyContent: 'center',
@@ -336,19 +363,41 @@ const makeStyles = (colors) =>
     headerButtonActive: {
       backgroundColor: colors.folderSoft,
     },
-    titleInput: {
-      fontSize: 26,
+    deleteHeaderButton: {
+      backgroundColor: colors.dangerSoft,
+    },
+    headerTitleField: {
+      flex: 1,
+      minWidth: 0,
+      height: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 11,
+      backgroundColor: colors.inputBg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
+    },
+    headerTitleInput: {
+      flex: 1,
+      minWidth: 0,
+      height: 42,
+      paddingVertical: 0,
+      fontSize: 16,
       fontWeight: '700',
-      paddingHorizontal: 20,
-      paddingTop: 12,
-      paddingBottom: 4,
       color: colors.text,
+      outlineStyle: 'none',
+    },
+    headerTitleFieldFocused: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
     },
     contentInput: {
       flex: 1,
       fontSize: 16,
       paddingHorizontal: 20,
-      paddingTop: 8,
+      paddingTop: 16,
       color: colors.text,
       lineHeight: 25,
     },
