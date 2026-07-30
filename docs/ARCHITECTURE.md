@@ -68,7 +68,8 @@ This is **gating, not encryption** — note `content` is stored in cleartext. Se
 `NoteEditorScreen` and `ExpenseRecordEditorScreen` create the note row first
 (empty), then navigate into it by `noteId`. Field changes trigger a debounced
 (800ms) `noteRepo.update`. The debounce timer is cleared on unmount and before
-delete.
+delete. Normal note bodies are limited to 100,000 characters; see
+[Note Character Limits](NOTE_LIMITS.md).
 
 ## Auth
 

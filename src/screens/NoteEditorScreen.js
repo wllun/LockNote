@@ -14,6 +14,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import { radius, shadow, useTheme } from '../theme';
+import {
+  getNormalNoteCharacterCount,
+  NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
+} from '../utils/note-limits.mjs';
 
 const NoteEditorScreen = ({ route, navigation }) => {
   const colors = useTheme();
@@ -32,6 +36,9 @@ const NoteEditorScreen = ({ route, navigation }) => {
   // Latest values for the unmount cleanup (state in a [] effect is stale).
   const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, deleted: false });
   const insets = useSafeAreaInsets();
+  const contentCharacterCount = getNormalNoteCharacterCount(content);
+  const isNearContentLimit =
+    contentCharacterCount >= NORMAL_NOTE_CONTENT_MAX_CHARACTERS * 0.9;
 
   const loadNote = async () => {
     try {
@@ -252,17 +259,32 @@ const NoteEditorScreen = ({ route, navigation }) => {
         </View>
       </View>
 
-      <TextInput
-        ref={contentRef}
-        style={styles.contentInput}
-        placeholder="Start writing..."
-        placeholderTextColor={colors.textTertiary}
-        value={content}
-        onChangeText={handleContentChange}
-        multiline
-        textAlignVertical="top"
-        accessibilityLabel="Note content"
-      />
+      <View style={styles.contentArea}>
+        <TextInput
+          ref={contentRef}
+          style={styles.contentInput}
+          placeholder="Start writing..."
+          placeholderTextColor={colors.textTertiary}
+          value={content}
+          onChangeText={handleContentChange}
+          maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS}
+          multiline
+          textAlignVertical="top"
+          accessibilityLabel="Note content"
+          accessibilityHint={`Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
+        />
+        <Text
+          style={[
+            styles.characterCounter,
+            isNearContentLimit && styles.characterCounterNearLimit,
+            { paddingBottom: Math.max(insets.bottom, 8) },
+          ]}
+          accessibilityLabel={`${contentCharacterCount.toLocaleString()} of ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} note characters used`}
+        >
+          {contentCharacterCount.toLocaleString()} /{' '}
+          {NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()}
+        </Text>
+      </View>
 
       <Modal visible={showLockModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
@@ -393,6 +415,9 @@ const makeStyles = (colors) =>
       borderColor: colors.primary,
       backgroundColor: colors.primarySoft,
     },
+    contentArea: {
+      flex: 1,
+    },
     contentInput: {
       flex: 1,
       fontSize: 16,
@@ -400,6 +425,17 @@ const makeStyles = (colors) =>
       paddingTop: 16,
       color: colors.text,
       lineHeight: 25,
+    },
+    characterCounter: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: 20,
+      paddingTop: 6,
+      fontSize: 13,
+      color: colors.textTertiary,
+    },
+    characterCounterNearLimit: {
+      color: colors.danger,
+      fontWeight: '600',
     },
     modalOverlay: {
       flex: 1,
