@@ -10,6 +10,7 @@ import {
   sanitizeExpenseAmountInput,
   sanitizeExpenseDateInput,
   serializeExpenseNote,
+  shouldShowExpenseRowPlaceholder,
 } from '../src/utils/expense-record.mjs';
 
 test('serializes and parses multiple expense rows', () => {
@@ -91,4 +92,19 @@ test('detects populated rows and abandoned empty expense notes', () => {
   assert.equal(isExpenseNoteEmpty('', [blankRow]), true);
   assert.equal(isExpenseNoteEmpty('Expense Jun 2026', [blankRow]), false);
   assert.equal(isExpenseNoteEmpty('', [dateOnlyRow]), false);
+});
+
+test('shows table placeholders only in the first row while all rows are empty', () => {
+  const blankRows = [
+    createExpenseRow({ id: 'blank-1' }),
+    createExpenseRow({ id: 'blank-2' }),
+  ];
+
+  assert.equal(shouldShowExpenseRowPlaceholder(blankRows, 0), true);
+  assert.equal(shouldShowExpenseRowPlaceholder(blankRows, 1), false);
+
+  blankRows[1].remark = 'Dinner';
+
+  assert.equal(shouldShowExpenseRowPlaceholder(blankRows, 0), false);
+  assert.equal(shouldShowExpenseRowPlaceholder(blankRows, 1), false);
 });

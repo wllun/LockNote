@@ -71,6 +71,9 @@ export const serializeExpenseNote = (rows) =>
 export const expenseRowHasContent = (row) =>
   !!row.date.trim() || !!row.remark.trim() || !!row.amount.trim();
 
+export const shouldShowExpenseRowPlaceholder = (rows, rowIndex) =>
+  rowIndex === 0 && !rows.some(expenseRowHasContent);
+
 export const isExpenseNoteEmpty = (title, rows) =>
   !title.trim() && !rows.some(expenseRowHasContent);
 

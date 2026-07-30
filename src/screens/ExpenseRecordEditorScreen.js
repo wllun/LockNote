@@ -25,6 +25,7 @@ import {
   sanitizeExpenseAmountInput,
   sanitizeExpenseDateInput,
   serializeExpenseNote,
+  shouldShowExpenseRowPlaceholder,
 } from '../utils/expense-record.mjs';
 import { radius, shadow, useTheme } from '../theme';
 
@@ -399,6 +400,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             {rows.map((row, index) => {
               const invalidAmount =
                 !!row.amount.trim() && parseExpenseAmount(row.amount) === null;
+              const showPlaceholder = shouldShowExpenseRowPlaceholder(rows, index);
 
               return (
                 <View
@@ -422,7 +424,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     onChangeText={(value) =>
                       handleRowChange(row.id, 'date', sanitizeExpenseDateInput(value))
                     }
-                    placeholder="1"
+                    placeholder={showPlaceholder ? '1' : undefined}
                     placeholderTextColor={colors.textTertiary}
                     inputMode="numeric"
                     keyboardType="number-pad"
@@ -444,7 +446,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     ]}
                     value={row.remark}
                     onChangeText={(value) => handleRowChange(row.id, 'remark', value)}
-                    placeholder="Enter remark"
+                    placeholder={showPlaceholder ? 'Enter remark' : undefined}
                     placeholderTextColor={colors.textTertiary}
                     returnKeyType="next"
                     onFocus={() => setFocusedCell(`${row.id}:remark`)}
@@ -470,7 +472,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                         sanitizeExpenseAmountInput(value)
                       )
                     }
-                    placeholder="0.00"
+                    placeholder={showPlaceholder ? '0.00' : undefined}
                     placeholderTextColor={colors.textTertiary}
                     inputMode="decimal"
                     keyboardType="decimal-pad"
