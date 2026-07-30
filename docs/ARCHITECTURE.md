@@ -36,6 +36,12 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 
 Screens reload their data on the navigation `focus` event (listener registered in `useEffect`, cleaned up on unmount) rather than holding shared state — so returning from the editor reflects edits without a store.
 
+List items expose contextual actions through long-press on native and a visible
+three-dots button on web. Note actions are pin, move, and soft-delete; folder
+actions are pin and soft-delete. Moving a note updates `folder_id`, with `null`
+representing Home. Deleting a folder soft-deletes its contained notes first so
+normal reads do not leave inaccessible active notes behind.
+
 ## Data model
 
 Two tables / collections. Timestamps are ISO strings; IDs are generated client-side (`Date.now()` base36 + random suffix).

@@ -18,8 +18,11 @@ import FolderItem from '../components/FolderItem';
 import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
 import CreateNoteTypeModal from '../components/create-note-type-modal';
+import ItemActionsModal from '../components/ItemActionsModal';
+import MoveNoteModal from '../components/MoveNoteModal';
 import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
+import { confirmDestructiveAction } from '../utils/confirm-action';
 
 const editorRouteFor = (note) =>
   note.note_type === EXPENSE_NOTE_TYPE ? 'ExpenseRecordEditor' : 'NoteEditor';
@@ -39,6 +42,16 @@ const HomeScreen = ({ navigation }) => {
   const [passwordModal, setPasswordModal] = useState({ visible: false, item: null, type: '' });
   const [query, setQuery] = useState('');
   const [results, setResults] = useState({ folders: [], notes: [] });
+  const [itemActions, setItemActions] = useState({
+    visible: false,
+    item: null,
+    type: '',
+  });
+  const [moveNoteModal, setMoveNoteModal] = useState({
+    visible: false,
+    note: null,
+    folders: [],
+  });
 
   const loadData = useCallback(async () => {
     try {
@@ -172,6 +185,88 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  const openItemActions = (item, type) => {
+    setItemActions({ visible: true, item, type });
+  };
+
+  const closeItemActions = () => {
+    setItemActions({ visible: false, item: null, type: '' });
+  };
+
+  const handleDeleteNote = (note) => {
+    confirmDestructiveAction({
+      title: 'Delete Note',
+      message: 'Are you sure you want to delete this note?',
+      onConfirm: async () => {
+        try {
+          await noteRepo.softDelete(note.id);
+          refreshCurrent();
+        } catch (error) {
+          Alert.alert('Error', 'Failed to delete note');
+        }
+      },
+    });
+  };
+
+  const handleDeleteFolder = async (folder) => {
+    try {
+      const folderNotes = await noteRepo.getByFolderId(folder.id);
+      const noteCount = folderNotes.length;
+      const detail =
+        noteCount === 0
+          ? 'Are you sure you want to delete this folder?'
+          : `This will also delete ${noteCount} ${
+              noteCount === 1 ? 'note' : 'notes'
+            } inside the folder.`;
+
+      confirmDestructiveAction({
+        title: 'Delete Folder',
+        message: detail,
+        onConfirm: async () => {
+          try {
+            await Promise.all(
+              folderNotes.map((note) => noteRepo.softDelete(note.id))
+            );
+            await folderRepo.softDelete(folder.id);
+            refreshCurrent();
+          } catch (error) {
+            Alert.alert('Error', 'Failed to delete folder');
+          }
+        },
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to inspect folder contents');
+    }
+  };
+
+  const openMoveNote = async (note) => {
+    try {
+      const availableFolders = await folderRepo.getAll();
+      setMoveNoteModal({
+        visible: true,
+        note,
+        folders: availableFolders,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load folders');
+    }
+  };
+
+  const closeMoveNote = () => {
+    setMoveNoteModal({ visible: false, note: null, folders: [] });
+  };
+
+  const handleMoveNote = async (folderId) => {
+    const note = moveNoteModal.note;
+    if (!note) return;
+    try {
+      await noteRepo.update(note.id, { folder_id: folderId });
+      refreshCurrent();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to move note');
+    }
+  };
+
   useEffect(() => {
     //👉 “register the listener in useEffect, and return a cleanup function so React removes the listener automatically to prevent duplicates.”
     const unsubscribe = navigation.addListener('focus', loadData);
@@ -221,7 +316,7 @@ const HomeScreen = ({ navigation }) => {
                 folder={folder}
                 index={index}
                 onPress={() => handleFolderPress(folder)}
-                onTogglePin={() => handleToggleFolderPin(folder)}
+                onOpenActions={() => openItemActions(folder, 'folder')}
               />
             ))}
           </View>
@@ -237,7 +332,7 @@ const HomeScreen = ({ navigation }) => {
                 note={note}
                 index={index}
                 onPress={() => handleNotePress(note)}
-                onTogglePin={() => handleToggleNotePin(note)}
+                onOpenActions={() => openItemActions(note, 'note')}
               />
             ))}
           </View>
@@ -271,7 +366,7 @@ const HomeScreen = ({ navigation }) => {
               folder={folder}
               index={index}
               onPress={() => handleFolderPress(folder)}
-              onTogglePin={() => handleToggleFolderPin(folder)}
+              onOpenActions={() => openItemActions(folder, 'folder')}
             />
           ))
         )}
@@ -294,7 +389,7 @@ const HomeScreen = ({ navigation }) => {
               note={note}
               index={index}
               onPress={() => handleNotePress(note)}
-              onTogglePin={() => handleToggleNotePin(note)}
+              onOpenActions={() => openItemActions(note, 'note')}
             />
           ))
         )}
@@ -340,6 +435,40 @@ const HomeScreen = ({ navigation }) => {
         visible={showNoteTypeModal}
         onClose={() => setShowNoteTypeModal(false)}
         onSelect={handleCreateRootNote}
+      />
+
+      <ItemActionsModal
+        visible={itemActions.visible}
+        itemType={itemActions.type}
+        isPinned={!!itemActions.item?.is_pinned}
+        onClose={closeItemActions}
+        onTogglePin={() => {
+          if (itemActions.type === 'folder') {
+            handleToggleFolderPin(itemActions.item);
+          } else {
+            handleToggleNotePin(itemActions.item);
+          }
+        }}
+        onMove={
+          itemActions.type === 'note'
+            ? () => openMoveNote(itemActions.item)
+            : undefined
+        }
+        onDelete={() => {
+          if (itemActions.type === 'folder') {
+            handleDeleteFolder(itemActions.item);
+          } else {
+            handleDeleteNote(itemActions.item);
+          }
+        }}
+      />
+
+      <MoveNoteModal
+        visible={moveNoteModal.visible}
+        folders={moveNoteModal.folders}
+        currentFolderId={moveNoteModal.note?.folder_id ?? null}
+        onClose={closeMoveNote}
+        onSelect={handleMoveNote}
       />
 
       <Modal visible={showFolderModal} animationType="fade" transparent>

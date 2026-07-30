@@ -1,5 +1,12 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Pressable,
+  StyleSheet,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { radius, shadow, useTheme } from '../theme';
@@ -14,7 +21,7 @@ import {
 const entering = (index) =>
   Platform.OS === 'web' ? undefined : FadeInDown.duration(220).delay(Math.min(index * 40, 240));
 
-const NoteItem = ({ note, onPress, onTogglePin, index = 0 }) => {
+const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -36,9 +43,9 @@ const NoteItem = ({ note, onPress, onTogglePin, index = 0 }) => {
     ? `RM ${formatExpenseAmount(calculateExpenseTotal(expenseRows))}`
     : note.content || 'No content';
 
-  const handlePinPress = (e) => {
+  const handleActionsPress = (e) => {
     e.stopPropagation?.();
-    onTogglePin?.();
+    onOpenActions?.();
   };
 
   return (
@@ -46,8 +53,22 @@ const NoteItem = ({ note, onPress, onTogglePin, index = 0 }) => {
       <TouchableOpacity
         style={styles.container}
         onPress={onPress}
-        onLongPress={onTogglePin}
+        onLongPress={Platform.OS === 'web' ? undefined : onOpenActions}
+        delayLongPress={450}
         activeOpacity={0.7}
+        accessibilityHint={
+          Platform.OS === 'web'
+            ? 'Opens this note'
+            : 'Opens this note. Long press for more actions'
+        }
+        accessibilityActions={
+          Platform.OS === 'web'
+            ? undefined
+            : [{ name: 'longpress', label: 'Show note actions' }]
+        }
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === 'longpress') onOpenActions?.();
+        }}
       >
         <View style={styles.header}>
           <Text style={styles.title} numberOfLines={1}>
@@ -64,18 +85,28 @@ const NoteItem = ({ note, onPress, onTogglePin, index = 0 }) => {
               <Ionicons name="lock-closed" size={12} color={colors.folder} />
             </View>
           )}
-          <TouchableOpacity
-            style={styles.pinButton}
-            onPress={handlePinPress}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.6}
-          >
-            <Ionicons
-              name={note.is_pinned ? 'pin' : 'pin-outline'}
-              size={16}
-              color={note.is_pinned ? colors.primary : colors.textTertiary}
-            />
-          </TouchableOpacity>
+          {!!note.is_pinned && (
+            <View style={styles.pinBadge}>
+              <Ionicons name="pin" size={13} color={colors.primary} />
+            </View>
+          )}
+          {Platform.OS === 'web' && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.webMenuButton,
+                pressed && styles.webMenuButtonPressed,
+              ]}
+              onPress={handleActionsPress}
+              accessibilityRole="button"
+              accessibilityLabel={`More actions for ${displayTitle}`}
+            >
+              <Ionicons
+                name="ellipsis-vertical"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </Pressable>
+          )}
         </View>
         <Text style={styles.preview} numberOfLines={2}>
           {locked ? (isExpense ? 'Locked expense record' : 'Locked note') : preview}
@@ -129,8 +160,25 @@ const makeStyles = (colors) =>
       fontSize: 11,
       fontWeight: '700',
     },
-    pinButton: {
-      padding: 2,
+    pinBadge: {
+      width: 24,
+      height: 24,
+      borderRadius: radius.full,
+      backgroundColor: colors.primarySoft,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    webMenuButton: {
+      width: 44,
+      height: 44,
+      marginVertical: -10,
+      marginRight: -10,
+      borderRadius: radius.full,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    webMenuButtonPressed: {
+      backgroundColor: colors.inputBg,
     },
     preview: {
       fontSize: 14,

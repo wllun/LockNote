@@ -9,13 +9,17 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
 import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
 import CreateNoteTypeModal from '../components/create-note-type-modal';
+import ItemActionsModal from '../components/ItemActionsModal';
+import MoveNoteModal from '../components/MoveNoteModal';
 import { hashPassword } from '../utils/crypto';
 import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
+import { confirmDestructiveAction } from '../utils/confirm-action';
 
 const editorRouteFor = (note) =>
   note.note_type === EXPENSE_NOTE_TYPE ? 'ExpenseRecordEditor' : 'NoteEditor';
@@ -29,6 +33,15 @@ const FolderScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [showNoteTypeModal, setShowNoteTypeModal] = useState(false);
   const [passwordModal, setPasswordModal] = useState({ visible: false, note: null });
+  const [itemActions, setItemActions] = useState({
+    visible: false,
+    note: null,
+  });
+  const [moveNoteModal, setMoveNoteModal] = useState({
+    visible: false,
+    note: null,
+    folders: [],
+  });
 
   const loadNotes = useCallback(async () => {
     try {
@@ -77,6 +90,57 @@ const FolderScreen = ({ route, navigation }) => {
     }
   };
 
+  const openItemActions = (note) => {
+    setItemActions({ visible: true, note });
+  };
+
+  const closeItemActions = () => {
+    setItemActions({ visible: false, note: null });
+  };
+
+  const handleDeleteNote = (note) => {
+    confirmDestructiveAction({
+      title: 'Delete Note',
+      message: 'Are you sure you want to delete this note?',
+      onConfirm: async () => {
+        try {
+          await noteRepo.softDelete(note.id);
+          loadNotes();
+        } catch (error) {
+          Alert.alert('Error', 'Failed to delete note');
+        }
+      },
+    });
+  };
+
+  const openMoveNote = async (note) => {
+    try {
+      const availableFolders = await folderRepo.getAll();
+      setMoveNoteModal({
+        visible: true,
+        note,
+        folders: availableFolders,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load folders');
+    }
+  };
+
+  const closeMoveNote = () => {
+    setMoveNoteModal({ visible: false, note: null, folders: [] });
+  };
+
+  const handleMoveNote = async (targetFolderId) => {
+    const note = moveNoteModal.note;
+    if (!note) return;
+    try {
+      await noteRepo.update(note.id, { folder_id: targetFolderId });
+      loadNotes();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to move note');
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', loadNotes);
     return unsubscribe;
@@ -93,7 +157,7 @@ const FolderScreen = ({ route, navigation }) => {
             note={item}
             index={index}
             onPress={() => handleNotePress(item)}
-            onTogglePin={() => handleToggleNotePin(item)}
+            onOpenActions={() => openItemActions(item)}
           />
         )}
         ListEmptyComponent={
@@ -126,6 +190,24 @@ const FolderScreen = ({ route, navigation }) => {
         visible={showNoteTypeModal}
         onClose={() => setShowNoteTypeModal(false)}
         onSelect={handleCreateNote}
+      />
+
+      <ItemActionsModal
+        visible={itemActions.visible}
+        itemType="note"
+        isPinned={!!itemActions.note?.is_pinned}
+        onClose={closeItemActions}
+        onTogglePin={() => handleToggleNotePin(itemActions.note)}
+        onMove={() => openMoveNote(itemActions.note)}
+        onDelete={() => handleDeleteNote(itemActions.note)}
+      />
+
+      <MoveNoteModal
+        visible={moveNoteModal.visible}
+        folders={moveNoteModal.folders}
+        currentFolderId={folderId}
+        onClose={closeMoveNote}
+        onSelect={handleMoveNote}
       />
 
       <PasswordModal
