@@ -83,6 +83,7 @@ When the user presses the Add button, let them choose one of these note types:
 
 - [X] Pin — already shipped free in Phase 1 scope; decide which tier it belongs to
 - [ ] Coloring note
+- [ ] Custom note background images — allow users to select, change, or remove a background image per note while preserving text readability and local-only storage
 - [ ] View (list/grid?)
 - [ ] Sort
 - [ ] Trash (currently soft-delete with no trash UI)
