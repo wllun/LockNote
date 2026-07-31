@@ -16,7 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
+import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
 import {
+  calculateCategorizedTotal,
   calculateExpenseTotal,
   createExpenseRow,
   formatExpenseAmount,
@@ -24,10 +26,12 @@ import {
   normalizeExpenseAmountInput,
   parseExpenseAmount,
   parseExpenseNote,
+  removeExpenseCategory,
   sanitizeExpenseAmountInput,
   sanitizeExpenseDateInput,
   serializeExpenseNote,
   shouldShowExpenseRowPlaceholder,
+  upsertExpenseCategory,
 } from '../utils/expense-record.mjs';
 import { radius, shadow, useTheme } from '../theme';
 
@@ -40,11 +44,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   const [title, setTitle] = useState('');
   const [rows, setRows] = useState(initialRows);
+  const [categories, setCategories] = useState([]);
+  const [summaryNote, setSummaryNote] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
@@ -54,6 +61,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const latest = useRef({
     title: '',
     rows: initialRows,
+    categories: [],
+    summaryNote: '',
     hasPassword: false,
     isPinned: false,
     deleted: false,
@@ -84,12 +93,16 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       setTitle(loadedTitle);
       setRows(loadedRows);
+      setCategories(parsed.categories);
+      setSummaryNote(parsed.summaryNote);
       setHasPassword(!!note.password);
       setIsPinned(!!note.is_pinned);
       latest.current = {
         ...latest.current,
         title: loadedTitle,
         rows: loadedRows,
+        categories: parsed.categories,
+        summaryNote: parsed.summaryNote,
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
       };
@@ -99,7 +112,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   }, [noteId]);
 
   const scheduleSave = useCallback(
-    (nextTitle, nextRows) => {
+    (
+      nextTitle,
+      nextRows,
+      nextCategories = latest.current.categories,
+      nextSummaryNote = latest.current.summaryNote
+    ) => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       setSaveStatus('Saving...');
 
@@ -108,7 +126,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         try {
           await noteRepo.update(noteId, {
             title: nextTitle.trim(),
-            content: serializeExpenseNote(nextRows),
+            content: serializeExpenseNote(
+              nextRows,
+              nextCategories,
+              nextSummaryNote
+            ),
           });
           setSaveStatus('Saved');
         } catch (error) {
@@ -123,7 +145,71 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const updateDraft = (nextTitle, nextRows) => {
     latest.current.title = nextTitle;
     latest.current.rows = nextRows;
-    scheduleSave(nextTitle, nextRows);
+    scheduleSave(
+      nextTitle,
+      nextRows,
+      latest.current.categories,
+      latest.current.summaryNote
+    );
+  };
+
+  const persistCategories = async (nextCategories) => {
+    const previousCategories = latest.current.categories;
+    if (saveTimeout.current) {
+      clearTimeout(saveTimeout.current);
+      saveTimeout.current = null;
+    }
+    latest.current.categories = nextCategories;
+    setCategories(nextCategories);
+    setSaveStatus('Saving...');
+    try {
+      await noteRepo.update(noteId, {
+        title: latest.current.title.trim(),
+        content: serializeExpenseNote(
+          latest.current.rows,
+          nextCategories,
+          latest.current.summaryNote
+        ),
+      });
+      setSaveStatus('Saved');
+    } catch (error) {
+      latest.current.categories = previousCategories;
+      setCategories(previousCategories);
+      console.error('Expense category save failed:', error);
+      setSaveStatus('Could not save');
+      scheduleSave(
+        latest.current.title,
+        latest.current.rows,
+        previousCategories,
+        latest.current.summaryNote
+      );
+      throw error;
+    }
+  };
+
+  const handleSaveCategory = async (result) => {
+    const nextCategories = upsertExpenseCategory(latest.current.categories, result);
+    await persistCategories(nextCategories);
+  };
+
+  const handleDeleteCategory = async (categoryId) => {
+    const nextCategories = removeExpenseCategory(latest.current.categories, categoryId);
+    try {
+      await persistCategories(nextCategories);
+    } catch {
+      Alert.alert('Error', 'Failed to delete the saved category.');
+    }
+  };
+
+  const handleSummaryNoteChange = (value) => {
+    setSummaryNote(value);
+    latest.current.summaryNote = value;
+    scheduleSave(
+      latest.current.title,
+      latest.current.rows,
+      latest.current.categories,
+      value
+    );
   };
 
   const handleTitleChange = (value) => {
@@ -258,7 +344,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       if (draft.deleted) return;
 
       if (
-        isExpenseNoteEmpty(draft.title, draft.rows) &&
+        isExpenseNoteEmpty(
+          draft.title,
+          draft.rows,
+          draft.categories,
+          draft.summaryNote
+        ) &&
         !draft.hasPassword &&
         !draft.isPinned
       ) {
@@ -267,7 +358,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         noteRepo
           .update(noteId, {
             title: draft.title.trim(),
-            content: serializeExpenseNote(draft.rows),
+            content: serializeExpenseNote(
+              draft.rows,
+              draft.categories,
+              draft.summaryNote
+            ),
           })
           .catch(() => {});
       }
@@ -345,6 +440,27 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 RM {formatExpenseAmount(total)}
               </Text>
             </View>
+          </View>
+
+          <View style={styles.summaryActionRow}>
+            <View>
+              <Text style={styles.summaryActionTitle}>Monthly categories</Text>
+              <Text style={styles.summaryActionHint}>
+                {categories.length
+                  ? `${categories.length} saved · RM ${formatExpenseAmount(calculateCategorizedTotal(categories))}`
+                  : 'Group matching expense remarks'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.summaryButton}
+              onPress={() => setShowSummaryModal(true)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Open monthly expense summary"
+            >
+              <Ionicons name="bar-chart-outline" size={19} color={colors.primary} />
+              <Text style={styles.summaryButtonText}>Summary</Text>
+            </TouchableOpacity>
           </View>
 
           {/* <View style={styles.sectionHeading}>
@@ -613,6 +729,18 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
+      <ExpenseSummaryModal
+        visible={showSummaryModal}
+        onClose={() => setShowSummaryModal(false)}
+        rows={rows}
+        categories={categories}
+        summaryNote={summaryNote}
+        saveStatus={saveStatus}
+        onSave={handleSaveCategory}
+        onDelete={handleDeleteCategory}
+        onNoteChange={handleSummaryNoteChange}
+      />
+
       <NoteExportModal
         visible={showExportModal}
         onClose={() => setShowExportModal(false)}
@@ -814,6 +942,42 @@ const makeStyles = (colors) =>
     },
     summaryContent: {
       alignItems: 'flex-end',
+    },
+    summaryActionRow: {
+      minHeight: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingHorizontal: 2,
+    },
+    summaryActionTitle: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    summaryActionHint: {
+      color: colors.textTertiary,
+      fontSize: 11,
+      marginTop: 2,
+    },
+    summaryButton: {
+      minWidth: 116,
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: radius.md,
+      backgroundColor: colors.card,
+    },
+    summaryButtonText: {
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: '800',
     },
     totalLabel: {
       color: colors.textTertiary,

@@ -52,8 +52,12 @@ Two tables / collections. Timestamps are ISO strings; IDs are generated client-s
 
 `note_type` defaults to `note` for existing/plaintext notes. Expense notes use
 `expense`; their editable table rows (`date`, `remark`, and `amount`) are stored
-as versioned JSON in `content` and edited by `ExpenseRecordEditorScreen`. The
-note's `title` remains in the normal title column.
+as versioned JSON in `content` and edited by `ExpenseRecordEditorScreen`. Version
+4 also stores named monthly-summary categories and one shared summary note in the
+same payload. Categories may contain multiple case-insensitive remark keywords or
+a manually entered amount; saving a normalized category name again updates it
+instead of creating a duplicate. The note's `title` remains in the normal title
+column.
 
 On native, `notes.folder_id` has `ON DELETE CASCADE` and there are indexes on `folder_id` and both `is_deleted` columns.
 
