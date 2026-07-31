@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
+import NoteExportModal from '../components/NoteExportModal';
 import {
   calculateExpenseTotal,
   createExpenseRow,
@@ -43,6 +44,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [isPinned, setIsPinned] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
@@ -316,7 +318,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="More expense note actions"
-          accessibilityHint="Shows pin, password, and delete actions"
+          accessibilityHint="Shows pin, password, export, and delete actions"
           accessibilityState={{ expanded: showActionsMenu }}
         >
           <Ionicons name="ellipsis-vertical" size={22} color={colors.text} />
@@ -532,6 +534,22 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               ]}
               onPress={() => {
                 setShowActionsMenu(false);
+                setShowExportModal(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Export expense note"
+            >
+              <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Export PDF or image</Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionsMenuItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                setShowActionsMenu(false);
                 handleTogglePin();
               }}
               accessibilityRole="button"
@@ -594,6 +612,15 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
+
+      <NoteExportModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        title={title}
+        rows={rows}
+        total={total}
+        type="expense"
+      />
 
       <Modal visible={showLockModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>

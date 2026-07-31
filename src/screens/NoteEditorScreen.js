@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
+import NoteExportModal from '../components/NoteExportModal';
 import { radius, shadow, useTheme } from '../theme';
 import {
   getNormalNoteCharacterCount,
@@ -31,6 +32,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [isPinned, setIsPinned] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const saveTimeout = useRef(null);
@@ -226,7 +228,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel="More note actions"
-          accessibilityHint="Shows pin, password, and delete actions"
+          accessibilityHint="Shows pin, password, export, and delete actions"
           accessibilityState={{ expanded: showActionsMenu }}
         >
           <Ionicons name="ellipsis-vertical" size={22} color={colors.text} />
@@ -276,6 +278,22 @@ const NoteEditorScreen = ({ route, navigation }) => {
             style={[styles.actionsMenu, { top: insets.top + 60 }]}
             accessibilityViewIsModal
           >
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionsMenuItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                setShowActionsMenu(false);
+                setShowExportModal(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Export note"
+            >
+              <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Export PDF or image</Text>
+            </Pressable>
+
             <Pressable
               style={({ pressed }) => [
                 styles.actionsMenuItem,
@@ -343,6 +361,13 @@ const NoteEditorScreen = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
+
+      <NoteExportModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        title={title}
+        content={content}
+      />
 
       <Modal visible={showLockModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
