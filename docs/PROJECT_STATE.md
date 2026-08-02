@@ -77,7 +77,7 @@ When the user presses the Add button, let them choose one of these note types:
 - [X] Add selection popup on both the Home and Folder Add buttons (unsupported types are clearly marked as coming soon)
 - [ ] Note — plaintext
 - [ ] Checklist — checkbox listing
-- [X] Expense Record — titled multi-row table with direct date/remark/amount entry, row controls, total, local persistence, list summaries, password/pin support, and 800 ms autosave
+- [X] Expense Record — titled multi-row table with direct date/remark/amount entry, row add/delete/reorder controls, total, local persistence, list summaries, password/pin support, and 800 ms autosave
 - [X] Expense Record monthly summaries — named categories support multiple case-insensitive remark keywords or manual amounts, same-name updates, and one shared auto-saved summary note
 - [ ] Expense Record currency selection — currently uses RM; consider storing a currency code per expense note and applying it consistently to table headers, totals, and Home/Folder summaries
 - [ ] Reminder — plaintext with notification settings

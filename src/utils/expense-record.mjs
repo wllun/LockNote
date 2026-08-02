@@ -13,6 +13,25 @@ export const createExpenseRow = (values = {}) => ({
       : '',
 });
 
+export const moveExpenseRow = (rows, rowId, direction) => {
+  if (!Array.isArray(rows) || (direction !== 'up' && direction !== 'down')) {
+    return rows;
+  }
+
+  const currentIndex = rows.findIndex((row) => row?.id === rowId);
+  const targetIndex = currentIndex + (direction === 'up' ? -1 : 1);
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= rows.length) {
+    return rows;
+  }
+
+  const reorderedRows = [...rows];
+  [reorderedRows[currentIndex], reorderedRows[targetIndex]] = [
+    reorderedRows[targetIndex],
+    reorderedRows[currentIndex],
+  ];
+  return reorderedRows;
+};
+
 const normalizeRows = (rows) =>
   Array.isArray(rows)
     ? rows

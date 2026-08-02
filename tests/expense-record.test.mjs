@@ -7,6 +7,7 @@ import {
   createExpenseRow,
   expenseRowHasContent,
   isExpenseNoteEmpty,
+  moveExpenseRow,
   normalizeExpenseAmountInput,
   normalizeExpenseCategoryKeyword,
   parseExpenseAmount,
@@ -18,6 +19,26 @@ import {
   upsertExpenseCategory,
   removeExpenseCategory,
 } from '../src/utils/expense-record.mjs';
+
+test('moves expense rows up and down without changing their data', () => {
+  const rows = [
+    createExpenseRow({ id: 'row-1', remark: 'Food', amount: '10.00' }),
+    createExpenseRow({ id: 'row-2', remark: 'Petrol', amount: '20.00' }),
+    createExpenseRow({ id: 'row-3', remark: 'Parking', amount: '5.00' }),
+  ];
+
+  const movedUp = moveExpenseRow(rows, 'row-3', 'up');
+  assert.deepEqual(movedUp.map((row) => row.id), ['row-1', 'row-3', 'row-2']);
+  assert.equal(movedUp[1], rows[2]);
+  assert.deepEqual(
+    moveExpenseRow(movedUp, 'row-3', 'down').map((row) => row.id),
+    ['row-1', 'row-2', 'row-3']
+  );
+
+  assert.equal(moveExpenseRow(rows, 'row-1', 'up'), rows);
+  assert.equal(moveExpenseRow(rows, 'row-3', 'down'), rows);
+  assert.equal(moveExpenseRow(rows, 'missing', 'up'), rows);
+});
 
 test('serializes and parses multiple expense rows', () => {
   const rows = [
