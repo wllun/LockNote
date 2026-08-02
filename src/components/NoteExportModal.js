@@ -2,17 +2,35 @@ import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { exportNoteImage, exportNotePdf } from '../utils/note-export';
-import { formatExpenseAmount } from '../utils/expense-record.mjs';
-import { getExportTitle } from '../utils/note-export.mjs';
+import {
+  formatExportAmount,
+  getExpenseExportCategories,
+  getExpenseExportCategorizedTotal,
+  getExpenseExportCategoryDescription,
+  getExportTitle,
+} from '../utils/note-export.mjs';
 import { radius, shadow, useTheme } from '../theme';
 
-const NoteExportModal = ({ visible, onClose, title, content = '', rows, total = 0, type = 'note' }) => {
+const NoteExportModal = ({
+  visible,
+  onClose,
+  title,
+  content = '',
+  rows,
+  total = 0,
+  categories = [],
+  summaryNote = '',
+  type = 'note',
+}) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const previewRef = useRef(null);
   const [exporting, setExporting] = useState(null);
-  const exportData = { title, content, rows, total, type };
+  const exportData = { title, content, rows, total, categories, summaryNote, type };
   const visibleRows = rows?.filter((row) => row.date?.trim() || row.remark?.trim() || row.amount?.trim()) ?? [];
+  const visibleCategories = getExpenseExportCategories(categories);
+  const visibleSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
+  const hasMonthlySummary = visibleCategories.length > 0 || visibleSummaryNote.length > 0;
 
   const runExport = async (format) => {
     setExporting(format);
@@ -58,7 +76,39 @@ const NoteExportModal = ({ visible, onClose, title, content = '', rows, total = 
                       <Text style={[styles.cell, styles.amountCell]}>{row.amount || '0.00'}</Text>
                     </View>
                   ))}
-                  <Text style={styles.total}>Total  RM {formatExpenseAmount(total)}</Text>
+                  <Text style={styles.total}>Total  RM {formatExportAmount(total)}</Text>
+                  {hasMonthlySummary && (
+                    <View style={styles.monthlySummary}>
+                      <Text style={styles.summaryTitle}>Monthly summary</Text>
+                      {visibleCategories.map((category) => (
+                        <View key={category.id || category.name} style={styles.summaryCategoryRow}>
+                          <View style={styles.summaryCategoryInfo}>
+                            <Text style={styles.summaryCategoryName}>{category.name}</Text>
+                            <Text style={styles.summaryCategoryMeta}>
+                              {getExpenseExportCategoryDescription(category)}
+                            </Text>
+                          </View>
+                          <Text style={styles.summaryCategoryAmount}>
+                            RM {formatExportAmount(category.amount)}
+                          </Text>
+                        </View>
+                      ))}
+                      {!!visibleCategories.length && (
+                        <View style={styles.categorizedTotalRow}>
+                          <Text style={styles.categorizedTotalLabel}>Categorized total</Text>
+                          <Text style={styles.categorizedTotalAmount}>
+                            RM {formatExportAmount(getExpenseExportCategorizedTotal(visibleCategories))}
+                          </Text>
+                        </View>
+                      )}
+                      {!!visibleSummaryNote && (
+                        <View style={styles.summaryNoteCard}>
+                          <Text style={styles.summaryNoteLabel}>Summary note</Text>
+                          <Text style={styles.summaryNoteText}>{visibleSummaryNote}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </>
               ) : (
                 <Text style={styles.previewBody}>{content || 'This note is empty.'}</Text>
@@ -105,6 +155,19 @@ const makeStyles = (colors) => StyleSheet.create({
   cell: { color: '#30384c', fontSize: 12, padding: 8 },
   dateCell: { width: 64 }, remarkCell: { flex: 1 }, amountCell: { width: 92, textAlign: 'right' },
   total: { color: '#4854dc', textAlign: 'right', fontSize: 17, fontWeight: '800', marginTop: 18 },
+  monthlySummary: { marginTop: 28, paddingTop: 20, borderTopWidth: 2, borderTopColor: '#dfe3ee' },
+  summaryTitle: { color: '#172033', fontSize: 18, lineHeight: 23, fontWeight: '800', marginBottom: 10 },
+  summaryCategoryRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#dfe3ee' },
+  summaryCategoryInfo: { flex: 1, minWidth: 0 },
+  summaryCategoryName: { color: '#30384c', fontSize: 13, fontWeight: '800' },
+  summaryCategoryMeta: { color: '#687086', fontSize: 10, lineHeight: 15, marginTop: 2 },
+  summaryCategoryAmount: { color: '#30384c', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  categorizedTotalRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 12 },
+  categorizedTotalLabel: { color: '#687086', fontSize: 12, fontWeight: '700' },
+  categorizedTotalAmount: { color: '#4854dc', fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  summaryNoteCard: { marginTop: 18, padding: 14, borderLeftWidth: 4, borderLeftColor: '#5b67f1', backgroundColor: '#f6f7fb' },
+  summaryNoteLabel: { color: '#30384c', fontSize: 11, fontWeight: '800', marginBottom: 5 },
+  summaryNoteText: { color: '#30384c', fontSize: 12, lineHeight: 18 },
   brand: { color: '#8a91a3', fontSize: 10, marginTop: 28 },
   actions: { flexDirection: 'row', gap: 12 },
   action: { flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.md, backgroundColor: colors.primary },

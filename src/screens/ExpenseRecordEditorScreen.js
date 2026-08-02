@@ -747,6 +747,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         title={title}
         rows={rows}
         total={total}
+        categories={categories}
+        summaryNote={summaryNote}
         type="expense"
       />
 

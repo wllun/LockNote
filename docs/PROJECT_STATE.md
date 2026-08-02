@@ -63,7 +63,7 @@ _Snapshot: 2026-07-30. Check off items as they land._
 
 ### Phase 4 — Export
 
-- [X] Export PDF & image - note and expense editors provide a preview and export through native sharing; web prints/saves PDF and downloads PNG locally
+- [X] Export PDF & image - note and expense editors provide a preview and export through native sharing; web prints/saves PDF and downloads PNG locally. Expense exports include saved monthly categories, categorized total, and the shared summary note.
 
 ### Phase 5 — Structure (not premium)
 

@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildNoteExportHtml,
+  getExpenseExportCategories,
+  getExpenseExportCategoryDescription,
   getExportFileName,
   getExportTitle,
 } from '../src/utils/note-export.mjs';
@@ -33,4 +35,43 @@ test('renders expense rows and the calculated total in PDF HTML', () => {
   assert.match(html, /<table>/);
   assert.match(html, /Lunch &amp; coffee/);
   assert.match(html, /RM 18\.50/);
+});
+
+test('renders monthly categories and the summary note in expense PDF HTML', () => {
+  const html = buildNoteExportHtml({
+    title: 'July expenses',
+    rows: [{ date: '12', remark: 'Lunch', amount: '18.50' }],
+    total: 18.5,
+    categories: [
+      {
+        id: 'food',
+        name: 'Food & drinks',
+        keywords: ['Lunch', '<coffee>'],
+        amount: 1234.5,
+        match_count: 2,
+      },
+      { id: 'cash', name: 'Cash', keywords: [], amount: 50, match_count: 0 },
+    ],
+    summaryNote: 'Check <receipts>\nClaim before Friday.',
+  });
+
+  assert.match(html, /Monthly summary/);
+  assert.match(html, /Food &amp; drinks/);
+  assert.match(html, /Lunch, &lt;coffee&gt; - 2 matching entries/);
+  assert.match(html, /Manual amount/);
+  assert.match(html, /Categorized total/);
+  assert.match(html, /RM 1,284\.50/);
+  assert.match(html, /Check &lt;receipts&gt;<br>Claim before Friday\./);
+});
+
+test('normalizes expense categories for export descriptions', () => {
+  const categories = getExpenseExportCategories([
+    null,
+    { name: '  Petrol  ', keywords: [' Shell ', ''], amount: '80', match_count: '1' },
+    { name: '   ', amount: 20 },
+  ]);
+
+  assert.equal(categories.length, 1);
+  assert.equal(categories[0].name, 'Petrol');
+  assert.equal(getExpenseExportCategoryDescription(categories[0]), 'Shell - 1 matching entry');
 });
