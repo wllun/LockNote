@@ -23,6 +23,7 @@ import {
   createExpenseRow,
   formatExpenseAmount,
   isExpenseNoteEmpty,
+  moveExpenseRow,
   normalizeExpenseAmountInput,
   parseExpenseAmount,
   parseExpenseNote,
@@ -52,6 +53,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [activeRowActionId, setActiveRowActionId] = useState(null);
   const [lockPassword, setLockPassword] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
@@ -72,6 +74,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const invalidAmountCount = rows.filter(
     (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
   ).length;
+  const activeRowActionIndex = rows.findIndex(
+    (row) => row.id === activeRowActionId
+  );
 
   const loadRecord = useCallback(async () => {
     try {
@@ -240,6 +245,15 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const removeRow = (rowId) => {
     const remainingRows = latest.current.rows.filter((row) => row.id !== rowId);
     const nextRows = remainingRows.length ? remainingRows : [createExpenseRow()];
+    setRows(nextRows);
+    updateDraft(latest.current.title, nextRows);
+  };
+
+  const moveRow = (rowId, direction) => {
+    const nextRows = moveExpenseRow(latest.current.rows, rowId, direction);
+    setActiveRowActionId(null);
+    if (nextRows === latest.current.rows) return;
+
     setRows(nextRows);
     updateDraft(latest.current.title, nextRows);
   };
@@ -570,13 +584,18 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                   />
                   <TouchableOpacity
                     style={styles.actionColumn}
-                    onPress={() => removeRow(row.id)}
+                    onPress={() => setActiveRowActionId(row.id)}
                     activeOpacity={0.7}
                     accessibilityRole="button"
-                    accessibilityLabel={`Delete expense row ${index + 1}`}
+                    accessibilityLabel={`Actions for expense row ${index + 1}`}
+                    accessibilityHint="Move this row up or down, or delete it"
                   >
-                    <View style={styles.removeRowIcon}>
-                      <Ionicons name="close" size={16} color={colors.danger} />
+                    <View style={styles.rowActionsIcon}>
+                      <Ionicons
+                        name="ellipsis-horizontal"
+                        size={18}
+                        color={colors.textSecondary}
+                      />
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -724,6 +743,92 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>
                 Delete note
               </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={activeRowActionIndex >= 0}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setActiveRowActionId(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setActiveRowActionId(null)}
+            accessible={false}
+          />
+          <View style={styles.rowActionsMenu} accessibilityViewIsModal>
+            <Text style={styles.rowActionsTitle}>
+              Row {activeRowActionIndex + 1}
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.rowActionsMenuItem,
+                activeRowActionIndex === 0 && styles.rowActionsMenuItemDisabled,
+                pressed && activeRowActionIndex > 0 && styles.actionsMenuItemPressed,
+              ]}
+              disabled={activeRowActionIndex === 0}
+              onPress={() => moveRow(activeRowActionId, 'up')}
+              accessibilityRole="button"
+              accessibilityLabel={`Move expense row ${activeRowActionIndex + 1} up`}
+              accessibilityState={{ disabled: activeRowActionIndex === 0 }}
+            >
+              <Ionicons name="arrow-up" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Move up</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.rowActionsMenuItem,
+                activeRowActionIndex === rows.length - 1 &&
+                  styles.rowActionsMenuItemDisabled,
+                pressed &&
+                  activeRowActionIndex < rows.length - 1 &&
+                  styles.actionsMenuItemPressed,
+              ]}
+              disabled={activeRowActionIndex === rows.length - 1}
+              onPress={() => moveRow(activeRowActionId, 'down')}
+              accessibilityRole="button"
+              accessibilityLabel={`Move expense row ${activeRowActionIndex + 1} down`}
+              accessibilityState={{
+                disabled: activeRowActionIndex === rows.length - 1,
+              }}
+            >
+              <Ionicons name="arrow-down" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Move down</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.rowActionsMenuItem,
+                styles.actionsMenuDeleteItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                const rowId = activeRowActionId;
+                setActiveRowActionId(null);
+                removeRow(rowId);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete expense row ${activeRowActionIndex + 1}`}
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
+              <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>
+                Delete row
+              </Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.rowActionsMenuItem,
+                styles.rowActionsCancelItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => setActiveRowActionId(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel row actions"
+            >
+              <Text style={styles.rowActionsCancelText}>Cancel</Text>
             </Pressable>
           </View>
         </View>
@@ -1093,11 +1198,11 @@ const makeStyles = (colors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    removeRowIcon: {
+    rowActionsIcon: {
       width: 28,
       height: 28,
       borderRadius: radius.full,
-      backgroundColor: colors.dangerSoft,
+      backgroundColor: colors.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1162,6 +1267,47 @@ const makeStyles = (colors) =>
       justifyContent: 'center',
       alignItems: 'center',
       padding: 24,
+    },
+    rowActionsMenu: {
+      width: '100%',
+      maxWidth: 340,
+      overflow: 'hidden',
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.lg,
+      ...shadow.card,
+    },
+    rowActionsTitle: {
+      color: colors.text,
+      fontSize: 17,
+      fontWeight: '800',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    rowActionsMenuItem: {
+      minHeight: 50,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      backgroundColor: colors.card,
+    },
+    rowActionsMenuItemDisabled: {
+      opacity: 0.35,
+    },
+    rowActionsCancelItem: {
+      justifyContent: 'center',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    rowActionsCancelText: {
+      color: colors.textSecondary,
+      fontSize: 16,
+      fontWeight: '700',
+      textAlign: 'center',
     },
     modalContent: {
       backgroundColor: colors.card,
