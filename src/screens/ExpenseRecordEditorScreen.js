@@ -12,9 +12,10 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
@@ -42,6 +43,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const { noteId } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const initialRows = useMemo(() => [createExpenseRow()], []);
 
@@ -60,6 +62,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [focusedCell, setFocusedCell] = useState(null);
   const [draggingRowId, setDraggingRowId] = useState(null);
   const [isDraggingRow, setIsDraggingRow] = useState(false);
+  const [dragPreview, setDragPreview] = useState(null);
+  const [isOverDeleteTarget, setIsOverDeleteTarget] = useState(false);
 
   const saveTimeout = useRef(null);
   const inputRefs = useRef({});
@@ -278,7 +282,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   const moveRow = (rowId, direction) => {
     const nextRows = moveExpenseRow(latest.current.rows, rowId, direction);
-    setActiveRowActionId(null);
     if (nextRows === latest.current.rows) return;
 
     setRows(nextRows);
@@ -301,6 +304,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const createRowDragResponder = (rowId, startIndex) => {
     let longPressTimeout = null;
     let longPressTriggered = false;
+    let overDeleteTarget = false;
+    const rowsBeforeDrag = latest.current.rows;
 
     const cancelLongPress = () => {
       if (!longPressTimeout) return;
@@ -327,18 +332,41 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         if (Math.abs(gestureState.dy) <= 4) return;
         cancelLongPress();
         setIsDraggingRow(true);
-        const rowOffset = Math.round(gestureState.dy / 48);
-        reorderRow(rowId, startIndex + rowOffset);
+        const currentRow = latest.current.rows.find((row) => row.id === rowId);
+        const deleteTargetTop = windowHeight - Math.max(96, insets.bottom + 88);
+        overDeleteTarget =
+          Math.abs(gestureState.moveX - windowWidth / 2) <= 76 &&
+          gestureState.moveY >= deleteTargetTop;
+        setIsOverDeleteTarget(overDeleteTarget);
+        setDragPreview({
+          row: currentRow,
+          x: gestureState.moveX,
+          y: gestureState.moveY,
+        });
+
+        if (!overDeleteTarget) {
+          const rowOffset = Math.round(gestureState.dy / 48);
+          reorderRow(rowId, startIndex + rowOffset);
+        }
       },
       onPanResponderRelease: () => {
         cancelLongPress();
         setDraggingRowId(null);
         setIsDraggingRow(false);
+        setDragPreview(null);
+        setIsOverDeleteTarget(false);
+        if (overDeleteTarget) {
+          setRows(rowsBeforeDrag);
+          updateDraft(latest.current.title, rowsBeforeDrag);
+          confirmRemoveRow(rowId);
+        }
       },
       onPanResponderTerminate: () => {
         cancelLongPress();
         setDraggingRowId(null);
         setIsDraggingRow(false);
+        setDragPreview(null);
+        setIsOverDeleteTarget(false);
       },
       onPanResponderTerminationRequest: () => false,
     });
@@ -577,10 +605,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
           <View style={styles.table}>
             <View style={[styles.tableRow, styles.tableHeader]}>
+              <View style={[styles.actionColumn, styles.actionHeaderColumn]} />
               <Text style={[styles.headerCell, styles.dateColumn]}>Date</Text>
               <Text style={[styles.headerCell, styles.remarkColumn]}>Remark</Text>
               <Text style={[styles.headerCell, styles.amountColumn]}>Amount (RM)</Text>
-              <View style={styles.actionColumn} />
             </View>
 
             {rows.map((row, index) => {
@@ -599,6 +627,37 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     draggingRowId === row.id && styles.draggingRow,
                   ]}
                 >
+                  <View
+                    style={styles.actionColumn}
+                    {...dragResponder.panHandlers}
+                    accessible
+                    accessibilityRole="adjustable"
+                    accessibilityLabel={`Reorder expense row ${index + 1}`}
+                    accessibilityHint="Drag up or down to reorder. Long press to delete this row."
+                    accessibilityActions={[
+                      { name: 'increment', label: 'Move row down' },
+                      { name: 'decrement', label: 'Move row up' },
+                      { name: 'activate', label: 'Delete row' },
+                    ]}
+                    onAccessibilityAction={({ nativeEvent }) => {
+                      if (nativeEvent.actionName === 'increment') moveRow(row.id, 'down');
+                      if (nativeEvent.actionName === 'decrement') moveRow(row.id, 'up');
+                      if (nativeEvent.actionName === 'activate') confirmRemoveRow(row.id);
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.rowActionsIcon,
+                        draggingRowId === row.id && styles.rowActionsIconDragging,
+                      ]}
+                    >
+                      <FontAwesome5
+                        name="th"
+                        size={16}
+                        color={colors.textSecondary}
+                      />
+                    </View>
+                  </View>
                   <TextInput
                     ref={(ref) => {
                       inputRefs.current[`${row.id}:date`] = ref;
@@ -671,37 +730,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     selectTextOnFocus
                     accessibilityLabel={`Amount for expense row ${index + 1}`}
                   />
-                  <View
-                    style={styles.actionColumn}
-                    {...dragResponder.panHandlers}
-                    accessible
-                    accessibilityRole="adjustable"
-                    accessibilityLabel={`Reorder expense row ${index + 1}`}
-                    accessibilityHint="Drag up or down to reorder. Long press to delete this row."
-                    accessibilityActions={[
-                      { name: 'increment', label: 'Move row down' },
-                      { name: 'decrement', label: 'Move row up' },
-                      { name: 'activate', label: 'Delete row' },
-                    ]}
-                    onAccessibilityAction={({ nativeEvent }) => {
-                      if (nativeEvent.actionName === 'increment') moveRow(row.id, 'down');
-                      if (nativeEvent.actionName === 'decrement') moveRow(row.id, 'up');
-                      if (nativeEvent.actionName === 'activate') confirmRemoveRow(row.id);
-                    }}
-                  >
-                    <View
-                      style={[
-                        styles.rowActionsIcon,
-                        draggingRowId === row.id && styles.rowActionsIconDragging,
-                      ]}
-                    >
-                      <Ionicons
-                        name="reorder-three-outline"
-                        size={22}
-                        color={colors.textSecondary}
-                      />
-                    </View>
-                  </View>
                 </View>
               );
             })}
@@ -749,6 +777,66 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           </View>
         </View>
       </ScrollView>
+
+      {isDraggingRow && dragPreview?.row && (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <View
+            style={[
+              styles.dragPreview,
+              isOverDeleteTarget && styles.dragPreviewDeleting,
+              {
+                width: Math.min(340, windowWidth - 32),
+                left: Math.max(
+                  16,
+                  Math.min(
+                    dragPreview.x - Math.min(340, windowWidth - 32) / 2,
+                    windowWidth - Math.min(340, windowWidth - 32) - 16
+                  )
+                ),
+                top: Math.max(insets.top + 8, dragPreview.y - 76),
+              },
+            ]}
+          >
+            <FontAwesome5 name="th" size={15} color={colors.textSecondary} />
+            <Text style={styles.dragPreviewDate} numberOfLines={1}>
+              {dragPreview.row.date.trim() || 'No date'}
+            </Text>
+            <Text style={styles.dragPreviewRemark} numberOfLines={1}>
+              {dragPreview.row.remark.trim() || 'No remark'}
+            </Text>
+            <Text style={styles.dragPreviewAmount} numberOfLines={1}>
+              {dragPreview.row.amount.trim()
+                ? `RM ${dragPreview.row.amount.trim()}`
+                : 'No amount'}
+            </Text>
+          </View>
+
+          <View
+            style={[
+              styles.dragDeleteTarget,
+              isOverDeleteTarget && styles.dragDeleteTargetActive,
+              {
+                left: windowWidth / 2 - 58,
+                bottom: Math.max(16, insets.bottom + 8),
+              },
+            ]}
+          >
+            <Ionicons
+              name={isOverDeleteTarget ? 'trash' : 'trash-outline'}
+              size={25}
+              color={isOverDeleteTarget ? colors.card : colors.danger}
+            />
+            <Text
+              style={[
+                styles.dragDeleteTargetText,
+                isOverDeleteTarget && styles.dragDeleteTargetTextActive,
+              ]}
+            >
+              Drop to delete
+            </Text>
+          </View>
+        </View>
+      )}
 
       <Modal
         visible={showActionsMenu}
@@ -1221,19 +1309,83 @@ const makeStyles = (colors) =>
       width: 44,
       alignItems: 'center',
       justifyContent: 'center',
+      borderRightWidth: 1,
+      borderRightColor: colors.border,
+    },
+    actionHeaderColumn: {
+      borderRightColor: 'rgba(255,255,255,0.18)',
     },
     rowActionsIcon: {
       width: 28,
       height: 28,
-      borderRadius: radius.full,
-      backgroundColor: colors.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
     rowActionsIconDragging: {
       backgroundColor: colors.card,
+      borderRadius: radius.md,
       borderWidth: 1,
       borderColor: colors.primary,
+    },
+    dragPreview: {
+      position: 'absolute',
+      minHeight: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 14,
+      backgroundColor: colors.card,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      borderRadius: radius.md,
+      ...shadow.card,
+    },
+    dragPreviewDeleting: {
+      borderColor: colors.danger,
+      backgroundColor: colors.dangerSoft,
+    },
+    dragPreviewDate: {
+      width: 54,
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    dragPreviewRemark: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    dragPreviewAmount: {
+      maxWidth: 92,
+      color: colors.text,
+      fontSize: 13,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    dragDeleteTarget: {
+      position: 'absolute',
+      width: 116,
+      minHeight: 68,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      backgroundColor: colors.card,
+      borderWidth: 2,
+      borderColor: colors.danger,
+      borderRadius: radius.lg,
+      ...shadow.card,
+    },
+    dragDeleteTargetActive: {
+      backgroundColor: colors.danger,
+    },
+    dragDeleteTargetText: {
+      color: colors.danger,
+      fontSize: 11,
+      fontWeight: '800',
+    },
+    dragDeleteTargetTextActive: {
+      color: colors.card,
     },
     invalidCell: {
       color: colors.danger,
