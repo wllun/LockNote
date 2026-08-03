@@ -55,7 +55,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [activeRowActionId, setActiveRowActionId] = useState(null);
   const [lockPassword, setLockPassword] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
@@ -78,9 +77,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const invalidAmountCount = rows.filter(
     (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
   ).length;
-  const activeRowActionIndex = rows.findIndex(
-    (row) => row.id === activeRowActionId
-  );
 
   const loadRecord = useCallback(async () => {
     try {
@@ -253,6 +249,33 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     updateDraft(latest.current.title, nextRows);
   };
 
+  const confirmRemoveRow = (rowId) => {
+    const currentRows = latest.current.rows;
+    const rowIndex = currentRows.findIndex((row) => row.id === rowId);
+    if (rowIndex < 0) return;
+
+    const row = currentRows[rowIndex];
+    const amount = parseExpenseAmount(row.amount);
+    Alert.alert(
+      `Delete expense row ${rowIndex + 1}?`,
+      [
+        `Date: ${row.date.trim() || 'Not entered'}`,
+        `Remark: ${row.remark.trim() || 'Not entered'}`,
+        `Amount: ${amount === null ? row.amount.trim() || 'Not entered' : `RM ${formatExpenseAmount(amount)}`}`,
+        '',
+        'This row will be removed from the expense note.',
+      ].join('\n'),
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete row',
+          style: 'destructive',
+          onPress: () => removeRow(rowId),
+        },
+      ]
+    );
+  };
+
   const moveRow = (rowId, direction) => {
     const nextRows = moveExpenseRow(latest.current.rows, rowId, direction);
     setActiveRowActionId(null);
@@ -276,7 +299,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const createRowDragResponder = (rowId, startIndex) => {
-    let didMove = false;
+    let longPressTimeout = null;
+    let longPressTriggered = false;
+
+    const cancelLongPress = () => {
+      if (!longPressTimeout) return;
+      clearTimeout(longPressTimeout);
+      longPressTimeout = null;
+    };
 
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -285,20 +315,28 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       onPanResponderGrant: () => {
         Keyboard.dismiss();
         setDraggingRowId(rowId);
+        longPressTimeout = setTimeout(() => {
+          longPressTimeout = null;
+          longPressTriggered = true;
+          setDraggingRowId(null);
+          confirmRemoveRow(rowId);
+        }, 650);
       },
       onPanResponderMove: (_, gestureState) => {
+        if (longPressTriggered) return;
         if (Math.abs(gestureState.dy) <= 4) return;
-        didMove = true;
+        cancelLongPress();
         setIsDraggingRow(true);
         const rowOffset = Math.round(gestureState.dy / 48);
         reorderRow(rowId, startIndex + rowOffset);
       },
       onPanResponderRelease: () => {
+        cancelLongPress();
         setDraggingRowId(null);
         setIsDraggingRow(false);
-        if (!didMove) setActiveRowActionId(rowId);
       },
       onPanResponderTerminate: () => {
+        cancelLongPress();
         setDraggingRowId(null);
         setIsDraggingRow(false);
       },
@@ -639,14 +677,16 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     accessible
                     accessibilityRole="adjustable"
                     accessibilityLabel={`Reorder expense row ${index + 1}`}
-                    accessibilityHint="Drag up or down to reorder. Tap for row actions."
+                    accessibilityHint="Drag up or down to reorder. Long press to delete this row."
                     accessibilityActions={[
                       { name: 'increment', label: 'Move row down' },
                       { name: 'decrement', label: 'Move row up' },
+                      { name: 'activate', label: 'Delete row' },
                     ]}
                     onAccessibilityAction={({ nativeEvent }) => {
                       if (nativeEvent.actionName === 'increment') moveRow(row.id, 'down');
                       if (nativeEvent.actionName === 'decrement') moveRow(row.id, 'up');
+                      if (nativeEvent.actionName === 'activate') confirmRemoveRow(row.id);
                     }}
                   >
                     <View
@@ -807,57 +847,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>
                 Delete note
               </Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={activeRowActionIndex >= 0}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setActiveRowActionId(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setActiveRowActionId(null)}
-            accessible={false}
-          />
-          <View style={styles.rowActionsMenu} accessibilityViewIsModal>
-            <Text style={styles.rowActionsTitle}>
-              Row {activeRowActionIndex + 1}
-            </Text>
-            <Pressable
-              style={({ pressed }) => [
-                styles.rowActionsMenuItem,
-                styles.actionsMenuDeleteItem,
-                pressed && styles.actionsMenuItemPressed,
-              ]}
-              onPress={() => {
-                const rowId = activeRowActionId;
-                setActiveRowActionId(null);
-                removeRow(rowId);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Delete expense row ${activeRowActionIndex + 1}`}
-            >
-              <Ionicons name="trash-outline" size={20} color={colors.danger} />
-              <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>
-                Delete row
-              </Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.rowActionsMenuItem,
-                styles.rowActionsCancelItem,
-                pressed && styles.actionsMenuItemPressed,
-              ]}
-              onPress={() => setActiveRowActionId(null)}
-              accessibilityRole="button"
-              accessibilityLabel="Cancel row actions"
-            >
-              <Text style={styles.rowActionsCancelText}>Cancel</Text>
             </Pressable>
           </View>
         </View>
@@ -1307,47 +1296,6 @@ const makeStyles = (colors) =>
       justifyContent: 'center',
       alignItems: 'center',
       padding: 24,
-    },
-    rowActionsMenu: {
-      width: '100%',
-      maxWidth: 340,
-      overflow: 'hidden',
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: radius.lg,
-      ...shadow.card,
-    },
-    rowActionsTitle: {
-      color: colors.text,
-      fontSize: 17,
-      fontWeight: '800',
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    rowActionsMenuItem: {
-      minHeight: 50,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      paddingHorizontal: 16,
-      backgroundColor: colors.card,
-    },
-    rowActionsMenuItemDisabled: {
-      opacity: 0.35,
-    },
-    rowActionsCancelItem: {
-      justifyContent: 'center',
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    },
-    rowActionsCancelText: {
-      color: colors.textSecondary,
-      fontSize: 16,
-      fontWeight: '700',
-      textAlign: 'center',
     },
     modalContent: {
       backgroundColor: colors.card,
