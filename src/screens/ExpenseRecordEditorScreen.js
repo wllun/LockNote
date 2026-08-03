@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -57,6 +59,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [lockPassword, setLockPassword] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
+  const [draggingRowId, setDraggingRowId] = useState(null);
+  const [isDraggingRow, setIsDraggingRow] = useState(false);
 
   const saveTimeout = useRef(null);
   const inputRefs = useRef({});
@@ -258,6 +262,50 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     updateDraft(latest.current.title, nextRows);
   };
 
+  const reorderRow = (rowId, targetIndex) => {
+    const currentRows = latest.current.rows;
+    const currentIndex = currentRows.findIndex((row) => row.id === rowId);
+    const boundedIndex = Math.max(0, Math.min(targetIndex, currentRows.length - 1));
+    if (currentIndex < 0 || currentIndex === boundedIndex) return;
+
+    const nextRows = [...currentRows];
+    const [movedRow] = nextRows.splice(currentIndex, 1);
+    nextRows.splice(boundedIndex, 0, movedRow);
+    setRows(nextRows);
+    updateDraft(latest.current.title, nextRows);
+  };
+
+  const createRowDragResponder = (rowId, startIndex) => {
+    let didMove = false;
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dy) > 4,
+      onPanResponderGrant: () => {
+        Keyboard.dismiss();
+        setDraggingRowId(rowId);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (Math.abs(gestureState.dy) <= 4) return;
+        didMove = true;
+        setIsDraggingRow(true);
+        const rowOffset = Math.round(gestureState.dy / 48);
+        reorderRow(rowId, startIndex + rowOffset);
+      },
+      onPanResponderRelease: () => {
+        setDraggingRowId(null);
+        setIsDraggingRow(false);
+        if (!didMove) setActiveRowActionId(rowId);
+      },
+      onPanResponderTerminate: () => {
+        setDraggingRowId(null);
+        setIsDraggingRow(false);
+      },
+      onPanResponderTerminationRequest: () => false,
+    });
+  };
+
   const focusNextRow = (rowIndex) => {
     const nextRow = rows[rowIndex + 1];
     if (nextRow) {
@@ -436,6 +484,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       <ScrollView
         style={styles.scroll}
+        scrollEnabled={!isDraggingRow}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Math.max(32, insets.bottom + 20) },
@@ -500,6 +549,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               const invalidAmount =
                 !!row.amount.trim() && parseExpenseAmount(row.amount) === null;
               const showPlaceholder = shouldShowExpenseRowPlaceholder(rows, index);
+              const dragResponder = createRowDragResponder(row.id, index);
 
               return (
                 <View
@@ -508,6 +558,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     styles.tableRow,
                     index % 2 === 0 ? styles.evenRow : styles.oddRow,
                     focusedCell?.startsWith(`${row.id}:`) && styles.focusedRow,
+                    draggingRowId === row.id && styles.draggingRow,
                   ]}
                 >
                   <TextInput
@@ -582,22 +633,35 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     selectTextOnFocus
                     accessibilityLabel={`Amount for expense row ${index + 1}`}
                   />
-                  <TouchableOpacity
+                  <View
                     style={styles.actionColumn}
-                    onPress={() => setActiveRowActionId(row.id)}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Actions for expense row ${index + 1}`}
-                    accessibilityHint="Move this row up or down, or delete it"
+                    {...dragResponder.panHandlers}
+                    accessible
+                    accessibilityRole="adjustable"
+                    accessibilityLabel={`Reorder expense row ${index + 1}`}
+                    accessibilityHint="Drag up or down to reorder. Tap for row actions."
+                    accessibilityActions={[
+                      { name: 'increment', label: 'Move row down' },
+                      { name: 'decrement', label: 'Move row up' },
+                    ]}
+                    onAccessibilityAction={({ nativeEvent }) => {
+                      if (nativeEvent.actionName === 'increment') moveRow(row.id, 'down');
+                      if (nativeEvent.actionName === 'decrement') moveRow(row.id, 'up');
+                    }}
                   >
-                    <View style={styles.rowActionsIcon}>
+                    <View
+                      style={[
+                        styles.rowActionsIcon,
+                        draggingRowId === row.id && styles.rowActionsIconDragging,
+                      ]}
+                    >
                       <Ionicons
-                        name="ellipsis-horizontal"
-                        size={18}
+                        name="reorder-three-outline"
+                        size={22}
                         color={colors.textSecondary}
                       />
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 </View>
               );
             })}
@@ -764,41 +828,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             <Text style={styles.rowActionsTitle}>
               Row {activeRowActionIndex + 1}
             </Text>
-            <Pressable
-              style={({ pressed }) => [
-                styles.rowActionsMenuItem,
-                activeRowActionIndex === 0 && styles.rowActionsMenuItemDisabled,
-                pressed && activeRowActionIndex > 0 && styles.actionsMenuItemPressed,
-              ]}
-              disabled={activeRowActionIndex === 0}
-              onPress={() => moveRow(activeRowActionId, 'up')}
-              accessibilityRole="button"
-              accessibilityLabel={`Move expense row ${activeRowActionIndex + 1} up`}
-              accessibilityState={{ disabled: activeRowActionIndex === 0 }}
-            >
-              <Ionicons name="arrow-up" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Move up</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.rowActionsMenuItem,
-                activeRowActionIndex === rows.length - 1 &&
-                  styles.rowActionsMenuItemDisabled,
-                pressed &&
-                  activeRowActionIndex < rows.length - 1 &&
-                  styles.actionsMenuItemPressed,
-              ]}
-              disabled={activeRowActionIndex === rows.length - 1}
-              onPress={() => moveRow(activeRowActionId, 'down')}
-              accessibilityRole="button"
-              accessibilityLabel={`Move expense row ${activeRowActionIndex + 1} down`}
-              accessibilityState={{
-                disabled: activeRowActionIndex === rows.length - 1,
-              }}
-            >
-              <Ionicons name="arrow-down" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Move down</Text>
-            </Pressable>
             <Pressable
               style={({ pressed }) => [
                 styles.rowActionsMenuItem,
@@ -1180,6 +1209,10 @@ const makeStyles = (colors) =>
     focusedRow: {
       backgroundColor: colors.primarySoft,
     },
+    draggingRow: {
+      backgroundColor: colors.primarySoft,
+      opacity: 0.9,
+    },
     focusedInput: {
       backgroundColor: colors.card,
       color: colors.text,
@@ -1207,6 +1240,11 @@ const makeStyles = (colors) =>
       backgroundColor: colors.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    rowActionsIconDragging: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.primary,
     },
     invalidCell: {
       color: colors.danger,
