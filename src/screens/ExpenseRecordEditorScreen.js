@@ -606,9 +606,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           <View style={styles.table}>
             <View style={[styles.tableRow, styles.tableHeader]}>
               <View style={[styles.actionColumn, styles.actionHeaderColumn]} />
-              <Text style={[styles.headerCell, styles.dateColumn]}>Date</Text>
+              <Text style={[styles.headerCell, styles.dateColumn]}>Day</Text>
               <Text style={[styles.headerCell, styles.remarkColumn]}>Remark</Text>
-              <Text style={[styles.headerCell, styles.amountColumn]}>Amount (RM)</Text>
+              <Text style={[styles.headerCell, styles.amountColumn]}>RM</Text>
             </View>
 
             {rows.map((row, index) => {
@@ -628,7 +628,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                   ]}
                 >
                   <View
-                    style={styles.actionColumn}
+                    style={[styles.actionColumn, styles.rowActionColumn]}
                     {...dragResponder.panHandlers}
                     accessible
                     accessibilityRole="adjustable"
@@ -652,84 +652,119 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       ]}
                     >
                       <FontAwesome5
-                        name="th"
+                        name="grip-vertical"
                         size={16}
                         color={colors.textSecondary}
                       />
                     </View>
                   </View>
-                  <TextInput
-                    ref={(ref) => {
-                      inputRefs.current[`${row.id}:date`] = ref;
-                    }}
+                  <View
                     style={[
-                      styles.cellInput,
+                      styles.tableCellColumn,
                       styles.dateColumn,
                       focusedCell === `${row.id}:date` && styles.focusedInput,
                     ]}
-                    value={row.date}
-                    onChangeText={(value) =>
-                      handleRowChange(row.id, 'date', sanitizeExpenseDateInput(value))
-                    }
-                    placeholder={showPlaceholder ? '1' : undefined}
-                    placeholderTextColor={colors.textTertiary}
-                    inputMode="numeric"
-                    keyboardType="number-pad"
-                    returnKeyType="next"
-                    onFocus={() => setFocusedCell(`${row.id}:date`)}
-                    onBlur={() => setFocusedCell(null)}
-                    onSubmitEditing={() => focusCell(row.id, 'remark')}
-                    selectTextOnFocus
-                    accessibilityLabel={`Date for expense row ${index + 1}`}
-                  />
-                  <TextInput
-                    ref={(ref) => {
-                      inputRefs.current[`${row.id}:remark`] = ref;
-                    }}
+                  >
+                    <TextInput
+                      ref={(ref) => {
+                        inputRefs.current[`${row.id}:date`] = ref;
+                      }}
+                      style={[styles.cellInput, styles.singleLineCellInput]}
+                      value={row.date}
+                      onChangeText={(value) =>
+                        handleRowChange(row.id, 'date', sanitizeExpenseDateInput(value))
+                      }
+                      placeholder={showPlaceholder ? '1' : undefined}
+                      placeholderTextColor={colors.textTertiary}
+                      inputMode="numeric"
+                      keyboardType="number-pad"
+                      multiline
+                      numberOfLines={1}
+                      scrollEnabled={false}
+                      submitBehavior="submit"
+                      returnKeyType="next"
+                      onFocus={() => setFocusedCell(`${row.id}:date`)}
+                      onBlur={() => setFocusedCell(null)}
+                      onSubmitEditing={() => focusCell(row.id, 'remark')}
+                      selectTextOnFocus
+                      accessibilityLabel={`Day for expense row ${index + 1}`}
+                    />
+                  </View>
+                  <View style={[styles.tableCellColumn, styles.remarkColumn]}>
+                    <Text
+                      style={styles.remarkMeasure}
+                      numberOfLines={3}
+                      accessible={false}
+                      importantForAccessibility="no-hide-descendants"
+                    >
+                      {row.remark || (showPlaceholder ? 'Enter remark' : ' ')}
+                    </Text>
+                    <TextInput
+                      ref={(ref) => {
+                        inputRefs.current[`${row.id}:remark`] = ref;
+                      }}
+                      style={[
+                        StyleSheet.absoluteFill,
+                        styles.cellInput,
+                        styles.remarkInput,
+                        focusedCell === `${row.id}:remark` && styles.focusedInput,
+                      ]}
+                      value={row.remark}
+                      onChangeText={(value) => handleRowChange(row.id, 'remark', value)}
+                      placeholder={showPlaceholder ? 'Enter remark' : undefined}
+                      placeholderTextColor={colors.textTertiary}
+                      multiline
+                      scrollEnabled={false}
+                      returnKeyType="next"
+                      onFocus={() => setFocusedCell(`${row.id}:remark`)}
+                      onBlur={() => setFocusedCell(null)}
+                      onSubmitEditing={() => focusCell(row.id, 'amount')}
+                      accessibilityLabel={`Remark for expense row ${index + 1}`}
+                    />
+                  </View>
+                  <View
                     style={[
-                      styles.cellInput,
-                      styles.remarkColumn,
-                      focusedCell === `${row.id}:remark` && styles.focusedInput,
-                    ]}
-                    value={row.remark}
-                    onChangeText={(value) => handleRowChange(row.id, 'remark', value)}
-                    placeholder={showPlaceholder ? 'Enter remark' : undefined}
-                    placeholderTextColor={colors.textTertiary}
-                    returnKeyType="next"
-                    onFocus={() => setFocusedCell(`${row.id}:remark`)}
-                    onBlur={() => setFocusedCell(null)}
-                    onSubmitEditing={() => focusCell(row.id, 'amount')}
-                    accessibilityLabel={`Remark for expense row ${index + 1}`}
-                  />
-                  <TextInput
-                    ref={(ref) => {
-                      inputRefs.current[`${row.id}:amount`] = ref;
-                    }}
-                    style={[
-                      styles.cellInput,
+                      styles.tableCellColumn,
                       styles.amountColumn,
                       invalidAmount && styles.invalidCell,
                       focusedCell === `${row.id}:amount` && styles.focusedInput,
                     ]}
-                    value={row.amount}
-                    onChangeText={(value) =>
-                      handleRowChange(
-                        row.id,
-                        'amount',
-                        sanitizeExpenseAmountInput(value)
-                      )
-                    }
-                    placeholder={showPlaceholder ? '0.00' : undefined}
-                    placeholderTextColor={colors.textTertiary}
-                    inputMode="decimal"
-                    keyboardType="decimal-pad"
-                    returnKeyType="next"
-                    onFocus={() => setFocusedCell(`${row.id}:amount`)}
-                    onBlur={() => handleAmountBlur(row)}
-                    onSubmitEditing={() => focusNextRow(index)}
-                    selectTextOnFocus
-                    accessibilityLabel={`Amount for expense row ${index + 1}`}
-                  />
+                  >
+                    <TextInput
+                      ref={(ref) => {
+                        inputRefs.current[`${row.id}:amount`] = ref;
+                      }}
+                      style={[
+                        styles.cellInput,
+                        styles.singleLineCellInput,
+                        styles.amountInput,
+                        invalidAmount && styles.invalidCell,
+                        focusedCell === `${row.id}:amount` && styles.focusedInput,
+                      ]}
+                      value={row.amount}
+                      onChangeText={(value) =>
+                        handleRowChange(
+                          row.id,
+                          'amount',
+                          sanitizeExpenseAmountInput(value)
+                        )
+                      }
+                      placeholder={showPlaceholder ? '0.00' : undefined}
+                      placeholderTextColor={colors.textTertiary}
+                      inputMode="decimal"
+                      keyboardType="decimal-pad"
+                      multiline
+                      numberOfLines={1}
+                      scrollEnabled={false}
+                      submitBehavior="submit"
+                      returnKeyType="next"
+                      onFocus={() => setFocusedCell(`${row.id}:amount`)}
+                      onBlur={() => handleAmountBlur(row)}
+                      onSubmitEditing={() => focusNextRow(index)}
+                      selectTextOnFocus
+                      accessibilityLabel={`Amount for expense row ${index + 1}`}
+                    />
+                  </View>
                 </View>
               );
             })}
@@ -797,7 +832,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               },
             ]}
           >
-            <FontAwesome5 name="th" size={15} color={colors.textSecondary} />
+            <FontAwesome5
+              name="grip-vertical"
+              size={15}
+              color={colors.textSecondary}
+            />
             <Text style={styles.dragPreviewDate} numberOfLines={1}>
               {dragPreview.row.date.trim() || 'No date'}
             </Text>
@@ -1268,20 +1307,30 @@ const makeStyles = (colors) =>
     headerCell: {
       color: colors.card,
       fontSize: 14,
+      lineHeight: 20,
       fontWeight: '800',
+      textAlignVertical: 'top',
       paddingHorizontal: 10,
       paddingVertical: 13,
       borderRightWidth: 1,
       borderRightColor: 'rgba(255,255,255,0.18)',
     },
+    tableCellColumn: {
+      borderRightWidth: 1,
+      borderRightColor: colors.border,
+    },
     cellInput: {
       color: colors.text,
       fontSize: 15,
+      lineHeight: 20,
+      textAlignVertical: 'top',
       paddingHorizontal: 10,
       paddingVertical: 11,
-      borderRightWidth: 1,
-      borderRightColor: colors.border,
       outlineStyle: 'none',
+    },
+    singleLineCellInput: {
+      height: 48,
+      alignSelf: 'stretch',
     },
     focusedRow: {
       backgroundColor: colors.primarySoft,
@@ -1295,14 +1344,29 @@ const makeStyles = (colors) =>
       color: colors.text,
     },
     dateColumn: {
-      width: 78,
+      width: 60,
     },
     remarkColumn: {
       flex: 1,
       minWidth: 100,
     },
+    remarkInput: {
+      overflow: 'hidden',
+    },
+    remarkMeasure: {
+      maxHeight: 82,
+      color: 'transparent',
+      fontSize: 15,
+      lineHeight: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 11,
+    },
     amountColumn: {
-      width: 105,
+      width: 76,
+      textAlign: 'right',
+    },
+    amountInput: {
+      textAlign: 'right',
       fontVariant: ['tabular-nums'],
     },
     actionColumn: {
@@ -1314,6 +1378,10 @@ const makeStyles = (colors) =>
     },
     actionHeaderColumn: {
       borderRightColor: 'rgba(255,255,255,0.18)',
+    },
+    rowActionColumn: {
+      justifyContent: 'flex-start',
+      paddingTop: 7,
     },
     rowActionsIcon: {
       width: 28,
