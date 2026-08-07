@@ -4,10 +4,8 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -15,7 +13,16 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  Gesture,
+  GestureDetector,
+  ScrollView,
+} from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
@@ -27,6 +34,7 @@ import {
   formatExpenseAmount,
   isExpenseNoteEmpty,
   moveExpenseRow,
+  moveExpenseRowToIndex,
   normalizeExpenseAmountInput,
   parseExpenseAmount,
   parseExpenseNote,
@@ -41,12 +49,153 @@ import { radius, shadow, useTheme } from '../theme';
 
 const EXPENSE_ROW_MIN_HEIGHT = 48;
 const EXPENSE_REMARK_MAX_HEIGHT = 82;
+const DELETE_TARGET_HEIGHT = 88;
+const DELETE_TARGET_HORIZONTAL_MARGIN = 24;
+const DELETE_TARGET_TOLERANCE = 20;
+
+const ExpenseRowDragHandle = ({
+  rowId,
+  rowIndex,
+  colors,
+  styles,
+  dragX,
+  dragY,
+  dragAreaX,
+  dragAreaY,
+  onDragStart,
+  onDragUpdate,
+  onDragEnd,
+  onDragCancel,
+  onMove,
+  onDelete,
+}) => {
+  const callbacks = useRef({
+    onDragStart,
+    onDragUpdate,
+    onDragEnd,
+    onDragCancel,
+    onMove,
+    onDelete,
+  });
+  callbacks.current = {
+    onDragStart,
+    onDragUpdate,
+    onDragEnd,
+    onDragCancel,
+    onMove,
+    onDelete,
+  };
+
+  const startDrag = useCallback(
+    () => callbacks.current.onDragStart(rowId),
+    [rowId]
+  );
+  const updateDrag = useCallback(
+    (translationY, absoluteX, absoluteY) =>
+      callbacks.current.onDragUpdate(
+        rowId,
+        translationY,
+        absoluteX,
+        absoluteY
+      ),
+    [rowId]
+  );
+  const endDrag = useCallback(
+    (translationY, absoluteX, absoluteY) =>
+      callbacks.current.onDragEnd(
+        rowId,
+        translationY,
+        absoluteX,
+        absoluteY
+      ),
+    [rowId]
+  );
+  const cancelDrag = useCallback(
+    () => callbacks.current.onDragCancel(rowId),
+    [rowId]
+  );
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(5)
+        .shouldCancelWhenOutside(false)
+        .runOnJS(true)
+        .onStart((event) => {
+          dragX.value = event.absoluteX - dragAreaX;
+          dragY.value = event.absoluteY - dragAreaY;
+          startDrag();
+        })
+        .onUpdate((event) => {
+          dragX.value = event.absoluteX - dragAreaX;
+          dragY.value = event.absoluteY - dragAreaY;
+          updateDrag(
+            event.translationY,
+            event.absoluteX,
+            event.absoluteY
+          );
+        })
+        .onEnd((event) => {
+          dragX.value = event.absoluteX - dragAreaX;
+          dragY.value = event.absoluteY - dragAreaY;
+          endDrag(
+            event.translationY,
+            event.absoluteX,
+            event.absoluteY
+          );
+        })
+        .onFinalize((_, success) => {
+          if (!success) cancelDrag();
+        }),
+    [
+      cancelDrag,
+      dragAreaX,
+      dragAreaY,
+      dragX,
+      dragY,
+      endDrag,
+      startDrag,
+      updateDrag,
+    ]
+  );
+
+  return (
+    <GestureDetector gesture={panGesture}>
+      <View
+        collapsable={false}
+        style={[styles.actionColumn, styles.rowDragHandle]}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={`Move expense row ${rowIndex + 1}`}
+        accessibilityHint="Drag to another row to move, or drag to the recycle bin to delete"
+        accessibilityActions={[
+          { name: 'increment', label: 'Move row down' },
+          { name: 'decrement', label: 'Move row up' },
+          { name: 'activate', label: 'Delete row' },
+        ]}
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === 'increment') {
+            callbacks.current.onMove(rowId, 'down');
+          }
+          if (nativeEvent.actionName === 'decrement') {
+            callbacks.current.onMove(rowId, 'up');
+          }
+          if (nativeEvent.actionName === 'activate') {
+            callbacks.current.onDelete(rowId);
+          }
+        }}
+      >
+        <Ionicons name="reorder-three-outline" size={25} color={colors.textSecondary} />
+      </View>
+    </GestureDetector>
+  );
+};
 
 const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const { noteId } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const initialRows = useMemo(() => [createExpenseRow()], []);
 
@@ -64,13 +213,24 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
   const [remarkInputHeights, setRemarkInputHeights] = useState({});
-  const [draggingRowId, setDraggingRowId] = useState(null);
-  const [isDraggingRow, setIsDraggingRow] = useState(false);
-  const [dragPreview, setDragPreview] = useState(null);
-  const [isOverDeleteTarget, setIsOverDeleteTarget] = useState(false);
+  const [activeDrag, setActiveDrag] = useState(null);
+  const [dragAreaBounds, setDragAreaBounds] = useState({
+    x: 0,
+    y: 0,
+    width: windowWidth,
+    height: 0,
+  });
 
   const saveTimeout = useRef(null);
   const inputRefs = useRef({});
+  const dragAreaRef = useRef(null);
+  const dragAreaBoundsRef = useRef(dragAreaBounds);
+  const rowLayouts = useRef({});
+  const dragRowLayoutsRef = useRef({});
+  const deleteTargetBoundsRef = useRef(null);
+  const activeDragRef = useRef(null);
+  const dragX = useSharedValue(0);
+  const dragY = useSharedValue(0);
   const latest = useRef({
     title: '',
     rows: initialRows,
@@ -85,6 +245,30 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const invalidAmountCount = rows.filter(
     (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
   ).length;
+  const deleteTargetBottom = Math.max(16, insets.bottom + 8);
+  const dragPreviewWidth = Math.min(340, windowWidth - 32);
+  const rowsWithoutDraggedRow = activeDrag
+    ? rows.filter((row) => row.id !== activeDrag.rowId)
+    : [];
+  const insertionBeforeRowId = activeDrag
+    ? rowsWithoutDraggedRow[activeDrag.targetIndex]?.id ?? null
+    : null;
+  const showEndInsertionGap =
+    !!activeDrag && activeDrag.targetIndex >= rowsWithoutDraggedRow.length;
+  const dragPreviewStyle = useAnimatedStyle(() => {
+    const availableWidth = dragAreaBounds.width || windowWidth;
+    const left = Math.max(
+      16,
+      Math.min(
+        dragX.value - dragPreviewWidth / 2,
+        availableWidth - dragPreviewWidth - 16
+      )
+    );
+    const top = Math.max(insets.top + 8, dragY.value - 64);
+    return {
+      transform: [{ translateX: left }, { translateY: top }],
+    };
+  });
 
   const loadRecord = useCallback(async () => {
     try {
@@ -304,70 +488,182 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     updateDraft(latest.current.title, nextRows);
   };
 
-  const reorderRow = (rowId, targetIndex) => {
-    const currentRows = latest.current.rows;
-    const currentIndex = currentRows.findIndex((row) => row.id === rowId);
-    const boundedIndex = Math.max(0, Math.min(targetIndex, currentRows.length - 1));
-    if (currentIndex < 0 || currentIndex === boundedIndex) return;
+  const measureDragArea = () => {
+    requestAnimationFrame(() => {
+      dragAreaRef.current?.measureInWindow((x, y, width, height) => {
+        const nextBounds = { x, y, width, height };
+        dragAreaBoundsRef.current = nextBounds;
+        setDragAreaBounds((currentBounds) =>
+          currentBounds.x === x &&
+          currentBounds.y === y &&
+          currentBounds.width === width &&
+          currentBounds.height === height
+            ? currentBounds
+            : nextBounds
+        );
+      });
+    });
+  };
 
-    const nextRows = [...currentRows];
-    const [movedRow] = nextRows.splice(currentIndex, 1);
-    nextRows.splice(boundedIndex, 0, movedRow);
+  const getDragTargetIndex = (rowId, translationY) => {
+    const currentRows = latest.current.rows;
+    const sourceIndex = currentRows.findIndex((row) => row.id === rowId);
+    if (sourceIndex < 0) return 0;
+
+    const dragLayouts = dragRowLayoutsRef.current;
+    const sourceLayout = dragLayouts[rowId];
+    if (!sourceLayout) {
+      return Math.max(
+        0,
+        Math.min(
+          currentRows.length - 1,
+          sourceIndex + Math.round(translationY / EXPENSE_ROW_MIN_HEIGHT)
+        )
+      );
+    }
+
+    const projectedCenter =
+      sourceLayout.y + sourceLayout.height / 2 + translationY;
+    const remainingRows = currentRows.filter((row) => row.id !== rowId);
+    for (let index = 0; index < remainingRows.length; index += 1) {
+      const layout = dragLayouts[remainingRows[index].id];
+      if (layout && projectedCenter < layout.y + layout.height / 2) {
+        return index;
+      }
+    }
+    return remainingRows.length;
+  };
+
+  const isPointOverDeleteTarget = (absoluteX, absoluteY) => {
+    if (!Number.isFinite(absoluteX) || !Number.isFinite(absoluteY)) return false;
+
+    const measuredTarget = deleteTargetBoundsRef.current;
+    const dragBounds = dragAreaBoundsRef.current;
+    if (!measuredTarget && (!dragBounds.width || !dragBounds.height)) return false;
+
+    const target =
+      measuredTarget ?? {
+        left: dragBounds.x + DELETE_TARGET_HORIZONTAL_MARGIN,
+        top:
+          dragBounds.y +
+          dragBounds.height -
+          deleteTargetBottom -
+          DELETE_TARGET_HEIGHT,
+        width: Math.max(
+          0,
+          dragBounds.width - DELETE_TARGET_HORIZONTAL_MARGIN * 2
+        ),
+        height: DELETE_TARGET_HEIGHT,
+      };
+    return (
+      absoluteX >= target.left - DELETE_TARGET_TOLERANCE &&
+      absoluteX <= target.left + target.width + DELETE_TARGET_TOLERANCE &&
+      absoluteY >= target.top - DELETE_TARGET_TOLERANCE &&
+      absoluteY <= target.top + target.height + DELETE_TARGET_TOLERANCE
+    );
+  };
+
+  const handleDeleteTargetLayout = ({ nativeEvent }) => {
+    const dragBounds = dragAreaBoundsRef.current;
+    const { x, y, width, height } = nativeEvent.layout;
+    deleteTargetBoundsRef.current = {
+      left: dragBounds.x + x,
+      top: dragBounds.y + y,
+      width,
+      height,
+    };
+  };
+
+  const handleDragStart = (rowId) => {
+    Keyboard.dismiss();
+    measureDragArea();
+    const currentRows = latest.current.rows;
+    const startIndex = currentRows.findIndex((row) => row.id === rowId);
+    if (startIndex < 0) return;
+
+    dragRowLayoutsRef.current = Object.fromEntries(
+      currentRows.map((row) => [
+        row.id,
+        rowLayouts.current[row.id]
+          ? { ...rowLayouts.current[row.id] }
+          : null,
+      ])
+    );
+    deleteTargetBoundsRef.current = null;
+
+    const nextDrag = {
+      rowId,
+      row: currentRows[startIndex],
+      startIndex,
+      targetIndex: startIndex,
+      overDelete: false,
+    };
+    activeDragRef.current = nextDrag;
+    setActiveDrag(nextDrag);
+  };
+
+  const handleDragUpdate = (
+    rowId,
+    translationY,
+    absoluteX,
+    absoluteY
+  ) => {
+    const currentDrag = activeDragRef.current;
+    if (!currentDrag || currentDrag.rowId !== rowId) return;
+
+    const targetIndex = getDragTargetIndex(rowId, translationY);
+    const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
+    if (
+      currentDrag.targetIndex === targetIndex &&
+      currentDrag.overDelete === overDelete
+    ) {
+      return;
+    }
+
+    const nextDrag = { ...currentDrag, targetIndex, overDelete };
+    activeDragRef.current = nextDrag;
+    setActiveDrag(nextDrag);
+  };
+
+  const handleDragEnd = (
+    rowId,
+    translationY,
+    absoluteX,
+    absoluteY
+  ) => {
+    const currentDrag = activeDragRef.current;
+    if (!currentDrag || currentDrag.rowId !== rowId) return;
+
+    const targetIndex = getDragTargetIndex(rowId, translationY);
+    const shouldDelete =
+      currentDrag.overDelete ||
+      isPointOverDeleteTarget(absoluteX, absoluteY);
+    activeDragRef.current = null;
+    dragRowLayoutsRef.current = {};
+    deleteTargetBoundsRef.current = null;
+    setActiveDrag(null);
+
+    if (shouldDelete) {
+      removeRow(rowId);
+      return;
+    }
+
+    const nextRows = moveExpenseRowToIndex(
+      latest.current.rows,
+      rowId,
+      targetIndex
+    );
+    if (nextRows === latest.current.rows) return;
     setRows(nextRows);
     updateDraft(latest.current.title, nextRows);
   };
 
-  const createRowDragResponder = (rowId, startIndex) => {
-    let overDeleteTarget = false;
-    const rowsBeforeDrag = latest.current.rows;
-
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        Math.abs(gestureState.dy) > 4,
-      onPanResponderGrant: () => {
-        Keyboard.dismiss();
-        setDraggingRowId(rowId);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (Math.abs(gestureState.dy) <= 4) return;
-        setIsDraggingRow(true);
-        const currentRow = latest.current.rows.find((row) => row.id === rowId);
-        const deleteTargetTop = windowHeight - Math.max(96, insets.bottom + 88);
-        overDeleteTarget =
-          Math.abs(gestureState.moveX - windowWidth / 2) <= 76 &&
-          gestureState.moveY >= deleteTargetTop;
-        setIsOverDeleteTarget(overDeleteTarget);
-        setDragPreview({
-          row: currentRow,
-          x: gestureState.moveX,
-          y: gestureState.moveY,
-        });
-
-        if (!overDeleteTarget) {
-          const rowOffset = Math.round(gestureState.dy / 48);
-          reorderRow(rowId, startIndex + rowOffset);
-        }
-      },
-      onPanResponderRelease: () => {
-        setDraggingRowId(null);
-        setIsDraggingRow(false);
-        setDragPreview(null);
-        setIsOverDeleteTarget(false);
-        if (overDeleteTarget) {
-          setRows(rowsBeforeDrag);
-          updateDraft(latest.current.title, rowsBeforeDrag);
-          confirmRemoveRow(rowId);
-        }
-      },
-      onPanResponderTerminate: () => {
-        setDraggingRowId(null);
-        setIsDraggingRow(false);
-        setDragPreview(null);
-        setIsOverDeleteTarget(false);
-      },
-      onPanResponderTerminationRequest: () => false,
-    });
+  const handleDragCancel = (rowId) => {
+    if (activeDragRef.current?.rowId !== rowId) return;
+    activeDragRef.current = null;
+    dragRowLayoutsRef.current = {};
+    deleteTargetBoundsRef.current = null;
+    setActiveDrag(null);
   };
 
   const focusNextRow = (rowIndex) => {
@@ -497,8 +793,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   return (
     <KeyboardAvoidingView
+      ref={dragAreaRef}
       style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      onLayout={measureDragArea}
     >
       <View style={styles.header}>
         <TouchableOpacity
@@ -555,6 +853,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         ]}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic"
+        scrollEnabled={!activeDrag}
       >
         <View style={styles.editorContent}>
           <View style={styles.summaryCard}>
@@ -613,49 +912,43 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               const invalidAmount =
                 !!row.amount.trim() && parseExpenseAmount(row.amount) === null;
               const showPlaceholder = shouldShowExpenseRowPlaceholder(rows, index);
-              const dragResponder = createRowDragResponder(row.id, index);
 
               return (
-                <View
-                  key={row.id}
-                  style={[
-                    styles.tableRow,
-                    index % 2 === 0 ? styles.evenRow : styles.oddRow,
-                    focusedCell?.startsWith(`${row.id}:`) && styles.focusedRow,
-                    draggingRowId === row.id && styles.draggingRow,
-                  ]}
-                >
-                  <View
-                    style={[styles.actionColumn, styles.rowActionColumn]}
-                    {...dragResponder.panHandlers}
-                    accessible
-                    accessibilityRole="adjustable"
-                    accessibilityLabel={`Reorder expense row ${index + 1}`}
-                    accessibilityHint="Drag up or down to reorder, or drag to the recycle bin to delete. Screen reader users can activate to delete."
-                    accessibilityActions={[
-                      { name: 'increment', label: 'Move row down' },
-                      { name: 'decrement', label: 'Move row up' },
-                      { name: 'activate', label: 'Delete row' },
-                    ]}
-                    onAccessibilityAction={({ nativeEvent }) => {
-                      if (nativeEvent.actionName === 'increment') moveRow(row.id, 'down');
-                      if (nativeEvent.actionName === 'decrement') moveRow(row.id, 'up');
-                      if (nativeEvent.actionName === 'activate') confirmRemoveRow(row.id);
-                    }}
-                  >
-                    <View
-                      style={[
-                        styles.rowActionsIcon,
-                        draggingRowId === row.id && styles.rowActionsIconDragging,
-                      ]}
-                    >
-                      <FontAwesome5
-                        name="grip-vertical"
-                        size={16}
-                        color={colors.textSecondary}
-                      />
+                <React.Fragment key={row.id}>
+                  {activeDrag && insertionBeforeRowId === row.id && (
+                    <View style={styles.rowInsertionGap}>
+                      <View style={styles.rowInsertionDot} />
+                      <View style={styles.rowInsertionLine} />
+                      <Text style={styles.rowInsertionText}>Row moves here</Text>
                     </View>
-                  </View>
+                  )}
+                  <View
+                    onLayout={({ nativeEvent }) => {
+                      rowLayouts.current[row.id] = nativeEvent.layout;
+                    }}
+                    style={[
+                      styles.tableRow,
+                      index % 2 === 0 ? styles.evenRow : styles.oddRow,
+                      focusedCell?.startsWith(`${row.id}:`) && styles.focusedRow,
+                      activeDrag?.rowId === row.id && styles.draggingRow,
+                    ]}
+                  >
+                    <ExpenseRowDragHandle
+                      rowId={row.id}
+                      rowIndex={index}
+                      colors={colors}
+                      styles={styles}
+                      dragX={dragX}
+                      dragY={dragY}
+                      dragAreaX={dragAreaBounds.x}
+                      dragAreaY={dragAreaBounds.y}
+                      onDragStart={handleDragStart}
+                      onDragUpdate={handleDragUpdate}
+                      onDragEnd={handleDragEnd}
+                      onDragCancel={handleDragCancel}
+                      onMove={moveRow}
+                      onDelete={confirmRemoveRow}
+                    />
                   <View
                     style={[
                       styles.tableCellColumn,
@@ -721,14 +1014,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       accessibilityLabel={`Remark for expense row ${index + 1}`}
                     />
                   </View>
-                  <View
-                    style={[
-                      styles.tableCellColumn,
-                      styles.amountColumn,
-                      invalidAmount && styles.invalidCell,
-                      focusedCell === `${row.id}:amount` && styles.focusedInput,
-                    ]}
-                  >
+                    <View
+                      style={[
+                        styles.tableCellColumn,
+                        styles.amountColumn,
+                        invalidAmount && styles.invalidCell,
+                        focusedCell === `${row.id}:amount` && styles.focusedInput,
+                      ]}
+                    >
                     <TextInput
                       ref={(ref) => {
                         inputRefs.current[`${row.id}:amount`] = ref;
@@ -762,11 +1055,20 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       onSubmitEditing={() => focusNextRow(index)}
                       selectTextOnFocus
                       accessibilityLabel={`Amount for expense row ${index + 1}`}
-                    />
+                      />
+                    </View>
                   </View>
-                </View>
+                </React.Fragment>
               );
             })}
+
+            {showEndInsertionGap && (
+              <View style={styles.rowInsertionGap}>
+                <View style={styles.rowInsertionDot} />
+                <View style={styles.rowInsertionLine} />
+                <Text style={styles.rowInsertionText}>Row moves here</Text>
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.addRowButton}
@@ -812,66 +1114,83 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
-      {isDraggingRow && dragPreview?.row && (
+      {activeDrag && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <View
+          <Animated.View
             style={[
               styles.dragPreview,
-              isOverDeleteTarget && styles.dragPreviewDeleting,
-              {
-                width: Math.min(340, windowWidth - 32),
-                left: Math.max(
-                  16,
-                  Math.min(
-                    dragPreview.x - Math.min(340, windowWidth - 32) / 2,
-                    windowWidth - Math.min(340, windowWidth - 32) - 16
-                  )
-                ),
-                top: Math.max(insets.top + 8, dragPreview.y - 76),
-              },
-            ]}
-          >
-            <FontAwesome5
-              name="grip-vertical"
-              size={15}
-              color={colors.textSecondary}
-            />
-            <Text style={styles.dragPreviewDate} numberOfLines={1}>
-              {dragPreview.row.date.trim() || 'No date'}
-            </Text>
-            <Text style={styles.dragPreviewRemark} numberOfLines={1}>
-              {dragPreview.row.remark.trim() || 'No remark'}
-            </Text>
-            <Text style={styles.dragPreviewAmount} numberOfLines={1}>
-              {dragPreview.row.amount.trim()
-                ? `RM ${dragPreview.row.amount.trim()}`
-                : 'No amount'}
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.dragDeleteTarget,
-              isOverDeleteTarget && styles.dragDeleteTargetActive,
-              {
-                left: windowWidth / 2 - 58,
-                bottom: Math.max(16, insets.bottom + 8),
-              },
+              activeDrag.overDelete && styles.dragPreviewDeleting,
+              { width: dragPreviewWidth },
+              dragPreviewStyle,
             ]}
           >
             <Ionicons
-              name={isOverDeleteTarget ? 'trash' : 'trash-outline'}
-              size={25}
-              color={isOverDeleteTarget ? colors.card : colors.danger}
+              name="reorder-three-outline"
+              size={24}
+              color={activeDrag.overDelete ? colors.danger : colors.primary}
             />
-            <Text
+            <View style={styles.dragPreviewContent}>
+              <Text style={styles.dragPreviewRemark} numberOfLines={1}>
+                {activeDrag.row.remark.trim() || 'Empty expense row'}
+              </Text>
+              <Text
+                style={[
+                  styles.dragPreviewDestination,
+                  activeDrag.overDelete && styles.dragPreviewDestinationDeleting,
+                ]}
+              >
+                {activeDrag.overDelete
+                  ? 'Release to delete'
+                  : `Move to row ${activeDrag.targetIndex + 1}`}
+              </Text>
+            </View>
+            <Text style={styles.dragPreviewAmount} numberOfLines={1}>
+              {activeDrag.row.amount.trim()
+                ? `RM ${activeDrag.row.amount.trim()}`
+                : 'No amount'}
+            </Text>
+          </Animated.View>
+
+          <View
+            onLayout={handleDeleteTargetLayout}
+            style={[
+              styles.dragDeleteTarget,
+              activeDrag.overDelete && styles.dragDeleteTargetActive,
+              { bottom: deleteTargetBottom },
+            ]}
+          >
+            <View
               style={[
-                styles.dragDeleteTargetText,
-                isOverDeleteTarget && styles.dragDeleteTargetTextActive,
+                styles.dragDeleteTargetIcon,
+                activeDrag.overDelete && styles.dragDeleteTargetIconActive,
               ]}
             >
-              Drop to delete
-            </Text>
+              <Ionicons
+                name={activeDrag.overDelete ? 'trash' : 'trash-outline'}
+                size={24}
+                color={activeDrag.overDelete ? colors.danger : colors.card}
+              />
+            </View>
+            <View style={styles.dragDeleteTargetCopy}>
+              <Text
+                style={[
+                  styles.dragDeleteTargetText,
+                  activeDrag.overDelete && styles.dragDeleteTargetTextActive,
+                ]}
+              >
+                {activeDrag.overDelete
+                  ? 'Release to delete'
+                  : 'Drag here to delete'}
+              </Text>
+              <Text
+                style={[
+                  styles.dragDeleteTargetHint,
+                  activeDrag.overDelete && styles.dragDeleteTargetHintActive,
+                ]}
+              >
+                Large drop zone
+              </Text>
+            </View>
           </View>
         </View>
       )}
@@ -1372,29 +1691,52 @@ const makeStyles = (colors) =>
     actionHeaderColumn: {
       borderRightColor: 'rgba(255,255,255,0.18)',
     },
-    rowActionColumn: {
-      justifyContent: 'flex-start',
-      paddingTop: 7,
+    rowDragHandle: {
+      minHeight: EXPENSE_ROW_MIN_HEIGHT,
+      alignSelf: 'stretch',
+      backgroundColor: 'transparent',
     },
-    rowActionsIcon: {
-      width: 28,
+    draggingRow: {
+      backgroundColor: colors.primarySoft,
+      opacity: 0.35,
+    },
+    rowInsertionGap: {
       height: 28,
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 7,
+      paddingHorizontal: 10,
+      backgroundColor: colors.primarySoft,
     },
-    rowActionsIconDragging: {
-      backgroundColor: colors.card,
-      borderRadius: radius.md,
-      borderWidth: 1,
+    rowInsertionDot: {
+      width: 10,
+      height: 10,
+      borderWidth: 2,
       borderColor: colors.primary,
+      borderRadius: radius.full,
+      backgroundColor: colors.card,
+    },
+    rowInsertionLine: {
+      flex: 1,
+      height: 3,
+      backgroundColor: colors.primary,
+      borderRadius: radius.full,
+    },
+    rowInsertionText: {
+      color: colors.primary,
+      fontSize: 11,
+      fontWeight: '700',
     },
     dragPreview: {
       position: 'absolute',
-      minHeight: 52,
+      left: 0,
+      top: 0,
+      minHeight: 62,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
-      paddingHorizontal: 14,
+      gap: 9,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
       backgroundColor: colors.card,
       borderWidth: 2,
       borderColor: colors.primary,
@@ -1402,50 +1744,83 @@ const makeStyles = (colors) =>
       ...shadow.card,
     },
     dragPreviewDeleting: {
-      borderColor: colors.danger,
       backgroundColor: colors.dangerSoft,
+      borderColor: colors.danger,
     },
-    dragPreviewDate: {
-      width: 54,
-      color: colors.textSecondary,
-      fontSize: 13,
-      fontWeight: '700',
+    dragPreviewContent: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
     },
     dragPreviewRemark: {
-      flex: 1,
       color: colors.text,
       fontSize: 14,
       fontWeight: '700',
     },
+    dragPreviewDestination: {
+      color: colors.primary,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    dragPreviewDestinationDeleting: {
+      color: colors.danger,
+    },
     dragPreviewAmount: {
-      maxWidth: 92,
-      color: colors.text,
+      maxWidth: 94,
+      color: colors.textSecondary,
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '700',
       fontVariant: ['tabular-nums'],
+      textAlign: 'right',
     },
     dragDeleteTarget: {
       position: 'absolute',
-      width: 116,
-      minHeight: 68,
+      left: DELETE_TARGET_HORIZONTAL_MARGIN,
+      right: DELETE_TARGET_HORIZONTAL_MARGIN,
+      height: DELETE_TARGET_HEIGHT,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 4,
-      backgroundColor: colors.card,
-      borderWidth: 2,
+      gap: 12,
+      paddingHorizontal: 20,
+      backgroundColor: colors.dangerSoft,
+      borderWidth: 3,
       borderColor: colors.danger,
       borderRadius: radius.lg,
       ...shadow.card,
     },
     dragDeleteTargetActive: {
       backgroundColor: colors.danger,
+      borderColor: colors.card,
+    },
+    dragDeleteTargetIcon: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.full,
+      backgroundColor: colors.danger,
+    },
+    dragDeleteTargetIconActive: {
+      backgroundColor: colors.card,
+    },
+    dragDeleteTargetCopy: {
+      gap: 2,
     },
     dragDeleteTargetText: {
       color: colors.danger,
-      fontSize: 11,
+      fontSize: 14,
       fontWeight: '800',
     },
     dragDeleteTargetTextActive: {
+      color: colors.card,
+    },
+    dragDeleteTargetHint: {
+      color: colors.danger,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    dragDeleteTargetHintActive: {
       color: colors.card,
     },
     invalidCell: {
