@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="900" viewBox="0 0 1500 900">
+  <defs>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="24" flood-color="#0F172A" flood-opacity="0.10"/>
+    </filter>
+
+    <symbol id="icon-a" viewBox="0 0 256 256">
+      <rect width="256" height="256" rx="56" fill="#4F46E5"/>
+      <path d="M70 44h78l42 42v108c0 10-8 18-18 18H70c-10 0-18-8-18-18V62c0-10 8-18 18-18Z" fill="#FFFDF7"/>
+      <path d="M148 44v28c0 10 8 18 18 18h24Z" fill="#F59E0B"/>
+      <circle cx="121" cy="128" r="15" fill="#4F46E5"/>
+      <path d="m111 138h20l9 38h-38Z" fill="#4F46E5"/>
+    </symbol>
+
+    <symbol id="icon-b" viewBox="0 0 256 256">
+      <rect width="256" height="256" rx="56" fill="#0F172A"/>
+      <path d="M128 34 204 64v70c0 49-29 79-76 99-47-20-76-50-76-99V64Z" fill="#F59E0B"/>
+      <path d="M91 75h55l29 29v66c0 8-6 14-14 14H91c-8 0-14-6-14-14V89c0-8 6-14 14-14Z" fill="#FFFDF7"/>
+      <path d="M146 75v17c0 8 6 14 14 14h15Z" fill="#0F172A"/>
+      <rect x="96" y="119" width="59" height="10" rx="5" fill="#0F172A"/>
+      <rect x="96" y="141" width="42" height="10" rx="5" fill="#0F172A"/>
+    </symbol>
+
+    <symbol id="icon-c" viewBox="0 0 256 256">
+      <rect width="256" height="256" rx="56" fill="#F59E0B"/>
+      <path d="M67 47h94l34 34v128H67Z" fill="#FFFDF7"/>
+      <path d="M161 47v20c0 9 7 16 16 16h18Z" fill="#4F46E5"/>
+      <path d="M97 109v-8c0-20 14-35 32-35s32 15 32 35v8h8c8 0 14 6 14 14v51c0 8-6 14-14 14H89c-8 0-14-6-14-14v-51c0-8 6-14 14-14Zm18 0h28v-8c0-10-6-18-14-18s-14 8-14 18Z" fill="#4F46E5" fill-rule="evenodd"/>
+      <circle cx="129" cy="144" r="9" fill="#FFFDF7"/>
+      <path d="m124 150h10l5 20h-20Z" fill="#FFFDF7"/>
+    </symbol>
+  </defs>
+
+  <rect width="1500" height="900" fill="#F4F5FA"/>
+  <text x="72" y="78" fill="#111827" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="42" font-weight="800">LockNote icon directions</text>
+  <text x="72" y="120" fill="#64748B" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20">Flat vector construction · high contrast · tested at launcher size</text>
+
+  <g filter="url(#cardShadow)">
+    <rect x="60" y="166" width="420" height="658" rx="32" fill="#FFFFFF"/>
+    <rect x="540" y="166" width="420" height="658" rx="32" fill="#FFFFFF"/>
+    <rect x="1020" y="166" width="420" height="658" rx="32" fill="#FFFFFF"/>
+  </g>
+
+  <rect x="84" y="190" width="132" height="34" rx="17" fill="#EEF0FE"/>
+  <text x="150" y="213" text-anchor="middle" fill="#4F46E5" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="1.5">RECOMMENDED</text>
+
+  <use href="#icon-a" x="140" y="248" width="260" height="260"/>
+  <use href="#icon-b" x="620" y="248" width="260" height="260"/>
+  <use href="#icon-c" x="1100" y="248" width="260" height="260"/>
+
+  <text x="92" y="574" fill="#111827" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="27" font-weight="800">A · Keyhole Fold</text>
+  <text x="572" y="574" fill="#111827" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="27" font-weight="800">B · Shield Note</text>
+  <text x="1052" y="574" fill="#111827" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="27" font-weight="800">C · Lock Page</text>
+
+  <text x="92" y="612" fill="#64748B" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18">Privacy shown through negative space.</text>
+  <text x="92" y="641" fill="#64748B" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18">Most distinctive and least cluttered.</text>
+  <text x="572" y="612" fill="#64748B" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18">Security-first, formal, and trustworthy.</text>
+  <text x="572" y="641" fill="#64748B" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18">Best if protection is the main promise.</text>
+  <text x="1052" y="612" fill="#64748B" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18">Literal and immediately understandable.</text>
+  <text x="1052" y="641" fill="#64748B" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18">Friendlier, but more conventional.</text>
+
+  <line x1="92" y1="682" x2="448" y2="682" stroke="#E5E7EB"/>
+  <line x1="572" y1="682" x2="928" y2="682" stroke="#E5E7EB"/>
+  <line x1="1052" y1="682" x2="1408" y2="682" stroke="#E5E7EB"/>
+
+  <text x="92" y="720" fill="#94A3B8" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="1.2">LAUNCHER SIZE</text>
+  <text x="572" y="720" fill="#94A3B8" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="1.2">LAUNCHER SIZE</text>
+  <text x="1052" y="720" fill="#94A3B8" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="1.2">LAUNCHER SIZE</text>
+
+  <use href="#icon-a" x="92" y="742" width="58" height="58"/>
+  <use href="#icon-a" x="169" y="752" width="38" height="38"/>
+  <use href="#icon-b" x="572" y="742" width="58" height="58"/>
+  <use href="#icon-b" x="649" y="752" width="38" height="38"/>
+  <use href="#icon-c" x="1052" y="742" width="58" height="58"/>
+  <use href="#icon-c" x="1129" y="752" width="38" height="38"/>
+
+  <rect x="226" y="742" width="58" height="58" rx="14" fill="#0A0C12"/>
+  <use href="#icon-a" x="235" y="751" width="40" height="40"/>
+  <rect x="706" y="742" width="58" height="58" rx="14" fill="#F4F5FA" stroke="#E5E7EB"/>
+  <use href="#icon-b" x="715" y="751" width="40" height="40"/>
+  <rect x="1186" y="742" width="58" height="58" rx="14" fill="#0A0C12"/>
+  <use href="#icon-c" x="1195" y="751" width="40" height="40"/>
+</svg>

@@ -551,7 +551,7 @@ trying to remember everything.
 Start with changes that are visible and reversible:
 
 1. Change text, spacing, colors, or an icon.
-2. Add a character counter to the note editor.
+2. Change when the note editor's character counter displays its warning color.
 3. Add an "edited at" label using the existing `updated_at` value.
 4. Add a client-side toggle that hides or shows a section.
 5. Add a confirmation before a non-destructive action.

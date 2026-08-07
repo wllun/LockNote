@@ -9,11 +9,17 @@ import {
   Platform,
   Modal,
   Text,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
+import NoteExportModal from '../components/NoteExportModal';
 import { radius, shadow, useTheme } from '../theme';
+import {
+  getNormalNoteCharacterCount,
+  NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
+} from '../utils/note-limits.mjs';
 
 const NoteEditorScreen = ({ route, navigation }) => {
   const colors = useTheme();
@@ -24,13 +30,19 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [content, setContent] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
+  const [isTitleFocused, setIsTitleFocused] = useState(false);
   const saveTimeout = useRef(null);
   const contentRef = useRef(null);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
   const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, deleted: false });
   const insets = useSafeAreaInsets();
+  const contentCharacterCount = getNormalNoteCharacterCount(content);
+  const isNearContentLimit =
+    contentCharacterCount >= NORMAL_NOTE_CONTENT_MAX_CHARACTERS * 0.9;
 
   const loadNote = async () => {
     try {
@@ -181,63 +193,180 @@ const NoteEditorScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           style={styles.headerButton}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={handleTogglePin}
-            style={[styles.headerButton, isPinned && styles.headerButtonActive]}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={isPinned ? 'pin' : 'pin-outline'}
-              size={20}
-              color={isPinned ? colors.primary : colors.textSecondary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowLockModal(true)}
-            style={[styles.headerButton, hasPassword && styles.headerButtonActive]}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={hasPassword ? 'lock-closed' : 'lock-open-outline'}
-              size={20}
-              color={hasPassword ? colors.folder : colors.textSecondary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleDelete}
-            style={styles.headerButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="trash-outline" size={20} color={colors.danger} />
-          </TouchableOpacity>
+
+        <View
+          style={[
+            styles.headerTitleField,
+            isTitleFocused && styles.headerTitleFieldFocused,
+          ]}
+        >
+          <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+          <TextInput
+            style={styles.headerTitleInput}
+            placeholder="Note title"
+            placeholderTextColor={colors.textTertiary}
+            value={title}
+            onChangeText={handleTitleChange}
+            onFocus={() => setIsTitleFocused(true)}
+            onBlur={() => setIsTitleFocused(false)}
+            blurOnSubmit
+            returnKeyType="next"
+            onSubmitEditing={() => contentRef.current?.focus()}
+            accessibilityLabel="Note title"
+            accessibilityHint="Edits the title of this note"
+          />
         </View>
+
+        <TouchableOpacity
+          onPress={() => setShowActionsMenu(true)}
+          style={styles.headerButton}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="More note actions"
+          accessibilityHint="Shows pin, password, export, and delete actions"
+          accessibilityState={{ expanded: showActionsMenu }}
+        >
+          <Ionicons name="ellipsis-vertical" size={22} color={colors.text} />
+        </TouchableOpacity>
       </View>
 
-      <TextInput
-        style={styles.titleInput}
-        placeholder="Title"
-        placeholderTextColor={colors.textTertiary}
-        value={title}
-        onChangeText={handleTitleChange}
-        multiline
-        blurOnSubmit
-        returnKeyType="next"
-        onSubmitEditing={() => contentRef.current?.focus()}
-      />
-      <TextInput
-        ref={contentRef}
-        style={styles.contentInput}
-        placeholder="Start writing..."
-        placeholderTextColor={colors.textTertiary}
-        value={content}
-        onChangeText={handleContentChange}
-        multiline
-        textAlignVertical="top"
-        autoFocus={!title}
+      <View style={styles.contentArea}>
+        <TextInput
+          ref={contentRef}
+          style={styles.contentInput}
+          placeholder="Start writing..."
+          placeholderTextColor={colors.textTertiary}
+          value={content}
+          onChangeText={handleContentChange}
+          maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS}
+          multiline
+          textAlignVertical="top"
+          accessibilityLabel="Note content"
+          accessibilityHint={`Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
+        />
+        <Text
+          style={[
+            styles.characterCounter,
+            isNearContentLimit && styles.characterCounterNearLimit,
+            { paddingBottom: Math.max(insets.bottom, 8) },
+          ]}
+          accessibilityLabel={`${contentCharacterCount.toLocaleString()} of ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} note characters used`}
+        >
+          {contentCharacterCount.toLocaleString()} /{' '}
+          {NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()}
+        </Text>
+      </View>
+
+      <Modal
+        visible={showActionsMenu}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowActionsMenu(false)}
+      >
+        <View style={styles.actionsMenuOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowActionsMenu(false)}
+            accessible={false}
+          />
+          <View
+            style={[styles.actionsMenu, { top: insets.top + 60 }]}
+            accessibilityViewIsModal
+          >
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionsMenuItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                setShowActionsMenu(false);
+                setShowExportModal(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Export note"
+            >
+              <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Export PDF or image</Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionsMenuItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                setShowActionsMenu(false);
+                handleTogglePin();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={isPinned ? 'Unpin note' : 'Pin note'}
+            >
+              <Ionicons
+                name={isPinned ? 'pin' : 'pin-outline'}
+                size={20}
+                color={isPinned ? colors.primary : colors.textSecondary}
+              />
+              <Text style={styles.actionsMenuText}>
+                {isPinned ? 'Unpin note' : 'Pin note'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionsMenuItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                setShowActionsMenu(false);
+                setShowLockModal(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                hasPassword ? 'Manage note password' : 'Set note password'
+              }
+            >
+              <Ionicons
+                name={hasPassword ? 'lock-closed' : 'lock-open-outline'}
+                size={20}
+                color={hasPassword ? colors.folder : colors.textSecondary}
+              />
+              <Text style={styles.actionsMenuText}>
+                {hasPassword ? 'Password protection' : 'Lock note'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionsMenuItem,
+                styles.actionsMenuDeleteItem,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => {
+                setShowActionsMenu(false);
+                handleDelete();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Delete note"
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
+              <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>
+                Delete note
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <NoteExportModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        title={title}
+        content={content}
       />
 
       <Modal visible={showLockModal} animationType="fade" transparent>
@@ -317,40 +446,108 @@ const makeStyles = (colors) =>
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      gap: 8,
       paddingHorizontal: 12,
       paddingVertical: 8,
-    },
-    headerActions: {
-      flexDirection: 'row',
-      gap: 8,
+      backgroundColor: colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
     },
     headerButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       borderRadius: radius.full,
       backgroundColor: colors.background,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    headerButtonActive: {
-      backgroundColor: colors.folderSoft,
+    headerTitleField: {
+      flex: 1,
+      minWidth: 0,
+      height: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 11,
+      backgroundColor: colors.inputBg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
     },
-    titleInput: {
-      fontSize: 26,
+    headerTitleInput: {
+      flex: 1,
+      minWidth: 0,
+      height: 42,
+      paddingVertical: 0,
+      fontSize: 16,
       fontWeight: '700',
-      paddingHorizontal: 20,
-      paddingTop: 12,
-      paddingBottom: 4,
       color: colors.text,
+      outlineStyle: 'none',
+    },
+    headerTitleFieldFocused: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
+    },
+    contentArea: {
+      flex: 1,
     },
     contentInput: {
       flex: 1,
       fontSize: 16,
       paddingHorizontal: 20,
-      paddingTop: 8,
+      paddingTop: 16,
       color: colors.text,
       lineHeight: 25,
+    },
+    characterCounter: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: 20,
+      paddingTop: 6,
+      fontSize: 13,
+      color: colors.textTertiary,
+    },
+    characterCounterNearLimit: {
+      color: colors.danger,
+      fontWeight: '600',
+    },
+    actionsMenuOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(15,23,42,0.12)',
+    },
+    actionsMenu: {
+      position: 'absolute',
+      right: 12,
+      width: 244,
+      overflow: 'hidden',
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
+      ...shadow.card,
+    },
+    actionsMenuItem: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      backgroundColor: colors.card,
+    },
+    actionsMenuItemPressed: {
+      backgroundColor: colors.inputBg,
+    },
+    actionsMenuDeleteItem: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    actionsMenuText: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.text,
+    },
+    actionsMenuDeleteText: {
+      color: colors.danger,
+      fontWeight: '600',
     },
     modalOverlay: {
       flex: 1,

@@ -10,6 +10,7 @@ _Snapshot: 2026-07-30. Check off items as they land._
 - [X] Password lock/unlock on folders and notes (SHA-256 gate)
 - [X] Local persistence — SQLite on iOS/Android, AsyncStorage on web
 - [X] Bottom-tab navigation (Home, Settings) with pull-to-refresh
+- [X] Home folder cards show a soft-delete-aware note count badge
 
 ## To do
 
@@ -36,7 +37,8 @@ _Snapshot: 2026-07-30. Check off items as they land._
 - [X] Dark mode — palette centralized in `src/theme.js` (`useTheme()` + `makeStyles(colors)`). Theme mode (`system` / `light` / `dark`) is set in Settings, persisted in AsyncStorage (`@locknote_theme`), shared via `ThemeProvider` context; `system` follows the OS via `useColorScheme`. `userInterfaceStyle` is `automatic`.
 - [X] Password recovery/reset — an app-wide recovery PIN (Settings → Security), persisted in AsyncStorage via `src/utils/recovery.js`, hashed with the same SHA-256 helper as item passwords. `PasswordModal` gets a "Forgot password?" link that verifies the PIN and clears the item's password. Note: this resets the gate, it does not recover the original password (impossible from a hash) — consistent with the "gating, not encryption" model.
 - [ ] Data export / cross-platform portability (native SQLite and web AsyncStorage are separate, no sync)
-- [X] Pinning — `is_pinned` column added to both SQLite tables (migrated via guarded `ALTER TABLE`) and to the web AsyncStorage records. Pinned folders/notes sort first everywhere (lists + search). Toggle via long-press in lists, or a header button in the note editor.
+- [X] Pinning — `is_pinned` column added to both SQLite tables (migrated via guarded `ALTER TABLE`) and to the web AsyncStorage records. Pinned folders/notes sort first everywhere (lists + search). List actions open by long-press on native or three dots on web; editor actions use a three-dots menu.
+- [X] Contextual list actions — notes can be pinned, moved between Home/folders, or soft-deleted; folders can be pinned or soft-deleted together with their contained notes.
 
 ## Roadmap
 
@@ -61,7 +63,7 @@ _Snapshot: 2026-07-30. Check off items as they land._
 
 ### Phase 4 — Export
 
-- [ ] Export PDF & image
+- [X] Export PDF & image - note and expense editors provide a preview and export through native sharing; web prints/saves PDF and downloads PNG locally. Expense exports include saved monthly categories, categorized total, and the shared summary note.
 
 ### Phase 5 — Structure (not premium)
 
@@ -75,7 +77,9 @@ When the user presses the Add button, let them choose one of these note types:
 - [X] Add selection popup on both the Home and Folder Add buttons (unsupported types are clearly marked as coming soon)
 - [ ] Note — plaintext
 - [ ] Checklist — checkbox listing
-- [X] Expense Record — titled multi-row table with direct date/remark/amount entry, row controls, running total, local persistence, list summaries, password/pin support, and 800 ms autosave
+- [X] Expense Record — titled multi-row table with direct date/remark/amount entry, row add/delete/reorder controls, total, local persistence, list summaries, password/pin support, and 800 ms autosave
+- [X] Expense Record monthly summaries — named categories support multiple case-insensitive remark keywords or manual amounts, same-name updates, and one shared auto-saved summary note
+- [ ] Expense Record monthly commitments checklist — approved additive Option C design; preserve the existing expense workflow and add a separate paid-status section. See [MONTHLY_EXPENSE_CHECKLIST.md](MONTHLY_EXPENSE_CHECKLIST.md)
 - [ ] Expense Record currency selection — currently uses RM; consider storing a currency code per expense note and applying it consistently to table headers, totals, and Home/Folder summaries
 - [ ] Reminder — plaintext with notification settings
 
@@ -83,6 +87,7 @@ When the user presses the Add button, let them choose one of these note types:
 
 - [X] Pin — already shipped free in Phase 1 scope; decide which tier it belongs to
 - [ ] Coloring note
+- [ ] Custom note background images — allow users to select, change, or remove a background image per note while preserving text readability and local-only storage
 - [ ] View (list/grid?)
 - [ ] Sort
 - [ ] Trash (currently soft-delete with no trash UI)

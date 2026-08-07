@@ -1,0 +1,111 @@
+# Monthly Commitments Section
+
+Status: approved design direction (Option C), not yet implemented.
+
+![Option C monthly commitments mock](../assets/design/monthly-expense-checklist-option-c.png)
+
+Editable vector source: [monthly-expense-checklist-option-c.svg](../assets/design/monthly-expense-checklist-option-c.svg)
+
+## Decision
+
+Add a separate **Monthly commitments** checklist to an expense note. This is an additive section and must not replace or weaken the current expense workflow.
+
+The existing expense note keeps:
+
+- its total summary and Summary action;
+- the Day, Remark, and RM expense table;
+- editable rows, three-line Remark wrapping, drag-to-reorder, and drag-to-delete;
+- long-press deletion confirmation;
+- local persistence and 800 ms auto-save.
+
+## Placement
+
+Place the new section after **Monthly categories** and before the existing expense table:
+
+1. Existing Summary action and expense total on the same row
+2. New monthly commitments checklist
+3. Existing expense-entry table
+4. Existing save status
+
+The Summary action sits on the left of the total row. The `TOTAL` label and RM amount are right-aligned. Do not show a separate `Monthly categories` heading or saved-category count on the main screen.
+
+## Monthly commitments section
+
+The section header shows:
+
+- `Monthly commitments`
+- progress such as `1 of 3 paid`
+- the remaining unpaid amount, such as `RM 2,819.00 left`
+
+Each commitment row contains:
+
+- the existing drag-handle pattern;
+- an accessible Paid checkbox;
+- the bill name;
+- an optional due day;
+- an RM amount aligned to the right.
+
+Example rows:
+
+| Paid | Due day | Commitment | RM |
+| --- | ---: | --- | ---: |
+| No | 1 | House installment | 2,500.00 |
+| Yes | 8 | Car installment | 1,000.00 |
+| No | 15 | Insurance | 319.00 |
+
+The example totals are:
+
+- Commitments: RM 3,819.00
+- Paid: RM 1,000.00
+- Remaining: RM 2,819.00
+
+## Interaction rules
+
+- Checked means the commitment has been paid for the month represented by this note.
+- Checking a row keeps it visible and updates the paid count and remaining amount immediately.
+- A checked row remains part of the commitments total.
+- Checking a commitment does not automatically create an expense-table row, preventing duplicate amounts.
+- `Add monthly bill` adds a commitment without affecting existing expense rows.
+- Reordering and deletion should reuse the existing expense-row gestures and detailed confirmation pattern.
+- Checkbox and row actions must keep at least a 44 × 44 point touch target and have descriptive accessibility labels.
+- Paid state must use a visible checkmark and text/progress feedback; color alone is not sufficient.
+
+## Data shape for implementation
+
+Store commitments inside the expense note's versioned JSON payload, independently from `rows`:
+
+```json
+{
+  "monthlyCommitments": [
+    {
+      "id": "local-base36-id",
+      "day": "1",
+      "remark": "House installment",
+      "amount": "2500.00",
+      "isPaid": false
+    }
+  ]
+}
+```
+
+An implementation will require a payload-version migration that defaults `monthlyCommitments` to an empty array for existing notes. It should not require new repository methods because expense-note content remains versioned JSON.
+
+## Totals and existing behavior
+
+Commitment totals are displayed inside the new section. The current expense total continues to represent only rows recorded in the existing expense table. This avoids changing current calculations or counting a commitment twice.
+
+## Remaining product decision
+
+Decide how checked states start a new month before implementation:
+
+- Recommended initial behavior: keep paid state per note and provide a confirmed `Reset paid status` action.
+- Possible later behavior: copy commitments into a new monthly note with every checkbox reset.
+- Avoid silently resetting checkboxes by calendar date because a user may still be finishing the previous month's note.
+
+## Out of scope for the first implementation
+
+- Replacing the existing expense table
+- Automatically creating expense rows when a bill is checked
+- Notifications or payment reminders
+- Currency selection beyond the current RM behavior
+- Automatic calendar-based checkbox reset
