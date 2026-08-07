@@ -488,20 +488,42 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     updateDraft(latest.current.title, nextRows);
   };
 
-  const measureDragArea = () => {
+  const storeDragAreaBounds = (x, y, width, height) => {
+    const nextBounds = { x, y, width, height };
+    dragAreaBoundsRef.current = nextBounds;
+    setDragAreaBounds((currentBounds) =>
+      currentBounds.x === x &&
+      currentBounds.y === y &&
+      currentBounds.width === width &&
+      currentBounds.height === height
+        ? currentBounds
+        : nextBounds
+    );
+  };
+
+  const measureDragArea = (event) => {
+    const fallbackLayout = event?.nativeEvent?.layout;
     requestAnimationFrame(() => {
-      dragAreaRef.current?.measureInWindow((x, y, width, height) => {
-        const nextBounds = { x, y, width, height };
-        dragAreaBoundsRef.current = nextBounds;
-        setDragAreaBounds((currentBounds) =>
-          currentBounds.x === x &&
-          currentBounds.y === y &&
-          currentBounds.width === width &&
-          currentBounds.height === height
-            ? currentBounds
-            : nextBounds
+      const dragArea = dragAreaRef.current;
+      if (typeof dragArea?.measureInWindow === 'function') {
+        dragArea.measureInWindow(storeDragAreaBounds);
+        return;
+      }
+
+      if (typeof dragArea?.getBoundingClientRect === 'function') {
+        const bounds = dragArea.getBoundingClientRect();
+        storeDragAreaBounds(bounds.left, bounds.top, bounds.width, bounds.height);
+        return;
+      }
+
+      if (fallbackLayout) {
+        storeDragAreaBounds(
+          fallbackLayout.x ?? 0,
+          fallbackLayout.y ?? 0,
+          fallbackLayout.width,
+          fallbackLayout.height
         );
-      });
+      }
     });
   };
 
@@ -846,7 +868,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       <ScrollView
         style={styles.scroll}
-        scrollEnabled={!isDraggingRow}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Math.max(32, insets.bottom + 20) },
