@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initDB } from './src/db/sqlite';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider, useTheme, useThemeMode } from './src/theme';
@@ -38,15 +39,20 @@ function AppRoot() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppRoot />
-      </AuthProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoot />
+        </AuthProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

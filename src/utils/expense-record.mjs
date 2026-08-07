@@ -13,23 +13,37 @@ export const createExpenseRow = (values = {}) => ({
       : '',
 });
 
+export const moveExpenseRowToIndex = (rows, rowId, targetIndex) => {
+  if (!Array.isArray(rows) || !Number.isInteger(targetIndex)) {
+    return rows;
+  }
+
+  const currentIndex = rows.findIndex((row) => row?.id === rowId);
+  if (currentIndex < 0 || !rows.length) {
+    return rows;
+  }
+
+  const boundedIndex = Math.max(0, Math.min(targetIndex, rows.length - 1));
+  if (currentIndex === boundedIndex) return rows;
+
+  const reorderedRows = [...rows];
+  const [movedRow] = reorderedRows.splice(currentIndex, 1);
+  reorderedRows.splice(boundedIndex, 0, movedRow);
+  return reorderedRows;
+};
+
 export const moveExpenseRow = (rows, rowId, direction) => {
   if (!Array.isArray(rows) || (direction !== 'up' && direction !== 'down')) {
     return rows;
   }
 
   const currentIndex = rows.findIndex((row) => row?.id === rowId);
-  const targetIndex = currentIndex + (direction === 'up' ? -1 : 1);
-  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= rows.length) {
-    return rows;
-  }
+  if (currentIndex < 0) return rows;
 
-  const reorderedRows = [...rows];
-  [reorderedRows[currentIndex], reorderedRows[targetIndex]] = [
-    reorderedRows[targetIndex],
-    reorderedRows[currentIndex],
-  ];
-  return reorderedRows;
+  const targetIndex = currentIndex + (direction === 'up' ? -1 : 1);
+  if (targetIndex < 0 || targetIndex >= rows.length) return rows;
+
+  return moveExpenseRowToIndex(rows, rowId, targetIndex);
 };
 
 const normalizeRows = (rows) =>

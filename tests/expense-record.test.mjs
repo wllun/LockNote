@@ -8,6 +8,7 @@ import {
   expenseRowHasContent,
   isExpenseNoteEmpty,
   moveExpenseRow,
+  moveExpenseRowToIndex,
   normalizeExpenseAmountInput,
   normalizeExpenseCategoryKeyword,
   parseExpenseAmount,
@@ -38,6 +39,26 @@ test('moves expense rows up and down without changing their data', () => {
   assert.equal(moveExpenseRow(rows, 'row-1', 'up'), rows);
   assert.equal(moveExpenseRow(rows, 'row-3', 'down'), rows);
   assert.equal(moveExpenseRow(rows, 'missing', 'up'), rows);
+});
+
+test('moves a dragged expense row directly to its drop index', () => {
+  const rows = [
+    createExpenseRow({ id: 'row-1', remark: 'Food' }),
+    createExpenseRow({ id: 'row-2', remark: 'Petrol' }),
+    createExpenseRow({ id: 'row-3', remark: 'Parking' }),
+    createExpenseRow({ id: 'row-4', remark: 'Toll' }),
+  ];
+
+  const moved = moveExpenseRowToIndex(rows, 'row-1', 2);
+  assert.deepEqual(moved.map((row) => row.id), [
+    'row-2',
+    'row-3',
+    'row-1',
+    'row-4',
+  ]);
+  assert.equal(moved[2], rows[0]);
+  assert.equal(moveExpenseRowToIndex(rows, 'row-2', 1), rows);
+  assert.equal(moveExpenseRowToIndex(rows, 'missing', 2), rows);
 });
 
 test('serializes and parses multiple expense rows', () => {
