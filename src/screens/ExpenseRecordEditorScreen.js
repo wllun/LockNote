@@ -4,7 +4,6 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -12,10 +11,9 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
-import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
@@ -46,7 +44,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const { noteId } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const initialRows = useMemo(() => [createExpenseRow()], []);
 
@@ -64,10 +61,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
   const [remarkInputHeights, setRemarkInputHeights] = useState({});
-  const [draggingRowId, setDraggingRowId] = useState(null);
-  const [isDraggingRow, setIsDraggingRow] = useState(false);
-  const [dragPreview, setDragPreview] = useState(null);
-  const [isOverDeleteTarget, setIsOverDeleteTarget] = useState(false);
+  const [rowActionsRowId, setRowActionsRowId] = useState(null);
 
   const saveTimeout = useRef(null);
   const inputRefs = useRef({});
@@ -85,6 +79,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const invalidAmountCount = rows.filter(
     (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
   ).length;
+  const rowActionsIndex = rows.findIndex((row) => row.id === rowActionsRowId);
+  const rowActionsRow = rowActionsIndex >= 0 ? rows[rowActionsIndex] : null;
 
   const loadRecord = useCallback(async () => {
     try {
@@ -304,70 +300,15 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     updateDraft(latest.current.title, nextRows);
   };
 
-  const reorderRow = (rowId, targetIndex) => {
-    const currentRows = latest.current.rows;
-    const currentIndex = currentRows.findIndex((row) => row.id === rowId);
-    const boundedIndex = Math.max(0, Math.min(targetIndex, currentRows.length - 1));
-    if (currentIndex < 0 || currentIndex === boundedIndex) return;
-
-    const nextRows = [...currentRows];
-    const [movedRow] = nextRows.splice(currentIndex, 1);
-    nextRows.splice(boundedIndex, 0, movedRow);
-    setRows(nextRows);
-    updateDraft(latest.current.title, nextRows);
+  const handleMoveRowAction = (direction) => {
+    const rowId = rowActionsRowId;
+    if (rowId) moveRow(rowId, direction);
   };
 
-  const createRowDragResponder = (rowId, startIndex) => {
-    let overDeleteTarget = false;
-    const rowsBeforeDrag = latest.current.rows;
-
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        Math.abs(gestureState.dy) > 4,
-      onPanResponderGrant: () => {
-        Keyboard.dismiss();
-        setDraggingRowId(rowId);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (Math.abs(gestureState.dy) <= 4) return;
-        setIsDraggingRow(true);
-        const currentRow = latest.current.rows.find((row) => row.id === rowId);
-        const deleteTargetTop = windowHeight - Math.max(96, insets.bottom + 88);
-        overDeleteTarget =
-          Math.abs(gestureState.moveX - windowWidth / 2) <= 76 &&
-          gestureState.moveY >= deleteTargetTop;
-        setIsOverDeleteTarget(overDeleteTarget);
-        setDragPreview({
-          row: currentRow,
-          x: gestureState.moveX,
-          y: gestureState.moveY,
-        });
-
-        if (!overDeleteTarget) {
-          const rowOffset = Math.round(gestureState.dy / 48);
-          reorderRow(rowId, startIndex + rowOffset);
-        }
-      },
-      onPanResponderRelease: () => {
-        setDraggingRowId(null);
-        setIsDraggingRow(false);
-        setDragPreview(null);
-        setIsOverDeleteTarget(false);
-        if (overDeleteTarget) {
-          setRows(rowsBeforeDrag);
-          updateDraft(latest.current.title, rowsBeforeDrag);
-          confirmRemoveRow(rowId);
-        }
-      },
-      onPanResponderTerminate: () => {
-        setDraggingRowId(null);
-        setIsDraggingRow(false);
-        setDragPreview(null);
-        setIsOverDeleteTarget(false);
-      },
-      onPanResponderTerminationRequest: () => false,
-    });
+  const handleDeleteRowAction = () => {
+    const rowId = rowActionsRowId;
+    setRowActionsRowId(null);
+    if (rowId) confirmRemoveRow(rowId);
   };
 
   const focusNextRow = (rowIndex) => {
@@ -548,7 +489,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       <ScrollView
         style={styles.scroll}
-        scrollEnabled={!isDraggingRow}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Math.max(32, insets.bottom + 20) },
@@ -613,7 +553,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               const invalidAmount =
                 !!row.amount.trim() && parseExpenseAmount(row.amount) === null;
               const showPlaceholder = shouldShowExpenseRowPlaceholder(rows, index);
-              const dragResponder = createRowDragResponder(row.id, index);
 
               return (
                 <View
@@ -622,40 +561,29 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     styles.tableRow,
                     index % 2 === 0 ? styles.evenRow : styles.oddRow,
                     focusedCell?.startsWith(`${row.id}:`) && styles.focusedRow,
-                    draggingRowId === row.id && styles.draggingRow,
                   ]}
                 >
-                  <View
-                    style={[styles.actionColumn, styles.rowActionColumn]}
-                    {...dragResponder.panHandlers}
-                    accessible
-                    accessibilityRole="adjustable"
-                    accessibilityLabel={`Reorder expense row ${index + 1}`}
-                    accessibilityHint="Drag up or down to reorder, or drag to the recycle bin to delete. Screen reader users can activate to delete."
-                    accessibilityActions={[
-                      { name: 'increment', label: 'Move row down' },
-                      { name: 'decrement', label: 'Move row up' },
-                      { name: 'activate', label: 'Delete row' },
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.actionColumn,
+                      styles.rowActionButton,
+                      pressed && styles.rowActionButtonPressed,
                     ]}
-                    onAccessibilityAction={({ nativeEvent }) => {
-                      if (nativeEvent.actionName === 'increment') moveRow(row.id, 'down');
-                      if (nativeEvent.actionName === 'decrement') moveRow(row.id, 'up');
-                      if (nativeEvent.actionName === 'activate') confirmRemoveRow(row.id);
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setRowActionsRowId(row.id);
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Actions for expense row ${index + 1}`}
+                    accessibilityHint="Shows options to move or delete this row"
+                    accessibilityState={{ expanded: rowActionsRowId === row.id }}
                   >
-                    <View
-                      style={[
-                        styles.rowActionsIcon,
-                        draggingRowId === row.id && styles.rowActionsIconDragging,
-                      ]}
-                    >
-                      <FontAwesome5
-                        name="grip-vertical"
-                        size={16}
-                        color={colors.textSecondary}
-                      />
-                    </View>
-                  </View>
+                    <Ionicons
+                      name="ellipsis-horizontal"
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </Pressable>
                   <View
                     style={[
                       styles.tableCellColumn,
@@ -812,69 +740,127 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
-      {isDraggingRow && dragPreview?.row && (
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <View
-            style={[
-              styles.dragPreview,
-              isOverDeleteTarget && styles.dragPreviewDeleting,
-              {
-                width: Math.min(340, windowWidth - 32),
-                left: Math.max(
-                  16,
-                  Math.min(
-                    dragPreview.x - Math.min(340, windowWidth - 32) / 2,
-                    windowWidth - Math.min(340, windowWidth - 32) - 16
-                  )
-                ),
-                top: Math.max(insets.top + 8, dragPreview.y - 76),
-              },
-            ]}
-          >
-            <FontAwesome5
-              name="grip-vertical"
-              size={15}
-              color={colors.textSecondary}
-            />
-            <Text style={styles.dragPreviewDate} numberOfLines={1}>
-              {dragPreview.row.date.trim() || 'No date'}
-            </Text>
-            <Text style={styles.dragPreviewRemark} numberOfLines={1}>
-              {dragPreview.row.remark.trim() || 'No remark'}
-            </Text>
-            <Text style={styles.dragPreviewAmount} numberOfLines={1}>
-              {dragPreview.row.amount.trim()
-                ? `RM ${dragPreview.row.amount.trim()}`
-                : 'No amount'}
-            </Text>
-          </View>
+      <Modal
+        visible={!!rowActionsRow}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setRowActionsRowId(null)}
+      >
+        <View
+          style={[
+            styles.rowActionsOverlay,
+            { paddingBottom: Math.max(16, insets.bottom + 8) },
+          ]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setRowActionsRowId(null)}
+            accessible={false}
+          />
+          {rowActionsRow && (
+            <View style={styles.rowActionsSheet} accessibilityViewIsModal>
+              <View style={styles.rowActionsHeader}>
+                <Text style={styles.rowActionsTitle}>Row {rowActionsIndex + 1}</Text>
+                <Text style={styles.rowActionsDescription} numberOfLines={2}>
+                  {rowActionsRow.remark.trim() || 'No remark'}
+                </Text>
+              </View>
 
-          <View
-            style={[
-              styles.dragDeleteTarget,
-              isOverDeleteTarget && styles.dragDeleteTargetActive,
-              {
-                left: windowWidth / 2 - 58,
-                bottom: Math.max(16, insets.bottom + 8),
-              },
-            ]}
-          >
-            <Ionicons
-              name={isOverDeleteTarget ? 'trash' : 'trash-outline'}
-              size={25}
-              color={isOverDeleteTarget ? colors.card : colors.danger}
-            />
-            <Text
-              style={[
-                styles.dragDeleteTargetText,
-                isOverDeleteTarget && styles.dragDeleteTargetTextActive,
-              ]}
-            >
-              Drop to delete
-            </Text>
-          </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.rowActionsItem,
+                  rowActionsIndex === 0 && styles.rowActionsItemDisabled,
+                  pressed && rowActionsIndex > 0 && styles.rowActionsItemPressed,
+                ]}
+                onPress={() => handleMoveRowAction('up')}
+                disabled={rowActionsIndex === 0}
+                accessibilityRole="button"
+                accessibilityLabel={`Move expense row ${rowActionsIndex + 1} up`}
+                accessibilityState={{ disabled: rowActionsIndex === 0 }}
+              >
+                <Ionicons
+                  name="arrow-up"
+                  size={21}
+                  color={rowActionsIndex === 0 ? colors.textTertiary : colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.rowActionsItemText,
+                    rowActionsIndex === 0 && styles.rowActionsItemTextDisabled,
+                  ]}
+                >
+                  Move up
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.rowActionsItem,
+                  rowActionsIndex === rows.length - 1 && styles.rowActionsItemDisabled,
+                  pressed &&
+                    rowActionsIndex < rows.length - 1 &&
+                    styles.rowActionsItemPressed,
+                ]}
+                onPress={() => handleMoveRowAction('down')}
+                disabled={rowActionsIndex === rows.length - 1}
+                accessibilityRole="button"
+                accessibilityLabel={`Move expense row ${rowActionsIndex + 1} down`}
+                accessibilityState={{
+                  disabled: rowActionsIndex === rows.length - 1,
+                }}
+              >
+                <Ionicons
+                  name="arrow-down"
+                  size={21}
+                  color={
+                    rowActionsIndex === rows.length - 1
+                      ? colors.textTertiary
+                      : colors.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.rowActionsItemText,
+                    rowActionsIndex === rows.length - 1 &&
+                      styles.rowActionsItemTextDisabled,
+                  ]}
+                >
+                  Move down
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.rowActionsItem,
+                  styles.rowActionsDeleteItem,
+                  pressed && styles.rowActionsItemPressed,
+                ]}
+                onPress={handleDeleteRowAction}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete expense row ${rowActionsIndex + 1}`}
+              >
+                <Ionicons name="trash-outline" size={21} color={colors.danger} />
+                <Text style={[styles.rowActionsItemText, styles.rowActionsDeleteText]}>
+                  Delete row
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.rowActionsItem,
+                  pressed && styles.rowActionsItemPressed,
+                ]}
+                onPress={() => setRowActionsRowId(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel row actions"
+              >
+                <Ionicons name="close" size={21} color={colors.textSecondary} />
+                <Text style={styles.rowActionsItemText}>Cancel</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
-      )}
+      </Modal>
 
       <Modal
         visible={showActionsMenu}
@@ -1159,6 +1145,70 @@ const makeStyles = (colors) =>
       color: colors.danger,
       fontWeight: '600',
     },
+    rowActionsOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      paddingHorizontal: 12,
+      backgroundColor: 'rgba(15,23,42,0.48)',
+    },
+    rowActionsSheet: {
+      width: '100%',
+      maxWidth: 480,
+      overflow: 'hidden',
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.lg,
+      ...shadow.card,
+    },
+    rowActionsHeader: {
+      gap: 4,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: colors.inputBg,
+    },
+    rowActionsTitle: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '800',
+    },
+    rowActionsDescription: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    rowActionsItem: {
+      minHeight: 52,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      backgroundColor: colors.card,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    rowActionsItemPressed: {
+      backgroundColor: colors.primarySoft,
+    },
+    rowActionsItemDisabled: {
+      backgroundColor: colors.inputBg,
+    },
+    rowActionsItemText: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    rowActionsItemTextDisabled: {
+      color: colors.textTertiary,
+    },
+    rowActionsDeleteItem: {
+      borderTopColor: colors.border,
+    },
+    rowActionsDeleteText: {
+      color: colors.danger,
+    },
     scroll: {
       flex: 1,
     },
@@ -1334,10 +1384,6 @@ const makeStyles = (colors) =>
     focusedRow: {
       backgroundColor: colors.primarySoft,
     },
-    draggingRow: {
-      backgroundColor: colors.primarySoft,
-      opacity: 0.9,
-    },
     focusedInput: {
       backgroundColor: colors.card,
       color: colors.text,
@@ -1372,81 +1418,12 @@ const makeStyles = (colors) =>
     actionHeaderColumn: {
       borderRightColor: 'rgba(255,255,255,0.18)',
     },
-    rowActionColumn: {
-      justifyContent: 'flex-start',
-      paddingTop: 7,
+    rowActionButton: {
+      minHeight: EXPENSE_ROW_MIN_HEIGHT,
+      alignSelf: 'stretch',
     },
-    rowActionsIcon: {
-      width: 28,
-      height: 28,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    rowActionsIconDragging: {
-      backgroundColor: colors.card,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: colors.primary,
-    },
-    dragPreview: {
-      position: 'absolute',
-      minHeight: 52,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingHorizontal: 14,
-      backgroundColor: colors.card,
-      borderWidth: 2,
-      borderColor: colors.primary,
-      borderRadius: radius.md,
-      ...shadow.card,
-    },
-    dragPreviewDeleting: {
-      borderColor: colors.danger,
-      backgroundColor: colors.dangerSoft,
-    },
-    dragPreviewDate: {
-      width: 54,
-      color: colors.textSecondary,
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    dragPreviewRemark: {
-      flex: 1,
-      color: colors.text,
-      fontSize: 14,
-      fontWeight: '700',
-    },
-    dragPreviewAmount: {
-      maxWidth: 92,
-      color: colors.text,
-      fontSize: 13,
-      fontWeight: '800',
-      fontVariant: ['tabular-nums'],
-    },
-    dragDeleteTarget: {
-      position: 'absolute',
-      width: 116,
-      minHeight: 68,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
-      backgroundColor: colors.card,
-      borderWidth: 2,
-      borderColor: colors.danger,
-      borderRadius: radius.lg,
-      ...shadow.card,
-    },
-    dragDeleteTargetActive: {
-      backgroundColor: colors.danger,
-    },
-    dragDeleteTargetText: {
-      color: colors.danger,
-      fontSize: 11,
-      fontWeight: '800',
-    },
-    dragDeleteTargetTextActive: {
-      color: colors.card,
+    rowActionButtonPressed: {
+      backgroundColor: colors.primarySoft,
     },
     invalidCell: {
       color: colors.danger,
