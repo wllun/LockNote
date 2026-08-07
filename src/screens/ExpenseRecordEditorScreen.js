@@ -318,16 +318,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const createRowDragResponder = (rowId, startIndex) => {
-    let longPressTimeout = null;
-    let longPressTriggered = false;
     let overDeleteTarget = false;
     const rowsBeforeDrag = latest.current.rows;
-
-    const cancelLongPress = () => {
-      if (!longPressTimeout) return;
-      clearTimeout(longPressTimeout);
-      longPressTimeout = null;
-    };
 
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -336,17 +328,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       onPanResponderGrant: () => {
         Keyboard.dismiss();
         setDraggingRowId(rowId);
-        longPressTimeout = setTimeout(() => {
-          longPressTimeout = null;
-          longPressTriggered = true;
-          setDraggingRowId(null);
-          confirmRemoveRow(rowId);
-        }, 650);
       },
       onPanResponderMove: (_, gestureState) => {
-        if (longPressTriggered) return;
         if (Math.abs(gestureState.dy) <= 4) return;
-        cancelLongPress();
         setIsDraggingRow(true);
         const currentRow = latest.current.rows.find((row) => row.id === rowId);
         const deleteTargetTop = windowHeight - Math.max(96, insets.bottom + 88);
@@ -366,7 +350,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         }
       },
       onPanResponderRelease: () => {
-        cancelLongPress();
         setDraggingRowId(null);
         setIsDraggingRow(false);
         setDragPreview(null);
@@ -378,7 +361,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         }
       },
       onPanResponderTerminate: () => {
-        cancelLongPress();
         setDraggingRowId(null);
         setIsDraggingRow(false);
         setDragPreview(null);
@@ -649,7 +631,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     accessible
                     accessibilityRole="adjustable"
                     accessibilityLabel={`Reorder expense row ${index + 1}`}
-                    accessibilityHint="Drag up or down to reorder. Long press to delete this row."
+                    accessibilityHint="Drag up or down to reorder, or drag to the recycle bin to delete. Screen reader users can activate to delete."
                     accessibilityActions={[
                       { name: 'increment', label: 'Move row down' },
                       { name: 'decrement', label: 'Move row up' },
