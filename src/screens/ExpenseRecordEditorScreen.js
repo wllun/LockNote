@@ -39,6 +39,9 @@ import {
 } from '../utils/expense-record.mjs';
 import { radius, shadow, useTheme } from '../theme';
 
+const EXPENSE_ROW_MIN_HEIGHT = 48;
+const EXPENSE_REMARK_MAX_HEIGHT = 82;
+
 const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const { noteId } = route.params;
   const colors = useTheme();
@@ -60,6 +63,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [lockPassword, setLockPassword] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
+  const [remarkInputHeights, setRemarkInputHeights] = useState({});
   const [draggingRowId, setDraggingRowId] = useState(null);
   const [isDraggingRow, setIsDraggingRow] = useState(false);
   const [dragPreview, setDragPreview] = useState(null);
@@ -232,6 +236,18 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     );
     setRows(nextRows);
     updateDraft(latest.current.title, nextRows);
+  };
+
+  const handleRemarkContentSizeChange = (rowId, contentHeight) => {
+    const nextHeight = Math.max(
+      EXPENSE_ROW_MIN_HEIGHT,
+      Math.min(EXPENSE_REMARK_MAX_HEIGHT, Math.ceil(contentHeight))
+    );
+    setRemarkInputHeights((currentHeights) =>
+      currentHeights[rowId] === nextHeight
+        ? currentHeights
+        : { ...currentHeights, [rowId]: nextHeight }
+    );
   };
 
   const focusCell = (rowId, field) => {
@@ -691,22 +707,17 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     />
                   </View>
                   <View style={[styles.tableCellColumn, styles.remarkColumn]}>
-                    <Text
-                      style={styles.remarkMeasure}
-                      numberOfLines={3}
-                      accessible={false}
-                      importantForAccessibility="no-hide-descendants"
-                    >
-                      {row.remark || (showPlaceholder ? 'Enter remark' : ' ')}
-                    </Text>
                     <TextInput
                       ref={(ref) => {
                         inputRefs.current[`${row.id}:remark`] = ref;
                       }}
                       style={[
-                        StyleSheet.absoluteFill,
                         styles.cellInput,
                         styles.remarkInput,
+                        {
+                          height:
+                            remarkInputHeights[row.id] ?? EXPENSE_ROW_MIN_HEIGHT,
+                        },
                         focusedCell === `${row.id}:remark` && styles.focusedInput,
                       ]}
                       value={row.remark}
@@ -715,6 +726,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       placeholderTextColor={colors.textTertiary}
                       multiline
                       scrollEnabled={false}
+                      onContentSizeChange={({ nativeEvent }) =>
+                        handleRemarkContentSizeChange(
+                          row.id,
+                          nativeEvent.contentSize.height
+                        )
+                      }
                       returnKeyType="next"
                       onFocus={() => setFocusedCell(`${row.id}:remark`)}
                       onBlur={() => setFocusedCell(null)}
@@ -1288,7 +1305,7 @@ const makeStyles = (colors) =>
       ...shadow.card,
     },
     tableRow: {
-      minHeight: 48,
+      minHeight: EXPENSE_ROW_MIN_HEIGHT,
       flexDirection: 'row',
       alignItems: 'stretch',
       borderBottomWidth: 1,
@@ -1329,7 +1346,7 @@ const makeStyles = (colors) =>
       outlineStyle: 'none',
     },
     singleLineCellInput: {
-      height: 48,
+      height: EXPENSE_ROW_MIN_HEIGHT,
       alignSelf: 'stretch',
     },
     focusedRow: {
@@ -1351,15 +1368,9 @@ const makeStyles = (colors) =>
       minWidth: 100,
     },
     remarkInput: {
+      minHeight: EXPENSE_ROW_MIN_HEIGHT,
+      maxHeight: EXPENSE_REMARK_MAX_HEIGHT,
       overflow: 'hidden',
-    },
-    remarkMeasure: {
-      maxHeight: 82,
-      color: 'transparent',
-      fontSize: 15,
-      lineHeight: 20,
-      paddingHorizontal: 10,
-      paddingVertical: 11,
     },
     amountColumn: {
       width: 76,
