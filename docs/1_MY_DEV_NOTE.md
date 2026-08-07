@@ -1,5 +1,6 @@
 1. Copy the latest code to the short build folder
-    robocopy "C:\Users\behwl\OneDrive\Documents\ReactNative\LockNote" "C:\LNBuild" /E /XD .git node_modules android ios .expo dist web-build
+    `robocopy "C:\Users\behwl\OneDrive\Documents\ReactNative\LockNote" "C:\LNBuild" /E /XD .git node_modules android ios .expo dist web-build`
+    [Company Laptop Cmd] : `robocopy "C:\Users\User\Desktop\React App\LockNote" "C:\LNBuild" /E /XD .git node_modules android ios .expo dist web-build`
 
 2. Update the generated project
     cd C:\LNBuild
