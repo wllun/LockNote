@@ -20,6 +20,17 @@ Notes created before this limit was introduced are not truncated when loaded.
 If an existing note already exceeds the limit, its stored content remains
 unchanged until the user edits it.
 
+## Checklist notes
+
+| Field | Limit |
+| --- | ---: |
+| Checklist item | 500 characters per item |
+| Checklist size | 500 items |
+
+The checklist editor enforces the per-item text limit on new and existing
+items. The add-item card displays the current item count and stops adding items
+when the checklist reaches 500.
+
 ## Expense notes
 
 | Field | Limit |

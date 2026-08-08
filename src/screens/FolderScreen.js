@@ -19,10 +19,14 @@ import MoveNoteModal from '../components/MoveNoteModal';
 import { hashPassword } from '../utils/crypto';
 import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
+import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 
-const editorRouteFor = (note) =>
-  note.note_type === EXPENSE_NOTE_TYPE ? 'ExpenseRecordEditor' : 'NoteEditor';
+const editorRouteFor = (note) => {
+  if (note.note_type === EXPENSE_NOTE_TYPE) return 'ExpenseRecordEditor';
+  if (note.note_type === CHECKLIST_NOTE_TYPE) return 'ChecklistEditor';
+  return 'NoteEditor';
+};
 
 const FolderScreen = ({ route, navigation }) => {
   const colors = useTheme();
@@ -68,7 +72,9 @@ const FolderScreen = ({ route, navigation }) => {
         'Error',
         type === EXPENSE_NOTE_TYPE
           ? 'Failed to create expense record'
-          : 'Failed to create note'
+          : type === CHECKLIST_NOTE_TYPE
+            ? 'Failed to create checklist'
+            : 'Failed to create note'
       );
     }
   };

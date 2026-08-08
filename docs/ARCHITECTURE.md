@@ -60,6 +60,12 @@ a manually entered amount; saving a normalized category name again updates it
 instead of creating a duplicate. The note's `title` remains in the normal title
 column.
 
+Checklist notes use `checklist` and store ordered `{id, text, completed}` items
+as versioned JSON in `content`. `ChecklistEditorScreen` supports inline editing,
+checkbox toggles, item deletion, progress, PDF/image export, and the same local
+pin/password gate used by other notes. Checklist item text remains searchable
+because repository search already checks the serialized `content` field.
+
 Users can explicitly save the current commitment list for reuse in another
 expense note. This app-level template is stored locally in AsyncStorage under
 `@locknote_monthly_commitment_template`, excludes paid state and note-specific
@@ -81,10 +87,11 @@ This is **gating, not encryption** — note `content` is stored in cleartext. Se
 
 ## Editor auto-save
 
-`NoteEditorScreen` and `ExpenseRecordEditorScreen` create the note row first
-(empty), then navigate into it by `noteId`. Field changes trigger a debounced
-(800ms) `noteRepo.update`. The debounce timer is cleared on unmount and before
-delete. Normal note bodies are limited to 100,000 characters; see
+`NoteEditorScreen`, `ChecklistEditorScreen`, and `ExpenseRecordEditorScreen`
+create the note row first (empty), then navigate into it by `noteId`. Field
+changes trigger a debounced (800ms) `noteRepo.update`. The debounce timer is
+cleared on unmount and before delete. Normal note bodies are limited to 100,000
+characters; checklist items are limited to 500 characters and 500 items; see
 [Note Character Limits](NOTE_LIMITS.md).
 
 ## Auth

@@ -16,6 +16,11 @@ import {
   formatExpenseAmount,
   parseExpenseNote,
 } from '../utils/expense-record.mjs';
+import {
+  CHECKLIST_NOTE_TYPE,
+  getChecklistPreview,
+  parseChecklistNote,
+} from '../utils/checklist-note.mjs';
 
 // ponytail: entering animations are native-only — reanimated web leaves items visibility:hidden
 const entering = (index) =>
@@ -35,13 +40,19 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
 
   const locked = !!note.password;
   const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
+  const isChecklist = note.note_type === CHECKLIST_NOTE_TYPE;
   const expenseRows = isExpense ? parseExpenseNote(note.content).rows : [];
+  const checklistItems = isChecklist ? parseChecklistNote(note.content).items : [];
   const displayTitle = isExpense
     ? note.title.trim() || 'Expense Record'
-    : note.title || 'Untitled';
+    : isChecklist
+      ? note.title.trim() || 'Checklist'
+      : note.title || 'Untitled';
   const preview = isExpense
     ? `RM ${formatExpenseAmount(calculateExpenseTotal(expenseRows))}`
-    : note.content || 'No content';
+    : isChecklist
+      ? getChecklistPreview(checklistItems)
+      : note.content || 'No content';
 
   const handleActionsPress = (e) => {
     e.stopPropagation?.();
@@ -80,6 +91,12 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
               <Text style={styles.typeBadgeText}>Expense</Text>
             </View>
           )}
+          {isChecklist && (
+            <View style={styles.typeBadge}>
+              <Ionicons name="checkbox-outline" size={12} color={colors.primary} />
+              <Text style={styles.typeBadgeText}>Checklist</Text>
+            </View>
+          )}
           {locked && (
             <View style={styles.lockBadge}>
               <Ionicons name="lock-closed" size={12} color={colors.folder} />
@@ -109,7 +126,13 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
           )}
         </View>
         <Text style={styles.preview} numberOfLines={2}>
-          {locked ? (isExpense ? 'Locked expense record' : 'Locked note') : preview}
+          {locked
+            ? isExpense
+              ? 'Locked expense record'
+              : isChecklist
+                ? 'Locked checklist'
+                : 'Locked note'
+            : preview}
         </Text>
         <Text style={styles.date}>{formatDate(note.updated_at)}</Text>
       </TouchableOpacity>

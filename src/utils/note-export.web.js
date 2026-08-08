@@ -6,6 +6,7 @@ import {
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
   getExpenseExportMonthlyCommitments,
+  getChecklistExportItems,
   getExportFileName,
   getExportTitle,
 } from './note-export.mjs';
@@ -39,9 +40,15 @@ export const exportNoteImage = async (_viewRef, data) => {
   const rows = data.rows?.filter((row) => row.date?.trim() || row.remark?.trim() || row.amount?.trim());
   const categories = getExpenseExportCategories(data.categories);
   const commitments = getExpenseExportMonthlyCommitments(data.monthlyCommitments);
+  const isChecklist = data.type === 'checklist' || Array.isArray(data.checklistItems);
+  const checklistItems = getChecklistExportItems(data.checklistItems);
   const summaryNote = typeof data.summaryNote === 'string' ? data.summaryNote.trim() : '';
   const hasMonthlySummary = categories.length > 0 || summaryNote.length > 0;
-  const contentLines = rows ? [] : wrapText(context, data.content, width - padding * 2);
+  const contentLines = rows || isChecklist ? [] : wrapText(context, data.content, width - padding * 2);
+  const checklistLines = checklistItems.map((item) => ({
+    ...item,
+    lines: wrapText(context, item.text, width - padding * 2 - 70),
+  }));
   context.font = '24px sans-serif';
   const summaryNoteLines = summaryNote
     ? wrapText(context, summaryNote, width - padding * 2 - 32)
@@ -57,7 +64,9 @@ export const exportNoteImage = async (_viewRef, data) => {
     480,
     rows
       ? expenseHeight + commitmentHeight + summaryHeight + 120
-      : 210 + contentLines.length * 46
+      : isChecklist
+        ? 250 + checklistLines.reduce((sum, item) => sum + Math.max(58, item.lines.length * 38 + 20), 0)
+        : 210 + contentLines.length * 46
   );
   canvas.width = width;
   canvas.height = height;
@@ -119,6 +128,31 @@ export const exportNoteImage = async (_viewRef, data) => {
         context.font = '22px sans-serif'; summaryNoteLines.forEach((line) => { y += 38; context.fillText(line, padding + 22, y, width - padding * 2 - 44); });
       }
     }
+  } else if (isChecklist) {
+    let y = 190;
+    const completed = checklistItems.filter((item) => item.completed).length;
+    context.fillStyle = '#4854dc'; context.font = 'bold 25px sans-serif';
+    context.fillText(`${completed} of ${checklistItems.length} completed`, padding, y);
+    y += 42;
+    checklistLines.forEach((item) => {
+      const rowHeight = Math.max(58, item.lines.length * 38 + 20);
+      context.strokeStyle = '#dfe3ee'; context.lineWidth = 2;
+      context.strokeRect(padding, y, width - padding * 2, rowHeight - 8);
+      context.fillStyle = item.completed ? '#5b67f1' : '#ffffff';
+      context.fillRect(padding + 14, y + 14, 28, 28);
+      context.strokeStyle = item.completed ? '#5b67f1' : '#9aa3b7';
+      context.strokeRect(padding + 14, y + 14, 28, 28);
+      if (item.completed) {
+        context.fillStyle = '#ffffff'; context.font = 'bold 22px sans-serif';
+        context.fillText('✓', padding + 18, y + 37);
+      }
+      context.fillStyle = item.completed ? '#7b8498' : '#30384c';
+      context.font = '28px sans-serif';
+      item.lines.forEach((line, lineIndex) => {
+        context.fillText(line, padding + 62, y + 37 + lineIndex * 38, width - padding * 2 - 76);
+      });
+      y += rowHeight;
+    });
   } else {
     let y = 190; contentLines.forEach((line) => { context.fillText(line, padding, y); y += 46; });
   }

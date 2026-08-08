@@ -8,6 +8,7 @@ import {
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
   getExpenseExportMonthlyCommitments,
+  getChecklistExportItems,
   getExportTitle,
 } from '../utils/note-export.mjs';
 import { radius, shadow, useTheme } from '../theme';
@@ -22,6 +23,7 @@ const NoteExportModal = ({
   categories = [],
   summaryNote = '',
   monthlyCommitments = [],
+  checklistItems,
   type = 'note',
 }) => {
   const colors = useTheme();
@@ -36,11 +38,14 @@ const NoteExportModal = ({
     categories,
     summaryNote,
     monthlyCommitments,
+    checklistItems,
     type,
   };
   const visibleRows = rows?.filter((row) => row.date?.trim() || row.remark?.trim() || row.amount?.trim()) ?? [];
   const visibleCategories = getExpenseExportCategories(categories);
   const visibleCommitments = getExpenseExportMonthlyCommitments(monthlyCommitments);
+  const visibleChecklistItems = getChecklistExportItems(checklistItems);
+  const checklistCompleted = visibleChecklistItems.filter((item) => item.completed).length;
   const visibleSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
   const hasMonthlySummary = visibleCategories.length > 0 || visibleSummaryNote.length > 0;
 
@@ -74,7 +79,27 @@ const NoteExportModal = ({
             <View ref={previewRef} collapsable={false} style={styles.preview}>
               <Text style={styles.previewTitle}>{getExportTitle(title, type)}</Text>
               <View style={styles.accent} />
-              {rows ? (
+              {type === 'checklist' ? (
+                <View style={styles.checklistPreview}>
+                  <Text style={styles.checklistSummary}>
+                    {checklistCompleted} of {visibleChecklistItems.length} completed
+                  </Text>
+                  {visibleChecklistItems.length ? (
+                    visibleChecklistItems.map((item, index) => (
+                      <View key={item.id || index} style={styles.checklistRow}>
+                        <View style={[styles.checklistBox, item.completed && styles.checklistBoxChecked]}>
+                          {item.completed && <Text style={styles.checklistMark}>✓</Text>}
+                        </View>
+                        <Text style={[styles.checklistText, item.completed && styles.checklistTextCompleted]}>
+                          {item.text}
+                        </Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.previewBody}>No checklist items</Text>
+                  )}
+                </View>
+              ) : rows ? (
                 <>
                   <View style={[styles.tableRow, styles.tableHeader]}>
                     <Text style={[styles.headerCell, styles.dateCell]}>Date</Text>
@@ -188,6 +213,14 @@ const makeStyles = (colors) => StyleSheet.create({
   previewTitle: { color: '#172033', fontSize: 24, lineHeight: 30, fontWeight: '800' },
   accent: { height: 3, backgroundColor: '#5b67f1', borderRadius: radius.full, marginTop: 14, marginBottom: 20 },
   previewBody: { color: '#30384c', fontSize: 15, lineHeight: 23 },
+  checklistPreview: { gap: 9 },
+  checklistSummary: { color: '#4854dc', fontSize: 14, fontWeight: '800', marginBottom: 4 },
+  checklistRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 11, paddingVertical: 8, borderWidth: 1, borderColor: '#dfe3ee', borderRadius: 10 },
+  checklistBox: { width: 23, height: 23, borderRadius: 7, borderWidth: 2, borderColor: '#9aa3b7', alignItems: 'center', justifyContent: 'center' },
+  checklistBoxChecked: { backgroundColor: '#5b67f1', borderColor: '#5b67f1' },
+  checklistMark: { color: '#ffffff', fontSize: 15, fontWeight: '900' },
+  checklistText: { flex: 1, color: '#30384c', fontSize: 15, lineHeight: 21 },
+  checklistTextCompleted: { color: '#7b8498', textDecorationLine: 'line-through' },
   tableRow: { flexDirection: 'row', minHeight: 42, borderBottomWidth: 1, borderBottomColor: '#dfe3ee', alignItems: 'center' },
   tableHeader: { backgroundColor: '#5b67f1', borderBottomWidth: 0 },
   altRow: { backgroundColor: '#f6f7fb' },

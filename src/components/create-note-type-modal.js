@@ -26,7 +26,7 @@ const NOTE_TYPES = [
     title: 'Checklist',
     description: 'Create a list with checkboxes',
     icon: 'checkbox-outline',
-    available: false,
+    available: true,
   },
   {
     id: 'expense',

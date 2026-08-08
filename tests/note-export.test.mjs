@@ -5,6 +5,7 @@ import {
   getExpenseExportCategories,
   getExpenseExportCategoryDescription,
   getExpenseExportMonthlyCommitments,
+  getChecklistExportItems,
   getExportFileName,
   getExportTitle,
 } from '../src/utils/note-export.mjs';
@@ -12,7 +13,27 @@ import {
 test('uses clear fallback titles and filesystem-safe export names', () => {
   assert.equal(getExportTitle('', 'note'), 'Untitled note');
   assert.equal(getExportTitle('  ', 'expense'), 'Untitled expense record');
+  assert.equal(getExportTitle('  ', 'checklist'), 'Untitled checklist');
   assert.equal(getExportFileName('Bills: July / August?', 'pdf'), 'Bills July August.pdf');
+});
+
+test('renders and normalizes checklist items in PDF HTML', () => {
+  const checklistItems = getChecklistExportItems([
+    { id: '1', text: ' Buy milk ', completed: true },
+    { id: '2', text: '<Call plumber>', completed: false },
+    { id: '3', text: '   ', completed: true },
+  ]);
+  const html = buildNoteExportHtml({
+    title: 'Weekend tasks',
+    type: 'checklist',
+    checklistItems,
+  });
+
+  assert.equal(checklistItems.length, 2);
+  assert.match(html, /1 of 2 completed/);
+  assert.match(html, /checklist-item completed/);
+  assert.match(html, /Buy milk/);
+  assert.match(html, /&lt;Call plumber&gt;/);
 });
 
 test('escapes note text and preserves line breaks in PDF HTML', () => {

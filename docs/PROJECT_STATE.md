@@ -76,7 +76,7 @@ When the user presses the Add button, let them choose one of these note types:
 
 - [X] Add selection popup on both the Home and Folder Add buttons (unsupported types are clearly marked as coming soon)
 - [ ] Note — plaintext
-- [ ] Checklist — checkbox listing
+- [X] Checklist — ordered checkbox items with inline editing, progress, local autosave, list/search previews, pin/password/delete support, and PDF/image export
 - [X] Expense Record — titled multi-row table with direct date/remark/amount entry, row add/delete/reorder controls, total, local persistence, list summaries, password/pin support, and 800 ms autosave
 - [X] Expense Record monthly summaries — named categories support multiple case-insensitive remark keywords or manual amounts, same-name updates, and one shared auto-saved summary note
 - [X] Expense Record monthly commitments checklist — Option C paid-status section with progress, remaining amount, add/edit/reset, drag reorder, recycle-bin delete, version 5 persistence, and exports. See [MONTHLY_EXPENSE_CHECKLIST.md](MONTHLY_EXPENSE_CHECKLIST.md)
