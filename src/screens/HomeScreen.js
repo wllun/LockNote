@@ -20,6 +20,7 @@ import PasswordModal from '../components/PasswordModal';
 import CreateNoteTypeModal from '../components/create-note-type-modal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import MoveNoteModal from '../components/MoveNoteModal';
+import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
 import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
@@ -496,7 +497,7 @@ const HomeScreen = ({ navigation }) => {
       />
 
       <Modal visible={showFolderModal} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAwareModalContent>
           <View style={styles.modalContent}>
             <View style={styles.modalIconCircle}>
               <Ionicons name="folder-open" size={26} color={colors.folder} />
@@ -535,7 +536,7 @@ const HomeScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAwareModalContent>
       </Modal>
 
       <PasswordModal
@@ -635,13 +636,6 @@ const makeStyles = (colors) =>
       justifyContent: 'center',
       alignItems: 'center',
       ...shadow.fab,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(15,23,42,0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 24,
     },
     modalContent: {
       backgroundColor: colors.card,

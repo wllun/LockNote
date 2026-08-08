@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { radius, shadow, useTheme } from '../theme';
 import { recovery } from '../utils/recovery';
+import KeyboardAwareModalContent from './keyboard-aware-modal-content';
 
 // onReset (optional): async () => void — clears the item's password after a
 // successful recovery-PIN check. Omit to disable the "Forgot password?" link.
@@ -95,7 +96,7 @@ const PasswordModal = ({ visible, onClose, onVerify, onVerified, onReset }) => {
 
   return (
     <Modal visible={visible} animationType="fade" transparent>
-      <View style={styles.overlay}>
+      <KeyboardAwareModalContent>
         <View style={styles.content}>
           <View style={styles.iconCircle}>
             <Ionicons
@@ -165,20 +166,13 @@ const PasswordModal = ({ visible, onClose, onVerify, onVerified, onReset }) => {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAwareModalContent>
     </Modal>
   );
 };
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-    overlay: {
-      flex: 1,
-      backgroundColor: 'rgba(15,23,42,0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 24,
-    },
     content: {
       backgroundColor: colors.card,
       borderRadius: radius.lg,

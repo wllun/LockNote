@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
+import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { radius, shadow, useTheme } from '../theme';
 import {
   getNormalNoteCharacterCount,
@@ -393,7 +394,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
       />
 
       <Modal visible={showLockModal} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAwareModalContent>
           <View style={styles.modalContent}>
             <View style={styles.modalIconCircle}>
               <Ionicons
@@ -454,7 +455,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
               )}
             </View>
           </View>
-        </View>
+        </KeyboardAwareModalContent>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -583,13 +584,6 @@ const makeStyles = (colors) =>
     actionsMenuDeleteText: {
       color: colors.danger,
       fontWeight: '600',
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(15,23,42,0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 24,
     },
     modalContent: {
       backgroundColor: colors.card,
