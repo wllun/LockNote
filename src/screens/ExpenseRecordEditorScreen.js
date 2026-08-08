@@ -217,6 +217,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [categories, setCategories] = useState([]);
   const [summaryNote, setSummaryNote] = useState('');
   const [monthlyCommitments, setMonthlyCommitments] = useState([]);
+  const [isCommitmentsExpanded, setIsCommitmentsExpanded] = useState(true);
   const [savedCommitmentTemplate, setSavedCommitmentTemplate] = useState([]);
   const [isSavingCommitmentTemplate, setIsSavingCommitmentTemplate] = useState(false);
   const [commitmentTemplateMessage, setCommitmentTemplateMessage] = useState('');
@@ -1166,33 +1167,57 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.commitmentHeading}>
-            <View>
-              <Text style={styles.sectionTitle}>Monthly commitments</Text>
-              <Text style={styles.sectionHint}>Bills that repeat every month</Text>
-            </View>
-            <View style={styles.commitmentProgressArea}>
-              <Text style={styles.commitmentProgress}>
-                {commitmentTotals.paidCount} of {commitmentTotals.count} paid · RM{' '}
-                {formatExpenseAmount(commitmentTotals.remaining)} left
-              </Text>
-              {commitmentTotals.paidCount > 0 && (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.resetPaidButton,
-                    pressed && styles.actionsMenuItemPressed,
-                  ]}
-                  onPress={resetCommitmentPaidStatus}
-                  accessibilityRole="button"
-                  accessibilityLabel="Reset all monthly bills to unpaid"
-                >
-                  <Ionicons name="refresh-outline" size={17} color={colors.primary} />
-                  <Text style={styles.resetPaidText}>Reset</Text>
-                </Pressable>
-              )}
-            </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.commitmentHeadingToggle,
+                pressed && styles.actionsMenuItemPressed,
+              ]}
+              onPress={() => setIsCommitmentsExpanded((expanded) => !expanded)}
+              accessibilityRole="button"
+              accessibilityLabel={`${isCommitmentsExpanded ? 'Collapse' : 'Expand'} monthly commitments`}
+              accessibilityHint="Shows or hides monthly bills and their actions"
+              accessibilityState={{ expanded: isCommitmentsExpanded }}
+            >
+              <View style={styles.commitmentHeadingCopy}>
+                <Text style={styles.sectionTitle}>Monthly commitments</Text>
+                <Text style={styles.sectionHint}>Bills that repeat every month</Text>
+              </View>
+              <View style={styles.commitmentProgressArea}>
+                <Text style={styles.commitmentProgress} numberOfLines={2}>
+                  {commitmentTotals.paidCount} of {commitmentTotals.count} paid · RM{' '}
+                  {formatExpenseAmount(commitmentTotals.remaining)} left
+                </Text>
+                <View style={styles.commitmentDisclosureIcon}>
+                  <Ionicons
+                    name={isCommitmentsExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={19}
+                    color={colors.primary}
+                  />
+                </View>
+              </View>
+            </Pressable>
           </View>
 
-          <View style={styles.commitmentCard}>
+          {isCommitmentsExpanded && (
+            <View style={styles.commitmentExpandedContent}>
+              {commitmentTotals.paidCount > 0 && (
+                <View style={styles.resetPaidRow}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.resetPaidButton,
+                      pressed && styles.actionsMenuItemPressed,
+                    ]}
+                    onPress={resetCommitmentPaidStatus}
+                    accessibilityRole="button"
+                    accessibilityLabel="Reset all monthly bills to unpaid"
+                  >
+                    <Ionicons name="refresh-outline" size={17} color={colors.primary} />
+                    <Text style={styles.resetPaidText}>Reset</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              <View style={styles.commitmentCard}>
             {!monthlyCommitments.length && (
               <View style={styles.commitmentEmpty}>
                 <View style={styles.commitmentEmptyIcon}>
@@ -1395,15 +1420,17 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 </Pressable>
               )}
             </View>
-          </View>
+              </View>
 
-          {!!commitmentTemplateMessage && (
-            <Text
-              style={styles.commitmentTemplateMessage}
-              accessibilityLiveRegion="polite"
-            >
-              {commitmentTemplateMessage}
-            </Text>
+              {!!commitmentTemplateMessage && (
+                <Text
+                  style={styles.commitmentTemplateMessage}
+                  accessibilityLiveRegion="polite"
+                >
+                  {commitmentTemplateMessage}
+                </Text>
+              )}
+            </View>
           )}
 
           <View style={styles.expenseTableHeading}>
@@ -2275,23 +2302,53 @@ const makeStyles = (colors) =>
     },
     commitmentHeading: {
       minHeight: 54,
+      paddingHorizontal: 2,
+    },
+    commitmentHeadingToggle: {
+      minHeight: 54,
+      width: '100%',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
-      paddingHorizontal: 2,
+      borderRadius: radius.md,
+    },
+    commitmentHeadingCopy: {
+      flex: 1,
+      minWidth: 0,
     },
     commitmentProgressArea: {
-      alignItems: 'flex-end',
-      gap: 3,
+      maxWidth: '55%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 8,
     },
     commitmentProgress: {
+      flexShrink: 1,
       color: colors.textSecondary,
       fontSize: 11,
       lineHeight: 16,
       fontWeight: '700',
       textAlign: 'right',
       fontVariant: ['tabular-nums'],
+    },
+    commitmentDisclosureIcon: {
+      width: 38,
+      height: 38,
+      flexShrink: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primarySoft,
+      borderRadius: radius.full,
+    },
+    commitmentExpandedContent: {
+      gap: 12,
+    },
+    resetPaidRow: {
+      minHeight: 44,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
     },
     resetPaidButton: {
       minWidth: 72,
