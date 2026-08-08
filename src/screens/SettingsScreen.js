@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { radius, shadow, useTheme, useThemeMode } from '../theme';
 import { recovery } from '../utils/recovery';
+import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 
 const THEME_OPTIONS = [
   { mode: 'system', label: 'System', icon: 'contrast-outline' },
@@ -194,7 +195,7 @@ const SettingsScreen = () => {
       </View>
 
       <Modal visible={showRecoveryModal} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAwareModalContent>
           <View style={styles.modalContent}>
             <View style={styles.modalIconCircle}>
               <Ionicons name="key-outline" size={26} color={colors.primary} />
@@ -246,7 +247,7 @@ const SettingsScreen = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAwareModalContent>
       </Modal>
     </ScrollView>
   );
@@ -351,13 +352,6 @@ const makeStyles = (colors) =>
       fontSize: 13,
       color: colors.textTertiary,
       marginTop: 2,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(15,23,42,0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 24,
     },
     modalContent: {
       backgroundColor: colors.card,

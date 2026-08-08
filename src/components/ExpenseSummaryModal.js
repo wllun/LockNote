@@ -213,7 +213,13 @@ const ExpenseSummaryModal = ({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={
+          Platform.OS === 'ios'
+            ? 'padding'
+            : Platform.OS === 'android'
+              ? 'height'
+              : undefined
+        }
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
         <View
@@ -239,7 +245,11 @@ const ExpenseSummaryModal = ({
           </View>
 
           {mode === 'list' ? (
-            <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              contentContainerStyle={styles.body}
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              keyboardShouldPersistTaps="handled"
+            >
               <Pressable
                 style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
                 onPress={() => startForm()}
@@ -357,7 +367,11 @@ const ExpenseSummaryModal = ({
               </Text>
             </ScrollView>
           ) : (
-            <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              contentContainerStyle={styles.body}
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              keyboardShouldPersistTaps="handled"
+            >
               {!categoryId && categoryWithSameName && (
                 <View style={styles.infoBanner}>
                   <Ionicons name="information-circle-outline" size={20} color={colors.primary} />

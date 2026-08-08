@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
+import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { monthlyCommitmentTemplate } from '../utils/monthly-commitment-template';
 import {
   EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS,
@@ -1878,10 +1879,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         transparent
         onRequestClose={() => setCommitmentDraft(null)}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <KeyboardAwareModalContent>
           <View style={[styles.modalContent, styles.commitmentModalContent]}>
             <View style={styles.commitmentModalHeader}>
               <View>
@@ -1991,11 +1989,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardAwareModalContent>
       </Modal>
 
       <Modal visible={showLockModal} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAwareModalContent>
           <View style={styles.modalContent}>
             <View style={styles.modalIconCircle}>
               <Ionicons
@@ -2056,7 +2054,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               )}
             </View>
           </View>
-        </View>
+        </KeyboardAwareModalContent>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -2871,13 +2869,6 @@ const makeStyles = (colors) =>
       color: colors.danger,
       fontSize: 12,
       fontWeight: '600',
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(15,23,42,0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 24,
     },
     modalContent: {
       backgroundColor: colors.card,
