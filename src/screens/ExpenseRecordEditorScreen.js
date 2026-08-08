@@ -2578,7 +2578,7 @@ const makeStyles = (colors) =>
       color: colors.text,
     },
     dateColumn: {
-      width: 60,
+      width: 52,
     },
     remarkColumn: {
       flex: 1,
