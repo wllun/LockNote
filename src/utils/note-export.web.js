@@ -5,6 +5,7 @@ import {
   getExpenseExportCategories,
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
+  getExpenseExportMonthlyCommitments,
   getExportFileName,
   getExportTitle,
 } from './note-export.mjs';
@@ -37,6 +38,7 @@ export const exportNoteImage = async (_viewRef, data) => {
   context.font = '32px sans-serif';
   const rows = data.rows?.filter((row) => row.date?.trim() || row.remark?.trim() || row.amount?.trim());
   const categories = getExpenseExportCategories(data.categories);
+  const commitments = getExpenseExportMonthlyCommitments(data.monthlyCommitments);
   const summaryNote = typeof data.summaryNote === 'string' ? data.summaryNote.trim() : '';
   const hasMonthlySummary = categories.length > 0 || summaryNote.length > 0;
   const contentLines = rows ? [] : wrapText(context, data.content, width - padding * 2);
@@ -45,10 +47,18 @@ export const exportNoteImage = async (_viewRef, data) => {
     ? wrapText(context, summaryNote, width - padding * 2 - 32)
     : [];
   const expenseHeight = rows ? 262 + rows.length * 58 : 0;
+  const commitmentHeight = commitments.length
+    ? 172 + commitments.length * 62
+    : 0;
   const summaryHeight = hasMonthlySummary
     ? 110 + categories.length * 62 + (categories.length ? 58 : 0) + (summaryNote ? 54 + summaryNoteLines.length * 38 : 0)
     : 0;
-  const height = Math.max(480, rows ? expenseHeight + summaryHeight + 80 : 210 + contentLines.length * 46);
+  const height = Math.max(
+    480,
+    rows
+      ? expenseHeight + commitmentHeight + summaryHeight + 120
+      : 210 + contentLines.length * 46
+  );
   canvas.width = width;
   canvas.height = height;
   context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height);
@@ -62,6 +72,30 @@ export const exportNoteImage = async (_viewRef, data) => {
     context.font = '28px sans-serif';
     rows.forEach((row) => { y += 58; context.fillText(row.date || '', padding, y); context.fillText(row.remark || '', 260, y, 480); context.textAlign = 'right'; context.fillText(row.amount || '0.00', width - padding, y); context.textAlign = 'left'; });
     y += 72; context.font = 'bold 34px sans-serif'; context.textAlign = 'right'; context.fillText(`Total  RM ${formatExportAmount(data.total)}`, width - padding, y); context.textAlign = 'left';
+    if (commitments.length) {
+      y += 72;
+      context.fillStyle = '#dfe3ee'; context.fillRect(padding, y - 34, width - padding * 2, 3);
+      context.fillStyle = '#172033'; context.font = 'bold 34px sans-serif'; context.fillText('Monthly commitments', padding, y);
+      y += 42;
+      commitments.forEach((item) => {
+        context.fillStyle = '#30384c'; context.font = 'bold 24px sans-serif'; context.fillText(item.remark, padding, y, 420);
+        context.textAlign = 'right'; context.fillText(`RM ${formatExportAmount(item.amount)}`, width - padding, y); context.textAlign = 'left';
+        context.fillStyle = '#687086'; context.font = '19px sans-serif';
+        context.fillText(
+          `${item.day ? `Due day ${item.day}` : 'No due day'} · ${item.isPaid ? 'Paid' : 'Unpaid'}`,
+          padding,
+          y + 27,
+          width - padding * 2 - 220
+        );
+        y += 62;
+      });
+      const remaining = commitments
+        .filter((item) => !item.isPaid)
+        .reduce((sum, item) => sum + item.amount, 0);
+      context.fillStyle = '#4854dc'; context.font = 'bold 25px sans-serif'; context.textAlign = 'right';
+      context.fillText(`Remaining  RM ${formatExportAmount(remaining)}`, width - padding, y + 4);
+      context.textAlign = 'left'; y += 58;
+    }
     if (hasMonthlySummary) {
       y += 72;
       context.fillStyle = '#dfe3ee'; context.fillRect(padding, y - 34, width - padding * 2, 3);
