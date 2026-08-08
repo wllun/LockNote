@@ -29,6 +29,10 @@ import NoteExportModal from '../components/NoteExportModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
 import { monthlyCommitmentTemplate } from '../utils/monthly-commitment-template';
 import {
+  EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS,
+  EXPENSE_REMARK_MAX_CHARACTERS,
+} from '../utils/note-limits.mjs';
+import {
   applyMonthlyCommitmentTemplate,
   calculateExpenseTotal,
   calculateMonthlyCommitmentTotals,
@@ -269,6 +273,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const invalidAmountCount = rows.filter(
     (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
   ).length;
+  const focusedRemarkRow = rows.find(
+    (row) => focusedCell === `${row.id}:remark`
+  );
+  const focusedRemarkCharacterCount = focusedRemarkRow?.remark.length ?? 0;
+  const isFocusedRemarkNearLimit =
+    !!focusedRemarkRow &&
+    focusedRemarkCharacterCount >= EXPENSE_REMARK_MAX_CHARACTERS * 0.9;
   const deleteTargetBottom = Math.max(16, insets.bottom + 8);
   const dragPreviewWidth = Math.min(340, windowWidth - 32);
   const rowsWithoutDraggedRow = activeDrag?.kind === 'expense'
@@ -1495,6 +1506,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       ]}
                       value={row.remark}
                       onChangeText={(value) => handleRowChange(row.id, 'remark', value)}
+                      maxLength={EXPENSE_REMARK_MAX_CHARACTERS}
                       placeholder={showPlaceholder ? 'Enter remark' : undefined}
                       placeholderTextColor={colors.textTertiary}
                       multiline
@@ -1510,6 +1522,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       onBlur={() => setFocusedCell(null)}
                       onSubmitEditing={() => focusCell(row.id, 'amount')}
                       accessibilityLabel={`Remark for expense row ${index + 1}`}
+                      accessibilityHint={`Maximum ${EXPENSE_REMARK_MAX_CHARACTERS} characters`}
                     />
                   </View>
                     <View
@@ -1581,6 +1594,35 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               <Text style={styles.addRowText}>Add row</Text>
               <Text style={styles.addRowHint}>or press Enter after an amount</Text>
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.expenseInputLimitRow}>
+            <Text
+              style={[
+                styles.expenseInputLimitText,
+                isFocusedRemarkNearLimit && styles.expenseInputLimitWarning,
+              ]}
+              accessibilityLiveRegion="polite"
+            >
+              {focusedRemarkRow
+                ? focusedRemarkCharacterCount >= EXPENSE_REMARK_MAX_CHARACTERS
+                  ? 'Remark character limit reached'
+                  : isFocusedRemarkNearLimit
+                    ? `${EXPENSE_REMARK_MAX_CHARACTERS - focusedRemarkCharacterCount} remark characters remaining`
+                    : `Remark limit: ${EXPENSE_REMARK_MAX_CHARACTERS} characters`
+                : `Each expense remark allows up to ${EXPENSE_REMARK_MAX_CHARACTERS} characters.`}
+            </Text>
+            {!!focusedRemarkRow && (
+              <Text
+                style={[
+                  styles.expenseInputLimitCount,
+                  isFocusedRemarkNearLimit && styles.expenseInputLimitWarning,
+                ]}
+                accessibilityLabel={`${focusedRemarkCharacterCount} of ${EXPENSE_REMARK_MAX_CHARACTERS} remark characters used`}
+              >
+                {focusedRemarkCharacterCount} / {EXPENSE_REMARK_MAX_CHARACTERS}
+              </Text>
+            )}
           </View>
 
           <View style={styles.statusRow}>
@@ -1858,16 +1900,23 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             </View>
 
             <View style={styles.commitmentForm}>
-              <Text style={styles.commitmentInputLabel}>Bill name</Text>
+              <View style={styles.commitmentInputLabelRow}>
+                <Text style={styles.commitmentInputLabel}>Bill name</Text>
+                <Text style={styles.commitmentInputLimit}>
+                  Maximum {EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS} characters
+                </Text>
+              </View>
               <TextInput
                 style={styles.commitmentInput}
                 value={commitmentDraft?.remark ?? ''}
                 onChangeText={(value) => handleCommitmentDraftChange('remark', value)}
                 placeholder="e.g. Internet subscription"
                 placeholderTextColor={colors.textTertiary}
+                maxLength={EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS}
                 autoFocus
                 returnKeyType="next"
                 accessibilityLabel="Monthly bill name"
+                accessibilityHint={`Maximum ${EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS} characters`}
               />
 
               <View style={styles.commitmentFormRow}>
@@ -2768,6 +2817,29 @@ const makeStyles = (colors) =>
       color: colors.textTertiary,
       fontSize: 10,
     },
+    expenseInputLimitRow: {
+      minHeight: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingHorizontal: 4,
+    },
+    expenseInputLimitText: {
+      flex: 1,
+      color: colors.textTertiary,
+      fontSize: 11,
+      lineHeight: 16,
+    },
+    expenseInputLimitCount: {
+      color: colors.textTertiary,
+      fontSize: 11,
+      fontVariant: ['tabular-nums'],
+    },
+    expenseInputLimitWarning: {
+      color: colors.danger,
+      fontWeight: '700',
+    },
     statusRow: {
       minHeight: 24,
       flexDirection: 'row',
@@ -2852,11 +2924,23 @@ const makeStyles = (colors) =>
       flex: 1,
       minWidth: 0,
     },
+    commitmentInputLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
     commitmentInputLabel: {
       color: colors.textSecondary,
       fontSize: 12,
       lineHeight: 18,
       fontWeight: '700',
+    },
+    commitmentInputLimit: {
+      color: colors.textTertiary,
+      fontSize: 10,
+      lineHeight: 14,
+      textAlign: 'right',
     },
     commitmentInput: {
       minHeight: 50,

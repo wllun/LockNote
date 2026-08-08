@@ -23,6 +23,7 @@ import {
   parseExpenseAmount,
   sanitizeExpenseAmountInput,
 } from '../utils/expense-record.mjs';
+import { EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS } from '../utils/note-limits.mjs';
 import { radius, shadow, useTheme } from '../theme';
 
 const cleanText = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
@@ -67,6 +68,9 @@ const ExpenseSummaryModal = ({
     ? findExpenseCategory(categories, categoryName)
     : null;
   const isUpdating = !!categoryId || !!categoryWithSameName;
+  const summaryNoteCharacterCount = String(summaryNote ?? '').length;
+  const isSummaryNoteNearLimit =
+    summaryNoteCharacterCount >= EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS * 0.9;
 
   const startForm = (category = null) => {
     setCategoryId(category?.id ?? null);
@@ -300,28 +304,54 @@ const ExpenseSummaryModal = ({
                 placeholderTextColor={colors.textTertiary}
                 multiline
                 textAlignVertical="top"
-                maxLength={10000}
+                maxLength={EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS}
                 accessibilityLabel="Monthly summary notes"
+                accessibilityHint={`Maximum ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters`}
               />
               <View style={styles.notesStatus}>
-                <Ionicons
-                  name={saveStatus === 'Could not save' ? 'alert-circle-outline' : 'checkmark-circle-outline'}
-                  size={15}
-                  color={saveStatus === 'Could not save' ? colors.danger : colors.primary}
-                />
+                <View style={styles.notesSaveStatus}>
+                  <Ionicons
+                    name={saveStatus === 'Could not save' ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+                    size={15}
+                    color={saveStatus === 'Could not save' ? colors.danger : colors.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.notesStatusText,
+                      saveStatus === 'Could not save' && { color: colors.danger },
+                    ]}
+                  >
+                    {saveStatus === 'Saving...'
+                      ? 'Saving notes...'
+                      : saveStatus === 'Could not save'
+                        ? 'Could not save notes'
+                        : 'Notes saved automatically'}
+                  </Text>
+                </View>
                 <Text
                   style={[
-                    styles.notesStatusText,
-                    saveStatus === 'Could not save' && { color: colors.danger },
+                    styles.notesCharacterCount,
+                    isSummaryNoteNearLimit && styles.notesCharacterCountWarning,
                   ]}
+                  accessibilityLiveRegion="polite"
+                  accessibilityLabel={`${summaryNoteCharacterCount.toLocaleString()} of ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} summary note characters used`}
                 >
-                  {saveStatus === 'Saving...'
-                    ? 'Saving notes...'
-                    : saveStatus === 'Could not save'
-                      ? 'Could not save notes'
-                      : 'Notes saved automatically'}
+                  {summaryNoteCharacterCount.toLocaleString()} /{' '}
+                  {EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()}
                 </Text>
               </View>
+              <Text
+                style={[
+                  styles.notesLimitMessage,
+                  isSummaryNoteNearLimit && styles.notesCharacterCountWarning,
+                ]}
+              >
+                {summaryNoteCharacterCount >= EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS
+                  ? 'Summary note character limit reached'
+                  : isSummaryNoteNearLimit
+                    ? `${(EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS - summaryNoteCharacterCount).toLocaleString()} characters remaining`
+                    : `Maximum ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters`}
+              </Text>
               <Text style={styles.footerHint}>
                 Use keywords to calculate, or type an amount directly.
               </Text>
@@ -483,8 +513,12 @@ const makeStyles = (colors) =>
     emptyText: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center' },
     notesHeading: { marginTop: 8 },
     notesInput: { minHeight: 100, color: colors.text, fontSize: 15, lineHeight: 21, padding: 13, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg, outlineStyle: 'none' },
-    notesStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -6 },
+    notesStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: -6 },
+    notesSaveStatus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     notesStatusText: { color: colors.textTertiary, fontSize: 11 },
+    notesCharacterCount: { color: colors.textTertiary, fontSize: 11, fontVariant: ['tabular-nums'] },
+    notesCharacterCountWarning: { color: colors.danger, fontWeight: '700' },
+    notesLimitMessage: { color: colors.textTertiary, fontSize: 11, lineHeight: 16, marginTop: -8, textAlign: 'right' },
     footerHint: { color: colors.textTertiary, fontSize: 12, lineHeight: 18, textAlign: 'center' },
     inputLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
     formInput: { minHeight: 50, color: colors.text, fontSize: 16, paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg, outlineStyle: 'none' },

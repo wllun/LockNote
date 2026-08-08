@@ -43,6 +43,10 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const contentCharacterCount = getNormalNoteCharacterCount(content);
   const isNearContentLimit =
     contentCharacterCount >= NORMAL_NOTE_CONTENT_MAX_CHARACTERS * 0.9;
+  const remainingContentCharacters = Math.max(
+    0,
+    NORMAL_NOTE_CONTENT_MAX_CHARACTERS - contentCharacterCount
+  );
 
   const loadNote = async () => {
     try {
@@ -249,17 +253,36 @@ const NoteEditorScreen = ({ route, navigation }) => {
           accessibilityLabel="Note content"
           accessibilityHint={`Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
         />
-        <Text
+        <View
           style={[
-            styles.characterCounter,
-            isNearContentLimit && styles.characterCounterNearLimit,
+            styles.characterLimitFooter,
             { paddingBottom: Math.max(insets.bottom, 8) },
           ]}
-          accessibilityLabel={`${contentCharacterCount.toLocaleString()} of ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} note characters used`}
         >
-          {contentCharacterCount.toLocaleString()} /{' '}
-          {NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()}
-        </Text>
+          <Text
+            style={[
+              styles.characterLimitMessage,
+              isNearContentLimit && styles.characterCounterNearLimit,
+            ]}
+            accessibilityLiveRegion="polite"
+          >
+            {remainingContentCharacters === 0
+              ? 'Character limit reached'
+              : isNearContentLimit
+                ? `${remainingContentCharacters.toLocaleString()} characters remaining`
+                : `Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
+          </Text>
+          <Text
+            style={[
+              styles.characterCounter,
+              isNearContentLimit && styles.characterCounterNearLimit,
+            ]}
+            accessibilityLabel={`${contentCharacterCount.toLocaleString()} of ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} note characters used`}
+          >
+            {contentCharacterCount.toLocaleString()} /{' '}
+            {NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()}
+          </Text>
+        </View>
       </View>
 
       <Modal
@@ -499,12 +522,24 @@ const makeStyles = (colors) =>
       color: colors.text,
       lineHeight: 25,
     },
-    characterCounter: {
-      alignSelf: 'flex-end',
+    characterLimitFooter: {
+      minHeight: 36,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
       paddingHorizontal: 20,
       paddingTop: 6,
+    },
+    characterLimitMessage: {
+      flex: 1,
+      color: colors.textTertiary,
+      fontSize: 12,
+    },
+    characterCounter: {
       fontSize: 13,
       color: colors.textTertiary,
+      fontVariant: ['tabular-nums'],
     },
     characterCounterNearLimit: {
       color: colors.danger,
