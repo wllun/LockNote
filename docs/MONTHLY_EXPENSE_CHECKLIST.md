@@ -14,8 +14,8 @@ The existing expense note keeps:
 
 - its total summary and Summary action;
 - the Day, Remark, and RM expense table;
-- editable rows, three-line Remark wrapping, drag-to-reorder, and drag-to-delete;
-- recycle-bin drag deletion with an accessibility confirmation fallback;
+- editable rows, three-line Remark wrapping, drag-to-reorder, and confirmed drag-to-delete;
+- recycle-bin drag deletion that always requires confirmation, including its accessibility action;
 - local persistence and 800 ms auto-save.
 
 ## Placement
@@ -68,7 +68,7 @@ The example totals are:
 - `Add monthly bill` adds a commitment without affecting existing expense rows.
 - `Save for next note` stores a reusable copy of the current bill names, due days, and amounts in local app storage. Paid state and note-specific IDs are not stored in the reusable copy.
 - When an expense note has no monthly commitments, `Apply` offers the last saved bill list. Applying creates new local IDs and marks every copied bill unpaid without changing the source expense note.
-- Reordering and deletion reuse the existing expense-row gestures: a full-width insertion gap previews the drop position, and releasing over the large recycle-bin target deletes the bill.
+- Reordering and deletion reuse the existing expense-row gestures: a full-width insertion gap previews the drop position, and releasing over the large recycle-bin target opens a confirmation before deleting the bill.
 - There is no long-press-to-delete interaction.
 - Checkbox and row actions must keep at least a 44 × 44 point touch target and have descriptive accessibility labels.
 - Paid state must use a visible checkmark and text/progress feedback; color alone is not sufficient.

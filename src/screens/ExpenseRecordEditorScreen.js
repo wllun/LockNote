@@ -902,8 +902,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     setActiveDrag(null);
 
     if (shouldDelete) {
-      if (currentDrag.kind === 'commitment') removeCommitment(rowId);
-      else removeRow(rowId);
+      if (currentDrag.kind === 'commitment') confirmRemoveCommitment(rowId);
+      else confirmRemoveRow(rowId);
       return;
     }
 
