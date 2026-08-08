@@ -59,10 +59,11 @@ import { radius, shadow, useTheme } from '../theme';
 
 const EXPENSE_ROW_MIN_HEIGHT = 48;
 const EXPENSE_REMARK_MAX_HEIGHT = 82;
-const DELETE_TARGET_HEIGHT = 88;
-const DELETE_TARGET_HORIZONTAL_MARGIN = 24;
-const DELETE_TARGET_TOLERANCE = 20;
+const DELETE_TARGET_SIZE = 56;
+const DELETE_TARGET_TOLERANCE = 28;
 const MONTHLY_COMMITMENT_MIN_HEIGHT = 68;
+const DRAG_PREVIEW_MAX_WIDTH = 280;
+const DRAG_PREVIEW_POINTER_OFFSET = 50;
 
 const ExpenseRowDragHandle = ({
   rowId,
@@ -281,7 +282,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     !!focusedRemarkRow &&
     focusedRemarkCharacterCount >= EXPENSE_REMARK_MAX_CHARACTERS * 0.9;
   const deleteTargetBottom = Math.max(16, insets.bottom + 8);
-  const dragPreviewWidth = Math.min(340, windowWidth - 32);
+  const dragPreviewWidth = Math.min(
+    DRAG_PREVIEW_MAX_WIDTH,
+    Math.max(0, windowWidth - 64)
+  );
   const rowsWithoutDraggedRow = activeDrag?.kind === 'expense'
     ? rows.filter((row) => row.id !== activeDrag.rowId)
     : [];
@@ -309,7 +313,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         availableWidth - dragPreviewWidth - 16
       )
     );
-    const top = Math.max(insets.top + 8, dragY.value - 64);
+    const top = Math.max(
+      insets.top + 8,
+      dragY.value - DRAG_PREVIEW_POINTER_OFFSET
+    );
     return {
       transform: [{ translateX: left }, { translateY: top }],
     };
@@ -799,17 +806,16 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
     const target =
       measuredTarget ?? {
-        left: dragBounds.x + DELETE_TARGET_HORIZONTAL_MARGIN,
+        left:
+          dragBounds.x +
+          Math.max(0, (dragBounds.width - DELETE_TARGET_SIZE) / 2),
         top:
           dragBounds.y +
           dragBounds.height -
           deleteTargetBottom -
-          DELETE_TARGET_HEIGHT,
-        width: Math.max(
-          0,
-          dragBounds.width - DELETE_TARGET_HORIZONTAL_MARGIN * 2
-        ),
-        height: DELETE_TARGET_HEIGHT,
+          DELETE_TARGET_SIZE,
+        width: DELETE_TARGET_SIZE,
+        height: DELETE_TARGET_SIZE,
       };
     return (
       absoluteX >= target.left - DELETE_TARGET_TOLERANCE &&
@@ -1666,7 +1672,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           >
             <Ionicons
               name="reorder-three-outline"
-              size={24}
+              size={20}
               color={activeDrag.overDelete ? colors.danger : colors.primary}
             />
             <View style={styles.dragPreviewContent}>
@@ -1702,38 +1708,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               { bottom: deleteTargetBottom },
             ]}
           >
-            <View
-              style={[
-                styles.dragDeleteTargetIcon,
-                activeDrag.overDelete && styles.dragDeleteTargetIconActive,
-              ]}
-            >
-              <Ionicons
-                name={activeDrag.overDelete ? 'trash' : 'trash-outline'}
-                size={24}
-                color={activeDrag.overDelete ? colors.danger : colors.card}
-              />
-            </View>
-            <View style={styles.dragDeleteTargetCopy}>
-              <Text
-                style={[
-                  styles.dragDeleteTargetText,
-                  activeDrag.overDelete && styles.dragDeleteTargetTextActive,
-                ]}
-              >
-                {activeDrag.overDelete
-                  ? 'Release to delete'
-                  : 'Drag here to delete'}
-              </Text>
-              <Text
-                style={[
-                  styles.dragDeleteTargetHint,
-                  activeDrag.overDelete && styles.dragDeleteTargetHintActive,
-                ]}
-              >
-                Large drop zone
-              </Text>
-            </View>
+            <Ionicons
+              name={activeDrag.overDelete ? 'trash' : 'trash-outline'}
+              size={24}
+              color={activeDrag.overDelete ? colors.card : colors.danger}
+            />
           </View>
         </View>
       )}
@@ -2696,12 +2675,12 @@ const makeStyles = (colors) =>
       position: 'absolute',
       left: 0,
       top: 0,
-      minHeight: 62,
+      minHeight: 50,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 9,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      gap: 7,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
       backgroundColor: colors.card,
       borderWidth: 2,
       borderColor: colors.primary,
@@ -2719,74 +2698,42 @@ const makeStyles = (colors) =>
     },
     dragPreviewRemark: {
       color: colors.text,
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '700',
     },
     dragPreviewDestination: {
       color: colors.primary,
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: '700',
     },
     dragPreviewDestinationDeleting: {
       color: colors.danger,
     },
     dragPreviewAmount: {
-      maxWidth: 94,
+      maxWidth: 78,
       color: colors.textSecondary,
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '700',
       fontVariant: ['tabular-nums'],
       textAlign: 'right',
     },
     dragDeleteTarget: {
       position: 'absolute',
-      left: DELETE_TARGET_HORIZONTAL_MARGIN,
-      right: DELETE_TARGET_HORIZONTAL_MARGIN,
-      height: DELETE_TARGET_HEIGHT,
-      flexDirection: 'row',
+      left: '50%',
+      width: DELETE_TARGET_SIZE,
+      height: DELETE_TARGET_SIZE,
+      marginLeft: -DELETE_TARGET_SIZE / 2,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 12,
-      paddingHorizontal: 20,
       backgroundColor: colors.dangerSoft,
-      borderWidth: 3,
+      borderWidth: 2,
       borderColor: colors.danger,
-      borderRadius: radius.lg,
+      borderRadius: radius.full,
       ...shadow.card,
     },
     dragDeleteTargetActive: {
       backgroundColor: colors.danger,
       borderColor: colors.card,
-    },
-    dragDeleteTargetIcon: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: radius.full,
-      backgroundColor: colors.danger,
-    },
-    dragDeleteTargetIconActive: {
-      backgroundColor: colors.card,
-    },
-    dragDeleteTargetCopy: {
-      gap: 2,
-    },
-    dragDeleteTargetText: {
-      color: colors.danger,
-      fontSize: 14,
-      fontWeight: '800',
-    },
-    dragDeleteTargetTextActive: {
-      color: colors.card,
-    },
-    dragDeleteTargetHint: {
-      color: colors.danger,
-      fontSize: 11,
-      fontWeight: '600',
-    },
-    dragDeleteTargetHintActive: {
-      color: colors.card,
     },
     invalidCell: {
       color: colors.danger,
