@@ -66,6 +66,8 @@ The example totals are:
 - A checked row remains part of the commitments total.
 - Checking a commitment does not automatically create an expense-table row, preventing duplicate amounts.
 - `Add monthly bill` adds a commitment without affecting existing expense rows.
+- `Save for next note` stores a reusable copy of the current bill names, due days, and amounts in local app storage. Paid state and note-specific IDs are not stored in the reusable copy.
+- When an expense note has no monthly commitments, `Apply` offers the last saved bill list. Applying creates new local IDs and marks every copied bill unpaid without changing the source expense note.
 - Reordering and deletion reuse the existing expense-row gestures: a full-width insertion gap previews the drop position, and releasing over the large recycle-bin target deletes the bill.
 - There is no long-press-to-delete interaction.
 - Checkbox and row actions must keep at least a 44 × 44 point touch target and have descriptive accessibility labels.
@@ -91,6 +93,8 @@ Store commitments inside the expense note's versioned JSON payload, independentl
 
 Payload version 5 defaults `monthlyCommitments` to an empty array for existing notes. No new repository methods are required because expense-note content remains versioned JSON. Commitments also appear in expense PDF and image exports.
 
+The reusable last-saved list is separate from note content and is stored locally in AsyncStorage under `@locknote_monthly_commitment_template`. Its version 1 payload contains only `day`, `remark`, and `amount`.
+
 ## Totals and existing behavior
 
 Commitment totals are displayed inside the new section. The current expense total continues to represent only rows recorded in the existing expense table. This avoids changing current calculations or counting a commitment twice.
@@ -98,7 +102,7 @@ Commitment totals are displayed inside the new section. The current expense tota
 ## Paid-state reset
 
 - Paid state is kept per note and a confirmed `Reset paid status` action marks every commitment unpaid.
-- Possible later behavior: copy commitments into a new monthly note with every checkbox reset.
+- Applying the last saved bill list to another expense note always starts with every checkbox reset.
 - Avoid silently resetting checkboxes by calendar date because a user may still be finishing the previous month's note.
 
 ## Out of scope for the first implementation

@@ -27,11 +27,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
+import { monthlyCommitmentTemplate } from '../utils/monthly-commitment-template';
 import {
+  applyMonthlyCommitmentTemplate,
   calculateExpenseTotal,
   calculateMonthlyCommitmentTotals,
   createExpenseRow,
   createMonthlyCommitment,
+  createMonthlyCommitmentTemplate,
   formatExpenseAmount,
   isExpenseNoteEmpty,
   moveExpenseRow,
@@ -209,6 +212,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [categories, setCategories] = useState([]);
   const [summaryNote, setSummaryNote] = useState('');
   const [monthlyCommitments, setMonthlyCommitments] = useState([]);
+  const [savedCommitmentTemplate, setSavedCommitmentTemplate] = useState([]);
+  const [isSavingCommitmentTemplate, setIsSavingCommitmentTemplate] = useState(false);
+  const [commitmentTemplateMessage, setCommitmentTemplateMessage] = useState('');
   const [commitmentDraft, setCommitmentDraft] = useState(null);
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
@@ -252,6 +258,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   const total = calculateExpenseTotal(rows);
   const commitmentTotals = calculateMonthlyCommitmentTotals(monthlyCommitments);
+  const savedCommitmentTotals = calculateMonthlyCommitmentTotals(
+    savedCommitmentTemplate
+  );
+  const currentCommitmentsMatchSavedTemplate =
+    !!monthlyCommitments.length &&
+    JSON.stringify(
+      createMonthlyCommitmentTemplate(monthlyCommitments).commitments
+    ) === JSON.stringify(savedCommitmentTemplate);
   const invalidAmountCount = rows.filter(
     (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
   ).length;
@@ -329,6 +343,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       Alert.alert('Error', 'Failed to load expense record');
     }
   }, [noteId]);
+
+  const loadSavedCommitmentTemplate = useCallback(async () => {
+    try {
+      setSavedCommitmentTemplate(await monthlyCommitmentTemplate.load());
+    } catch (error) {
+      console.error('Monthly commitment template load failed:', error);
+    }
+  }, []);
 
   const scheduleSave = useCallback(
     (
@@ -526,6 +548,42 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             ),
         },
       ]
+    );
+  };
+
+  const saveCommitmentsForNextNote = async () => {
+    if (!latest.current.monthlyCommitments.length || isSavingCommitmentTemplate) {
+      return;
+    }
+
+    setIsSavingCommitmentTemplate(true);
+    setCommitmentTemplateMessage('');
+    try {
+      const saved = await monthlyCommitmentTemplate.save(
+        latest.current.monthlyCommitments
+      );
+      setSavedCommitmentTemplate(saved);
+      setCommitmentTemplateMessage(
+        `Saved ${saved.length} ${saved.length === 1 ? 'bill' : 'bills'} for your next expense note.`
+      );
+    } catch (error) {
+      console.error('Monthly commitment template save failed:', error);
+      Alert.alert('Could not save bills', 'Please try saving the bill list again.');
+    } finally {
+      setIsSavingCommitmentTemplate(false);
+    }
+  };
+
+  const applySavedCommitments = () => {
+    const applied = applyMonthlyCommitmentTemplate({
+      version: 1,
+      commitments: savedCommitmentTemplate,
+    });
+    if (!applied.length) return;
+
+    updateMonthlyCommitments(applied);
+    setCommitmentTemplateMessage(
+      `Applied ${applied.length} ${applied.length === 1 ? 'bill' : 'bills'} with all paid boxes cleared.`
     );
   };
 
@@ -965,7 +1023,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     loadRecord();
-  }, [loadRecord]);
+    loadSavedCommitmentTemplate();
+  }, [loadRecord, loadSavedCommitmentTemplate]);
 
   useEffect(() => {
     return () => {
@@ -1131,6 +1190,33 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               </View>
             )}
 
+            {!monthlyCommitments.length && !!savedCommitmentTemplate.length && (
+              <View style={styles.savedTemplateCallout}>
+                <View style={styles.savedTemplateIcon}>
+                  <Ionicons name="copy-outline" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.savedTemplateCopy}>
+                  <Text style={styles.savedTemplateTitle}>Use your saved bills</Text>
+                  <Text style={styles.savedTemplateHint}>
+                    {savedCommitmentTemplate.length}{' '}
+                    {savedCommitmentTemplate.length === 1 ? 'bill' : 'bills'} · RM{' '}
+                    {formatExpenseAmount(savedCommitmentTotals.total)} · all unpaid
+                  </Text>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.applyTemplateButton,
+                    pressed && styles.actionsMenuItemPressed,
+                  ]}
+                  onPress={applySavedCommitments}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Apply ${savedCommitmentTemplate.length} saved monthly bills, all unpaid`}
+                >
+                  <Text style={styles.applyTemplateText}>Apply</Text>
+                </Pressable>
+              </View>
+            )}
+
             {monthlyCommitments.map((commitment, index) => (
               <React.Fragment key={commitment.id}>
                 {insertionBeforeCommitmentId === commitment.id && (
@@ -1237,17 +1323,71 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               </View>
             )}
 
-            <TouchableOpacity
-              style={styles.addCommitmentButton}
-              onPress={openNewCommitment}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel="Add monthly bill"
-            >
-              <Ionicons name="add-circle" size={23} color={colors.primary} />
-              <Text style={styles.addCommitmentText}>Add monthly bill</Text>
-            </TouchableOpacity>
+            <View style={styles.commitmentActions}>
+              <TouchableOpacity
+                style={styles.addCommitmentButton}
+                onPress={openNewCommitment}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Add monthly bill"
+              >
+                <Ionicons name="add-circle" size={23} color={colors.primary} />
+                <Text style={styles.addCommitmentText}>Add monthly bill</Text>
+              </TouchableOpacity>
+              {!!monthlyCommitments.length && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.saveTemplateButton,
+                    pressed && styles.actionsMenuItemPressed,
+                    currentCommitmentsMatchSavedTemplate &&
+                      styles.saveTemplateButtonComplete,
+                  ]}
+                  onPress={saveCommitmentsForNextNote}
+                  disabled={
+                    isSavingCommitmentTemplate ||
+                    currentCommitmentsMatchSavedTemplate
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    currentCommitmentsMatchSavedTemplate
+                      ? 'Monthly bills saved for the next expense note'
+                      : 'Save monthly bills for the next expense note'
+                  }
+                  accessibilityState={{
+                    disabled:
+                      isSavingCommitmentTemplate ||
+                      currentCommitmentsMatchSavedTemplate,
+                  }}
+                >
+                  <Ionicons
+                    name={
+                      currentCommitmentsMatchSavedTemplate
+                        ? 'checkmark-circle-outline'
+                        : 'copy-outline'
+                    }
+                    size={20}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.saveTemplateText} numberOfLines={1}>
+                    {isSavingCommitmentTemplate
+                      ? 'Saving…'
+                      : currentCommitmentsMatchSavedTemplate
+                        ? 'Saved for next note'
+                        : 'Save for next note'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           </View>
+
+          {!!commitmentTemplateMessage && (
+            <Text
+              style={styles.commitmentTemplateMessage}
+              accessibilityLiveRegion="polite"
+            >
+              {commitmentTemplateMessage}
+            </Text>
+          )}
 
           <View style={styles.expenseTableHeading}>
             <View>
@@ -2165,6 +2305,55 @@ const makeStyles = (colors) =>
       borderRadius: radius.md,
       backgroundColor: colors.primarySoft,
     },
+    savedTemplateCallout: {
+      minHeight: 72,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.primarySoft,
+    },
+    savedTemplateIcon: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+      backgroundColor: colors.card,
+    },
+    savedTemplateCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    savedTemplateTitle: {
+      color: colors.text,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '800',
+    },
+    savedTemplateHint: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      lineHeight: 16,
+      marginTop: 1,
+    },
+    applyTemplateButton: {
+      minWidth: 68,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      borderRadius: radius.full,
+      backgroundColor: colors.primary,
+    },
+    applyTemplateText: {
+      color: colors.card,
+      fontSize: 12,
+      fontWeight: '800',
+    },
     commitmentRow: {
       minHeight: MONTHLY_COMMITMENT_MIN_HEIGHT,
       flexDirection: 'row',
@@ -2238,7 +2427,13 @@ const makeStyles = (colors) =>
       textAlign: 'right',
       fontVariant: ['tabular-nums'],
     },
+    commitmentActions: {
+      minHeight: 54,
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    },
     addCommitmentButton: {
+      flex: 1,
       minHeight: 54,
       flexDirection: 'row',
       alignItems: 'center',
@@ -2250,6 +2445,35 @@ const makeStyles = (colors) =>
       color: colors.primary,
       fontSize: 14,
       fontWeight: '800',
+    },
+    saveTemplateButton: {
+      flex: 1,
+      minHeight: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      borderLeftWidth: 1,
+      borderLeftColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    saveTemplateButtonComplete: {
+      backgroundColor: colors.primarySoft,
+    },
+    saveTemplateText: {
+      flexShrink: 1,
+      color: colors.primary,
+      fontSize: 12,
+      fontWeight: '800',
+      textAlign: 'center',
+    },
+    commitmentTemplateMessage: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      lineHeight: 16,
+      paddingHorizontal: 4,
+      marginTop: -4,
     },
     expenseTableHeading: {
       flexDirection: 'row',

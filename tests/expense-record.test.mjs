@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  applyMonthlyCommitmentTemplate,
   calculateExpenseTotal,
   calculateExpenseCategory,
   calculateCategorizedTotal,
   calculateMonthlyCommitmentTotals,
   createExpenseRow,
   createMonthlyCommitment,
+  createMonthlyCommitmentTemplate,
   expenseRowHasContent,
   isExpenseNoteEmpty,
   moveExpenseRow,
@@ -16,6 +18,7 @@ import {
   normalizeExpenseAmountInput,
   normalizeExpenseCategoryKeyword,
   parseExpenseAmount,
+  parseMonthlyCommitmentTemplate,
   parseExpenseNote,
   sanitizeExpenseAmountInput,
   sanitizeExpenseDateInput,
@@ -292,6 +295,54 @@ test('persists, totals, and reorders monthly commitments independently', () => {
     moveMonthlyCommitment(moved, 'rent', 'up').map((item) => item.id),
     ['internet', 'rent', 'insurance']
   );
+});
+
+test('saves and reapplies monthly commitments as a fresh unpaid template', () => {
+  const template = createMonthlyCommitmentTemplate([
+    createMonthlyCommitment({
+      id: 'rent-old',
+      day: '1',
+      remark: ' Rent ',
+      amount: '1800',
+      isPaid: true,
+    }),
+    createMonthlyCommitment({
+      id: 'internet-old',
+      day: '15',
+      remark: 'Internet',
+      amount: '129.9',
+      isPaid: false,
+    }),
+  ]);
+
+  assert.deepEqual(template, {
+    version: 1,
+    commitments: [
+      { day: '1', remark: 'Rent', amount: '1800.00' },
+      { day: '15', remark: 'Internet', amount: '129.90' },
+    ],
+  });
+
+  const applied = applyMonthlyCommitmentTemplate(JSON.stringify(template));
+  assert.equal(applied.length, 2);
+  assert.deepEqual(
+    applied.map(({ day, remark, amount, isPaid }) => ({
+      day,
+      remark,
+      amount,
+      isPaid,
+    })),
+    [
+      { day: '1', remark: 'Rent', amount: '1800.00', isPaid: false },
+      { day: '15', remark: 'Internet', amount: '129.90', isPaid: false },
+    ]
+  );
+  assert.notEqual(applied[0].id, 'rent-old');
+  assert.notEqual(applied[1].id, 'internet-old');
+  assert.deepEqual(parseMonthlyCommitmentTemplate('not json'), {
+    version: 1,
+    commitments: [],
+  });
 });
 
 test('older expense payloads default to an empty monthly checklist', () => {

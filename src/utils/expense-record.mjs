@@ -91,6 +91,30 @@ const normalizeMonthlyCommitments = (commitments) =>
         .filter((commitment) => commitment.remark)
     : [];
 
+export const createMonthlyCommitmentTemplate = (commitments) => ({
+  version: 1,
+  commitments: normalizeMonthlyCommitments(commitments).map(
+    ({ day, remark, amount }) => ({ day, remark, amount })
+  ),
+});
+
+export const parseMonthlyCommitmentTemplate = (value) => {
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return createMonthlyCommitmentTemplate([]);
+    }
+    return createMonthlyCommitmentTemplate(parsed.commitments);
+  } catch {
+    return createMonthlyCommitmentTemplate([]);
+  }
+};
+
+export const applyMonthlyCommitmentTemplate = (template) =>
+  parseMonthlyCommitmentTemplate(template).commitments.map((commitment) =>
+    createMonthlyCommitment({ ...commitment, isPaid: false })
+  );
+
 const emptyParsedExpenseNote = () => ({
   sourceVersion: 2,
   rows: [],

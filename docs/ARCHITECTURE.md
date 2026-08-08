@@ -60,6 +60,11 @@ a manually entered amount; saving a normalized category name again updates it
 instead of creating a duplicate. The note's `title` remains in the normal title
 column.
 
+Users can explicitly save the current commitment list for reuse in another
+expense note. This app-level template is stored locally in AsyncStorage under
+`@locknote_monthly_commitment_template`, excludes paid state and note-specific
+IDs, and creates fresh unpaid commitments when applied.
+
 On native, `notes.folder_id` has `ON DELETE CASCADE` and there are indexes on `folder_id` and both `is_deleted` columns.
 
 ### Conventions
