@@ -79,7 +79,7 @@ When the user presses the Add button, let them choose one of these note types:
 - [ ] Checklist — checkbox listing
 - [X] Expense Record — titled multi-row table with direct date/remark/amount entry, row add/delete/reorder controls, total, local persistence, list summaries, password/pin support, and 800 ms autosave
 - [X] Expense Record monthly summaries — named categories support multiple case-insensitive remark keywords or manual amounts, same-name updates, and one shared auto-saved summary note
-- [ ] Expense Record monthly commitments checklist — approved additive Option C design; preserve the existing expense workflow and add a separate paid-status section. See [MONTHLY_EXPENSE_CHECKLIST.md](MONTHLY_EXPENSE_CHECKLIST.md)
+- [X] Expense Record monthly commitments checklist — Option C paid-status section with progress, remaining amount, add/edit/reset, drag reorder, recycle-bin delete, version 5 persistence, and exports. See [MONTHLY_EXPENSE_CHECKLIST.md](MONTHLY_EXPENSE_CHECKLIST.md)
 - [ ] Expense Record currency selection — currently uses RM; consider storing a currency code per expense note and applying it consistently to table headers, totals, and Home/Folder summaries
 - [ ] Reminder — plaintext with notification settings
 

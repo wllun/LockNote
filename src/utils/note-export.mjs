@@ -51,6 +51,20 @@ export const getExpenseExportCategoryDescription = (category) => {
 export const getExpenseExportCategorizedTotal = (categories = []) =>
   getExpenseExportCategories(categories).reduce((sum, category) => sum + category.amount, 0);
 
+export const getExpenseExportMonthlyCommitments = (commitments = []) =>
+  (Array.isArray(commitments) ? commitments : [])
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      id: item.id,
+      day: String(item.day ?? '').replace(/\D/g, '').slice(0, 2),
+      remark: String(item.remark ?? '').trim(),
+      amount: Number.isFinite(Number(item.amount)) && Number(item.amount) >= 0
+        ? Number(item.amount)
+        : 0,
+      isPaid: item.isPaid === true,
+    }))
+    .filter((item) => item.remark);
+
 export const buildNoteExportHtml = ({
   title,
   content = '',
@@ -58,11 +72,18 @@ export const buildNoteExportHtml = ({
   total,
   categories = [],
   summaryNote = '',
+  monthlyCommitments = [],
 }) => {
   const isExpense = Array.isArray(rows);
   const heading = escapeHtml(getExportTitle(title, isExpense ? 'expense' : 'note'));
   const exportCategories = getExpenseExportCategories(categories);
   const exportSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
+  const exportCommitments = getExpenseExportMonthlyCommitments(monthlyCommitments);
+  const commitmentSummary = exportCommitments.length
+    ? `<section class="monthly-summary"><h2>Monthly commitments</h2><table class="summary-table"><thead><tr><th>Status</th><th>Bill</th><th>Due</th><th class="amount">Amount (RM)</th></tr></thead><tbody>${exportCommitments
+        .map((item) => `<tr><td>${item.isPaid ? 'Paid' : 'Unpaid'}</td><td>${escapeHtml(item.remark)}</td><td>${item.day ? `Day ${escapeHtml(item.day)}` : '—'}</td><td class="amount">${formatExportAmount(item.amount)}</td></tr>`)
+        .join('')}</tbody></table><div class="summary-total"><span>Remaining</span><strong>RM ${formatExportAmount(exportCommitments.filter((item) => !item.isPaid).reduce((sum, item) => sum + item.amount, 0))}</strong></div></section>`
+    : '';
   const monthlySummary = isExpense && (exportCategories.length || exportSummaryNote)
     ? `<section class="monthly-summary"><h2>Monthly summary</h2>${exportCategories.length
         ? `<table class="summary-table"><thead><tr><th>Category</th><th>Calculation</th><th class="amount">Amount (RM)</th></tr></thead><tbody>${exportCategories
@@ -76,7 +97,7 @@ export const buildNoteExportHtml = ({
     ? `<table><thead><tr><th>Date</th><th>Remark</th><th class="amount">Amount (RM)</th></tr></thead><tbody>${rows
         .filter((row) => row.date?.trim() || row.remark?.trim() || row.amount?.trim())
         .map((row) => `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.remark)}</td><td class="amount">${escapeHtml(row.amount || '0.00')}</td></tr>`)
-        .join('')}</tbody></table><div class="total"><span>Total</span><strong>RM ${formatExportAmount(total)}</strong></div>${monthlySummary}`
+        .join('')}</tbody></table><div class="total"><span>Total</span><strong>RM ${formatExportAmount(total)}</strong></div>${commitmentSummary}${monthlySummary}`
     : `<div class="content">${escapeHtml(content).replaceAll('\n', '<br>')}</div>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>

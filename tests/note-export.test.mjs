@@ -4,6 +4,7 @@ import {
   buildNoteExportHtml,
   getExpenseExportCategories,
   getExpenseExportCategoryDescription,
+  getExpenseExportMonthlyCommitments,
   getExportFileName,
   getExportTitle,
 } from '../src/utils/note-export.mjs';
@@ -74,4 +75,24 @@ test('normalizes expense categories for export descriptions', () => {
   assert.equal(categories.length, 1);
   assert.equal(categories[0].name, 'Petrol');
   assert.equal(getExpenseExportCategoryDescription(categories[0]), 'Shell - 1 matching entry');
+});
+
+test('renders and normalizes monthly commitments in expense exports', () => {
+  const monthlyCommitments = getExpenseExportMonthlyCommitments([
+    { id: 'rent', day: '1', remark: ' Rent ', amount: '1800', isPaid: true },
+    { id: 'web', day: '15', remark: 'Internet', amount: '129.90', isPaid: false },
+  ]);
+  const html = buildNoteExportHtml({
+    title: 'August expenses',
+    rows: [],
+    total: 0,
+    monthlyCommitments,
+  });
+
+  assert.equal(monthlyCommitments[0].remark, 'Rent');
+  assert.match(html, /Monthly commitments/);
+  assert.match(html, /<td>Paid<\/td><td>Rent<\/td>/);
+  assert.match(html, /<td>Unpaid<\/td><td>Internet<\/td>/);
+  assert.match(html, /Remaining/);
+  assert.match(html, /RM 129\.90/);
 });

@@ -54,7 +54,8 @@ Two tables / collections. Timestamps are ISO strings; IDs are generated client-s
 `expense`; their editable table rows (`date`, `remark`, and `amount`) are stored
 as versioned JSON in `content` and edited by `ExpenseRecordEditorScreen`. Version
 4 also stores named monthly-summary categories and one shared summary note in the
-same payload. Categories may contain multiple case-insensitive remark keywords or
+same payload. Version 5 adds an independent monthly-commitment checklist with a
+bill name, optional due day, amount, and paid state. Categories may contain multiple case-insensitive remark keywords or
 a manually entered amount; saving a normalized category name again updates it
 instead of creating a duplicate. The note's `title` remains in the normal title
 column.

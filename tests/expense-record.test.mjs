@@ -4,11 +4,15 @@ import {
   calculateExpenseTotal,
   calculateExpenseCategory,
   calculateCategorizedTotal,
+  calculateMonthlyCommitmentTotals,
   createExpenseRow,
+  createMonthlyCommitment,
   expenseRowHasContent,
   isExpenseNoteEmpty,
   moveExpenseRow,
   moveExpenseRowToIndex,
+  moveMonthlyCommitment,
+  moveMonthlyCommitmentToIndex,
   normalizeExpenseAmountInput,
   normalizeExpenseCategoryKeyword,
   parseExpenseAmount,
@@ -68,13 +72,14 @@ test('serializes and parses multiple expense rows', () => {
   ];
 
   assert.deepEqual(parseExpenseNote(serializeExpenseNote(rows)), {
-    sourceVersion: 4,
+    sourceVersion: 5,
     rows: [
       { ...rows[0], amount: '98.00' },
       { ...rows[1], amount: '89.00' },
     ],
     categories: [],
     summaryNote: '',
+    monthlyCommitments: [],
   });
 });
 
@@ -100,14 +105,16 @@ test('converts the previous single-entry format into a table row', () => {
       ],
       categories: [],
       summaryNote: '',
+      monthlyCommitments: [],
     }
   );
 });
 
 test('returns no rows for missing or malformed content', () => {
-  assert.deepEqual(parseExpenseNote(''), { sourceVersion: 2, rows: [], categories: [], summaryNote: '' });
-  assert.deepEqual(parseExpenseNote('not json'), { sourceVersion: 2, rows: [], categories: [], summaryNote: '' });
-  assert.deepEqual(parseExpenseNote('[]'), { sourceVersion: 2, rows: [], categories: [], summaryNote: '' });
+  const empty = { sourceVersion: 2, rows: [], categories: [], summaryNote: '', monthlyCommitments: [] };
+  assert.deepEqual(parseExpenseNote(''), empty);
+  assert.deepEqual(parseExpenseNote('not json'), empty);
+  assert.deepEqual(parseExpenseNote('[]'), empty);
 });
 
 test('accepts table amounts with optional thousands separators', () => {
@@ -160,6 +167,12 @@ test('detects populated rows and abandoned empty expense notes', () => {
     false
   );
   assert.equal(isExpenseNoteEmpty('', [blankRow], [], 'Monthly note'), false);
+  assert.equal(
+    isExpenseNoteEmpty('', [blankRow], [], '', [
+      createMonthlyCommitment({ remark: 'Internet', amount: '129.00' }),
+    ]),
+    false
+  );
   assert.equal(isExpenseNoteEmpty('Expense Jun 2026', [blankRow]), false);
   assert.equal(isExpenseNoteEmpty('', [dateOnlyRow]), false);
 });
@@ -230,7 +243,7 @@ test('migrates version 3 single-keyword categories', () => {
   assert.equal(parsed.summaryNote, '');
 });
 
-test('persists categories and shared notes in version 4 content', () => {
+test('persists categories and shared notes in version 5 content', () => {
   const rows = [createExpenseRow({ id: '1', remark: 'Lunch', amount: '12.00' })];
   const categories = [
     { id: 'food', name: 'Food', keywords: ['Lunch', 'Dinner'], amount: 600, match_count: 5 },
@@ -241,7 +254,7 @@ test('persists categories and shared notes in version 4 content', () => {
     serializeExpenseNote(rows, categories, 'Check cash receipts.')
   );
 
-  assert.equal(parsed.sourceVersion, 4);
+  assert.equal(parsed.sourceVersion, 5);
   assert.deepEqual(parsed.categories, categories);
   assert.equal(parsed.summaryNote, 'Check cash receipts.');
   assert.equal(calculateCategorizedTotal(parsed.categories), 900);
@@ -249,4 +262,47 @@ test('persists categories and shared notes in version 4 content', () => {
     removeExpenseCategory(parsed.categories, 'food'),
     [categories[1], categories[2]]
   );
+});
+
+test('persists, totals, and reorders monthly commitments independently', () => {
+  const rows = [createExpenseRow({ id: '1', remark: 'Lunch', amount: '12.00' })];
+  const commitments = [
+    createMonthlyCommitment({ id: 'rent', day: '1', remark: 'Rent', amount: '1800', isPaid: true }),
+    createMonthlyCommitment({ id: 'internet', day: '15', remark: 'Internet', amount: '129.90' }),
+    createMonthlyCommitment({ id: 'insurance', day: '28', remark: 'Insurance', amount: '390' }),
+  ];
+  const parsed = parseExpenseNote(serializeExpenseNote(rows, [], '', commitments));
+
+  assert.deepEqual(parsed.monthlyCommitments, [
+    { ...commitments[0], amount: '1800.00' },
+    { ...commitments[1], amount: '129.90' },
+    { ...commitments[2], amount: '390.00' },
+  ]);
+  assert.deepEqual(calculateMonthlyCommitmentTotals(parsed.monthlyCommitments), {
+    total: 2319.9,
+    paid: 1800,
+    remaining: 519.9,
+    paidCount: 1,
+    count: 3,
+  });
+
+  const moved = moveMonthlyCommitmentToIndex(parsed.monthlyCommitments, 'rent', 2);
+  assert.deepEqual(moved.map((item) => item.id), ['internet', 'insurance', 'rent']);
+  assert.deepEqual(
+    moveMonthlyCommitment(moved, 'rent', 'up').map((item) => item.id),
+    ['internet', 'rent', 'insurance']
+  );
+});
+
+test('older expense payloads default to an empty monthly checklist', () => {
+  const parsed = parseExpenseNote(JSON.stringify({
+    version: 4,
+    rows: [],
+    categories: [],
+    summary_note: 'Keep receipts',
+  }));
+
+  assert.equal(parsed.sourceVersion, 4);
+  assert.deepEqual(parsed.monthlyCommitments, []);
+  assert.equal(parsed.summaryNote, 'Keep receipts');
 });

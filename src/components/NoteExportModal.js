@@ -7,6 +7,7 @@ import {
   getExpenseExportCategories,
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
+  getExpenseExportMonthlyCommitments,
   getExportTitle,
 } from '../utils/note-export.mjs';
 import { radius, shadow, useTheme } from '../theme';
@@ -20,15 +21,26 @@ const NoteExportModal = ({
   total = 0,
   categories = [],
   summaryNote = '',
+  monthlyCommitments = [],
   type = 'note',
 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const previewRef = useRef(null);
   const [exporting, setExporting] = useState(null);
-  const exportData = { title, content, rows, total, categories, summaryNote, type };
+  const exportData = {
+    title,
+    content,
+    rows,
+    total,
+    categories,
+    summaryNote,
+    monthlyCommitments,
+    type,
+  };
   const visibleRows = rows?.filter((row) => row.date?.trim() || row.remark?.trim() || row.amount?.trim()) ?? [];
   const visibleCategories = getExpenseExportCategories(categories);
+  const visibleCommitments = getExpenseExportMonthlyCommitments(monthlyCommitments);
   const visibleSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
   const hasMonthlySummary = visibleCategories.length > 0 || visibleSummaryNote.length > 0;
 
@@ -77,6 +89,34 @@ const NoteExportModal = ({
                     </View>
                   ))}
                   <Text style={styles.total}>Total  RM {formatExportAmount(total)}</Text>
+                  {!!visibleCommitments.length && (
+                    <View style={styles.monthlySummary}>
+                      <Text style={styles.summaryTitle}>Monthly commitments</Text>
+                      {visibleCommitments.map((item) => (
+                        <View key={item.id || item.remark} style={styles.summaryCategoryRow}>
+                          <View style={styles.summaryCategoryInfo}>
+                            <Text style={styles.summaryCategoryName}>{item.remark}</Text>
+                            <Text style={styles.summaryCategoryMeta}>
+                              {item.day ? `Due day ${item.day}` : 'No due day'} · {item.isPaid ? 'Paid' : 'Unpaid'}
+                            </Text>
+                          </View>
+                          <Text style={styles.summaryCategoryAmount}>
+                            RM {formatExportAmount(item.amount)}
+                          </Text>
+                        </View>
+                      ))}
+                      <View style={styles.categorizedTotalRow}>
+                        <Text style={styles.categorizedTotalLabel}>Remaining</Text>
+                        <Text style={styles.categorizedTotalAmount}>
+                          RM {formatExportAmount(
+                            visibleCommitments
+                              .filter((item) => !item.isPaid)
+                              .reduce((sum, item) => sum + item.amount, 0)
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                   {hasMonthlySummary && (
                     <View style={styles.monthlySummary}>
                       <Text style={styles.summaryTitle}>Monthly summary</Text>

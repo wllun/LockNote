@@ -13,6 +13,20 @@ export const createExpenseRow = (values = {}) => ({
       : '',
 });
 
+export const createMonthlyCommitment = (values = {}) => ({
+  id: values.id || createRowId(),
+  day:
+    typeof values.day === 'string' || typeof values.day === 'number'
+      ? String(values.day).replace(/\D/g, '').slice(0, 2)
+      : '',
+  remark: typeof values.remark === 'string' ? values.remark : '',
+  amount:
+    typeof values.amount === 'string' || typeof values.amount === 'number'
+      ? String(values.amount)
+      : '',
+  isPaid: values.isPaid === true,
+});
+
 export const moveExpenseRowToIndex = (rows, rowId, targetIndex) => {
   if (!Array.isArray(rows) || !Number.isInteger(targetIndex)) {
     return rows;
@@ -46,12 +60,44 @@ export const moveExpenseRow = (rows, rowId, direction) => {
   return moveExpenseRowToIndex(rows, rowId, targetIndex);
 };
 
+export const moveMonthlyCommitmentToIndex = (
+  commitments,
+  commitmentId,
+  targetIndex
+) => moveExpenseRowToIndex(commitments, commitmentId, targetIndex);
+
+export const moveMonthlyCommitment = (commitments, commitmentId, direction) =>
+  moveExpenseRow(commitments, commitmentId, direction);
+
 const normalizeRows = (rows) =>
   Array.isArray(rows)
     ? rows
         .filter((row) => row && typeof row === 'object' && !Array.isArray(row))
         .map((row) => createExpenseRow(row))
     : [];
+
+const normalizeMonthlyCommitments = (commitments) =>
+  Array.isArray(commitments)
+    ? commitments
+        .filter(
+          (commitment) =>
+            commitment && typeof commitment === 'object' && !Array.isArray(commitment)
+        )
+        .map((commitment) => ({
+          ...createMonthlyCommitment(commitment),
+          remark: String(commitment.remark ?? '').trim(),
+          amount: normalizeExpenseAmountInput(commitment.amount),
+        }))
+        .filter((commitment) => commitment.remark)
+    : [];
+
+const emptyParsedExpenseNote = () => ({
+  sourceVersion: 2,
+  rows: [],
+  categories: [],
+  summaryNote: '',
+  monthlyCommitments: [],
+});
 
 export const normalizeExpenseCategoryKeyword = (value) =>
   String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -103,12 +149,12 @@ const normalizeCategories = (categories) =>
     : [];
 
 export const parseExpenseNote = (content) => {
-  if (!content) return { sourceVersion: 2, rows: [], categories: [], summaryNote: '' };
+  if (!content) return emptyParsedExpenseNote();
 
   try {
     const parsed = JSON.parse(content);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { sourceVersion: 2, rows: [], categories: [], summaryNote: '' };
+      return emptyParsedExpenseNote();
     }
 
     if (Array.isArray(parsed.rows)) {
@@ -117,6 +163,9 @@ export const parseExpenseNote = (content) => {
         rows: normalizeRows(parsed.rows),
         categories: normalizeCategories(parsed.categories),
         summaryNote: typeof parsed.summary_note === 'string' ? parsed.summary_note : '',
+        monthlyCommitments: normalizeMonthlyCommitments(
+          parsed.monthlyCommitments ?? parsed.monthly_commitments
+        ),
       };
     }
 
@@ -139,24 +188,31 @@ export const parseExpenseNote = (content) => {
         ],
         categories: [],
         summaryNote: '',
+        monthlyCommitments: [],
       };
     }
   } catch {
     // Malformed content is treated as an empty expense note.
   }
 
-  return { sourceVersion: 2, rows: [], categories: [], summaryNote: '' };
+  return emptyParsedExpenseNote();
 };
 
-export const serializeExpenseNote = (rows, categories = [], summaryNote = '') =>
+export const serializeExpenseNote = (
+  rows,
+  categories = [],
+  summaryNote = '',
+  monthlyCommitments = []
+) =>
   JSON.stringify({
-    version: 4,
+    version: 5,
     rows: normalizeRows(rows).map((row) => ({
       ...row,
       amount: normalizeExpenseAmountInput(row.amount),
     })),
     categories: normalizeCategories(categories),
     summary_note: typeof summaryNote === 'string' ? summaryNote : '',
+    monthlyCommitments: normalizeMonthlyCommitments(monthlyCommitments),
   });
 
 export const expenseRowHasContent = (row) =>
@@ -165,11 +221,18 @@ export const expenseRowHasContent = (row) =>
 export const shouldShowExpenseRowPlaceholder = (rows, rowIndex) =>
   rowIndex === 0 && !rows.some(expenseRowHasContent);
 
-export const isExpenseNoteEmpty = (title, rows, categories = [], summaryNote = '') =>
+export const isExpenseNoteEmpty = (
+  title,
+  rows,
+  categories = [],
+  summaryNote = '',
+  monthlyCommitments = []
+) =>
   !title.trim() &&
   !rows.some(expenseRowHasContent) &&
   !categories.length &&
-  !summaryNote.trim();
+  !summaryNote.trim() &&
+  !normalizeMonthlyCommitments(monthlyCommitments).length;
 
 export const sanitizeExpenseDateInput = (value) =>
   String(value ?? '').replace(/\D/g, '');
@@ -210,6 +273,25 @@ export const calculateExpenseTotal = (rows) =>
     const amount = parseExpenseAmount(row.amount);
     return amount === null ? total : total + amount;
   }, 0);
+
+export const calculateMonthlyCommitmentTotals = (commitments) => {
+  const normalized = normalizeMonthlyCommitments(commitments);
+  return normalized.reduce(
+    (totals, commitment) => {
+      const amount = parseExpenseAmount(commitment.amount) ?? 0;
+      totals.total += amount;
+      totals.count += 1;
+      if (commitment.isPaid) {
+        totals.paid += amount;
+        totals.paidCount += 1;
+      } else {
+        totals.remaining += amount;
+      }
+      return totals;
+    },
+    { total: 0, paid: 0, remaining: 0, paidCount: 0, count: 0 }
+  );
+};
 
 export const calculateExpenseCategory = (rows, keywords) => {
   const cleanedKeywords = normalizeKeywordList(keywords);

@@ -28,13 +28,16 @@ import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
 import {
-  calculateCategorizedTotal,
   calculateExpenseTotal,
+  calculateMonthlyCommitmentTotals,
   createExpenseRow,
+  createMonthlyCommitment,
   formatExpenseAmount,
   isExpenseNoteEmpty,
   moveExpenseRow,
   moveExpenseRowToIndex,
+  moveMonthlyCommitment,
+  moveMonthlyCommitmentToIndex,
   normalizeExpenseAmountInput,
   parseExpenseAmount,
   parseExpenseNote,
@@ -52,6 +55,7 @@ const EXPENSE_REMARK_MAX_HEIGHT = 82;
 const DELETE_TARGET_HEIGHT = 88;
 const DELETE_TARGET_HORIZONTAL_MARGIN = 24;
 const DELETE_TARGET_TOLERANCE = 20;
+const MONTHLY_COMMITMENT_MIN_HEIGHT = 68;
 
 const ExpenseRowDragHandle = ({
   rowId,
@@ -68,6 +72,7 @@ const ExpenseRowDragHandle = ({
   onDragCancel,
   onMove,
   onDelete,
+  itemLabel = 'expense row',
 }) => {
   const callbacks = useRef({
     onDragStart,
@@ -166,7 +171,7 @@ const ExpenseRowDragHandle = ({
         style={[styles.actionColumn, styles.rowDragHandle]}
         accessible
         accessibilityRole="adjustable"
-        accessibilityLabel={`Move expense row ${rowIndex + 1}`}
+        accessibilityLabel={`Move ${itemLabel} ${rowIndex + 1}`}
         accessibilityHint="Drag to another row to move, or drag to the recycle bin to delete"
         accessibilityActions={[
           { name: 'increment', label: 'Move row down' },
@@ -203,6 +208,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [rows, setRows] = useState(initialRows);
   const [categories, setCategories] = useState([]);
   const [summaryNote, setSummaryNote] = useState('');
+  const [monthlyCommitments, setMonthlyCommitments] = useState([]);
+  const [commitmentDraft, setCommitmentDraft] = useState(null);
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
@@ -226,6 +233,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const dragAreaRef = useRef(null);
   const dragAreaBoundsRef = useRef(dragAreaBounds);
   const rowLayouts = useRef({});
+  const commitmentLayouts = useRef({});
   const dragRowLayoutsRef = useRef({});
   const deleteTargetBoundsRef = useRef(null);
   const activeDragRef = useRef(null);
@@ -236,25 +244,37 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     rows: initialRows,
     categories: [],
     summaryNote: '',
+    monthlyCommitments: [],
     hasPassword: false,
     isPinned: false,
     deleted: false,
   });
 
   const total = calculateExpenseTotal(rows);
+  const commitmentTotals = calculateMonthlyCommitmentTotals(monthlyCommitments);
   const invalidAmountCount = rows.filter(
     (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
   ).length;
   const deleteTargetBottom = Math.max(16, insets.bottom + 8);
   const dragPreviewWidth = Math.min(340, windowWidth - 32);
-  const rowsWithoutDraggedRow = activeDrag
+  const rowsWithoutDraggedRow = activeDrag?.kind === 'expense'
     ? rows.filter((row) => row.id !== activeDrag.rowId)
     : [];
-  const insertionBeforeRowId = activeDrag
+  const insertionBeforeRowId = activeDrag?.kind === 'expense'
     ? rowsWithoutDraggedRow[activeDrag.targetIndex]?.id ?? null
     : null;
   const showEndInsertionGap =
-    !!activeDrag && activeDrag.targetIndex >= rowsWithoutDraggedRow.length;
+    activeDrag?.kind === 'expense' &&
+    activeDrag.targetIndex >= rowsWithoutDraggedRow.length;
+  const commitmentsWithoutDraggedItem = activeDrag?.kind === 'commitment'
+    ? monthlyCommitments.filter((item) => item.id !== activeDrag.rowId)
+    : [];
+  const insertionBeforeCommitmentId = activeDrag?.kind === 'commitment'
+    ? commitmentsWithoutDraggedItem[activeDrag.targetIndex]?.id ?? null
+    : null;
+  const showEndCommitmentGap =
+    activeDrag?.kind === 'commitment' &&
+    activeDrag.targetIndex >= commitmentsWithoutDraggedItem.length;
   const dragPreviewStyle = useAnimatedStyle(() => {
     const availableWidth = dragAreaBounds.width || windowWidth;
     const left = Math.max(
@@ -292,6 +312,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       setRows(loadedRows);
       setCategories(parsed.categories);
       setSummaryNote(parsed.summaryNote);
+      setMonthlyCommitments(parsed.monthlyCommitments);
       setHasPassword(!!note.password);
       setIsPinned(!!note.is_pinned);
       latest.current = {
@@ -300,6 +321,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         rows: loadedRows,
         categories: parsed.categories,
         summaryNote: parsed.summaryNote,
+        monthlyCommitments: parsed.monthlyCommitments,
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
       };
@@ -313,7 +335,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       nextTitle,
       nextRows,
       nextCategories = latest.current.categories,
-      nextSummaryNote = latest.current.summaryNote
+      nextSummaryNote = latest.current.summaryNote,
+      nextMonthlyCommitments = latest.current.monthlyCommitments
     ) => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       setSaveStatus('Saving...');
@@ -326,7 +349,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             content: serializeExpenseNote(
               nextRows,
               nextCategories,
-              nextSummaryNote
+              nextSummaryNote,
+              nextMonthlyCommitments
             ),
           });
           setSaveStatus('Saved');
@@ -346,7 +370,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       nextTitle,
       nextRows,
       latest.current.categories,
-      latest.current.summaryNote
+      latest.current.summaryNote,
+      latest.current.monthlyCommitments
     );
   };
 
@@ -365,7 +390,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         content: serializeExpenseNote(
           latest.current.rows,
           nextCategories,
-          latest.current.summaryNote
+          latest.current.summaryNote,
+          latest.current.monthlyCommitments
         ),
       });
       setSaveStatus('Saved');
@@ -378,7 +404,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         latest.current.title,
         latest.current.rows,
         previousCategories,
-        latest.current.summaryNote
+        latest.current.summaryNote,
+        latest.current.monthlyCommitments
       );
       throw error;
     }
@@ -405,8 +432,137 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       latest.current.title,
       latest.current.rows,
       latest.current.categories,
-      value
+      value,
+      latest.current.monthlyCommitments
     );
+  };
+
+  const updateMonthlyCommitments = (nextCommitments) => {
+    latest.current.monthlyCommitments = nextCommitments;
+    setMonthlyCommitments(nextCommitments);
+    scheduleSave(
+      latest.current.title,
+      latest.current.rows,
+      latest.current.categories,
+      latest.current.summaryNote,
+      nextCommitments
+    );
+  };
+
+  const openNewCommitment = () => {
+    setCommitmentDraft(createMonthlyCommitment());
+  };
+
+  const openCommitment = (commitment) => {
+    setCommitmentDraft({ ...commitment });
+  };
+
+  const handleCommitmentDraftChange = (field, value) => {
+    setCommitmentDraft((current) =>
+      current ? { ...current, [field]: value } : current
+    );
+  };
+
+  const saveCommitment = () => {
+    if (!commitmentDraft) return;
+    const remark = commitmentDraft.remark.trim();
+    const day = sanitizeExpenseDateInput(commitmentDraft.day).slice(0, 2);
+    const amount = parseExpenseAmount(commitmentDraft.amount);
+    if (!remark) {
+      Alert.alert('Bill name required', 'Enter a name for this monthly bill.');
+      return;
+    }
+    if (day && (Number(day) < 1 || Number(day) > 31)) {
+      Alert.alert('Check due day', 'Due day must be between 1 and 31.');
+      return;
+    }
+    if (amount === null) {
+      Alert.alert('Check amount', 'Enter a valid monthly amount.');
+      return;
+    }
+
+    const savedCommitment = {
+      ...commitmentDraft,
+      day,
+      remark,
+      amount: normalizeExpenseAmountInput(commitmentDraft.amount),
+    };
+    const exists = latest.current.monthlyCommitments.some(
+      (item) => item.id === savedCommitment.id
+    );
+    updateMonthlyCommitments(
+      exists
+        ? latest.current.monthlyCommitments.map((item) =>
+            item.id === savedCommitment.id ? savedCommitment : item
+          )
+        : [...latest.current.monthlyCommitments, savedCommitment]
+    );
+    setCommitmentDraft(null);
+  };
+
+  const toggleCommitmentPaid = (commitmentId) => {
+    updateMonthlyCommitments(
+      latest.current.monthlyCommitments.map((item) =>
+        item.id === commitmentId ? { ...item, isPaid: !item.isPaid } : item
+      )
+    );
+  };
+
+  const resetCommitmentPaidStatus = () => {
+    Alert.alert(
+      'Reset paid status?',
+      'All monthly bills will be marked as unpaid. The bills and amounts will stay unchanged.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () =>
+            updateMonthlyCommitments(
+              latest.current.monthlyCommitments.map((item) => ({
+                ...item,
+                isPaid: false,
+              }))
+            ),
+        },
+      ]
+    );
+  };
+
+  const removeCommitment = (commitmentId) => {
+    updateMonthlyCommitments(
+      latest.current.monthlyCommitments.filter((item) => item.id !== commitmentId)
+    );
+  };
+
+  const confirmRemoveCommitment = (commitmentId) => {
+    const item = latest.current.monthlyCommitments.find(
+      (commitment) => commitment.id === commitmentId
+    );
+    if (!item) return;
+    Alert.alert(
+      `Delete ${item.remark}?`,
+      'This monthly bill will be removed from the checklist.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete bill',
+          style: 'destructive',
+          onPress: () => removeCommitment(commitmentId),
+        },
+      ]
+    );
+  };
+
+  const moveCommitment = (commitmentId, direction) => {
+    const nextCommitments = moveMonthlyCommitment(
+      latest.current.monthlyCommitments,
+      commitmentId,
+      direction
+    );
+    if (nextCommitments !== latest.current.monthlyCommitments) {
+      updateMonthlyCommitments(nextCommitments);
+    }
   };
 
   const handleTitleChange = (value) => {
@@ -527,9 +683,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     });
   };
 
-  const getDragTargetIndex = (rowId, translationY) => {
-    const currentRows = latest.current.rows;
-    const sourceIndex = currentRows.findIndex((row) => row.id === rowId);
+  const getDragTargetIndex = (rowId, translationY, kind = 'expense') => {
+    const currentItems =
+      kind === 'commitment'
+        ? latest.current.monthlyCommitments
+        : latest.current.rows;
+    const sourceIndex = currentItems.findIndex((item) => item.id === rowId);
     if (sourceIndex < 0) return 0;
 
     const dragLayouts = dragRowLayoutsRef.current;
@@ -538,22 +697,28 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       return Math.max(
         0,
         Math.min(
-          currentRows.length - 1,
-          sourceIndex + Math.round(translationY / EXPENSE_ROW_MIN_HEIGHT)
+          currentItems.length - 1,
+          sourceIndex +
+            Math.round(
+              translationY /
+                (kind === 'commitment'
+                  ? MONTHLY_COMMITMENT_MIN_HEIGHT
+                  : EXPENSE_ROW_MIN_HEIGHT)
+            )
         )
       );
     }
 
     const projectedCenter =
       sourceLayout.y + sourceLayout.height / 2 + translationY;
-    const remainingRows = currentRows.filter((row) => row.id !== rowId);
-    for (let index = 0; index < remainingRows.length; index += 1) {
-      const layout = dragLayouts[remainingRows[index].id];
+    const remainingItems = currentItems.filter((item) => item.id !== rowId);
+    for (let index = 0; index < remainingItems.length; index += 1) {
+      const layout = dragLayouts[remainingItems[index].id];
       if (layout && projectedCenter < layout.y + layout.height / 2) {
         return index;
       }
     }
-    return remainingRows.length;
+    return remainingItems.length;
   };
 
   const isPointOverDeleteTarget = (absoluteX, absoluteY) => {
@@ -596,26 +761,31 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     };
   };
 
-  const handleDragStart = (rowId) => {
+  const handleDragStart = (rowId, kind = 'expense') => {
     Keyboard.dismiss();
     measureDragArea();
-    const currentRows = latest.current.rows;
-    const startIndex = currentRows.findIndex((row) => row.id === rowId);
+    const currentItems =
+      kind === 'commitment'
+        ? latest.current.monthlyCommitments
+        : latest.current.rows;
+    const layouts = kind === 'commitment' ? commitmentLayouts.current : rowLayouts.current;
+    const startIndex = currentItems.findIndex((item) => item.id === rowId);
     if (startIndex < 0) return;
 
     dragRowLayoutsRef.current = Object.fromEntries(
-      currentRows.map((row) => [
-        row.id,
-        rowLayouts.current[row.id]
-          ? { ...rowLayouts.current[row.id] }
+      currentItems.map((item) => [
+        item.id,
+        layouts[item.id]
+          ? { ...layouts[item.id] }
           : null,
       ])
     );
     deleteTargetBoundsRef.current = null;
 
     const nextDrag = {
+      kind,
       rowId,
-      row: currentRows[startIndex],
+      row: currentItems[startIndex],
       startIndex,
       targetIndex: startIndex,
       overDelete: false,
@@ -633,7 +803,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.rowId !== rowId) return;
 
-    const targetIndex = getDragTargetIndex(rowId, translationY);
+    const targetIndex = getDragTargetIndex(
+      rowId,
+      translationY,
+      currentDrag.kind
+    );
     const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
     if (
       currentDrag.targetIndex === targetIndex &&
@@ -656,7 +830,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.rowId !== rowId) return;
 
-    const targetIndex = getDragTargetIndex(rowId, translationY);
+    const targetIndex = getDragTargetIndex(
+      rowId,
+      translationY,
+      currentDrag.kind
+    );
     const shouldDelete =
       currentDrag.overDelete ||
       isPointOverDeleteTarget(absoluteX, absoluteY);
@@ -666,18 +844,31 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     setActiveDrag(null);
 
     if (shouldDelete) {
-      removeRow(rowId);
+      if (currentDrag.kind === 'commitment') removeCommitment(rowId);
+      else removeRow(rowId);
       return;
     }
 
-    const nextRows = moveExpenseRowToIndex(
-      latest.current.rows,
-      rowId,
-      targetIndex
-    );
-    if (nextRows === latest.current.rows) return;
-    setRows(nextRows);
-    updateDraft(latest.current.title, nextRows);
+    if (currentDrag.kind === 'commitment') {
+      const nextCommitments = moveMonthlyCommitmentToIndex(
+        latest.current.monthlyCommitments,
+        rowId,
+        targetIndex
+      );
+      if (nextCommitments !== latest.current.monthlyCommitments) {
+        updateMonthlyCommitments(nextCommitments);
+      }
+    } else {
+      const nextRows = moveExpenseRowToIndex(
+        latest.current.rows,
+        rowId,
+        targetIndex
+      );
+      if (nextRows !== latest.current.rows) {
+        setRows(nextRows);
+        updateDraft(latest.current.title, nextRows);
+      }
+    }
   };
 
   const handleDragCancel = (rowId) => {
@@ -792,7 +983,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           draft.title,
           draft.rows,
           draft.categories,
-          draft.summaryNote
+          draft.summaryNote,
+          draft.monthlyCommitments
         ) &&
         !draft.hasPassword &&
         !draft.isPinned
@@ -805,7 +997,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             content: serializeExpenseNote(
               draft.rows,
               draft.categories,
-              draft.summaryNote
+              draft.summaryNote,
+              draft.monthlyCommitments
             ),
           })
           .catch(() => {});
@@ -878,26 +1071,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       >
         <View style={styles.editorContent}>
           <View style={styles.summaryCard}>
-            <View style={styles.summaryIcon}>
-              <Ionicons name="wallet-outline" size={22} color={colors.primary} />
-            </View>
-            <View style={styles.summaryContent}>
-              <Text style={styles.totalLabel}>TOTAL</Text>
-              <Text style={styles.totalText}>
-                RM {formatExpenseAmount(total)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.summaryActionRow}>
-            <View>
-              <Text style={styles.summaryActionTitle}>Monthly categories</Text>
-              <Text style={styles.summaryActionHint}>
-                {categories.length
-                  ? `${categories.length} saved · RM ${formatExpenseAmount(calculateCategorizedTotal(categories))}`
-                  : 'Group matching expense remarks'}
-              </Text>
-            </View>
             <TouchableOpacity
               style={styles.summaryButton}
               onPress={() => setShowSummaryModal(true)}
@@ -908,18 +1081,180 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               <Ionicons name="bar-chart-outline" size={19} color={colors.primary} />
               <Text style={styles.summaryButtonText}>Summary</Text>
             </TouchableOpacity>
+            <View style={styles.summaryContent}>
+              <Text style={styles.totalLabel}>TOTAL</Text>
+              <Text style={styles.totalText}>
+                RM {formatExpenseAmount(total)}
+              </Text>
+            </View>
           </View>
 
-          {/* <View style={styles.sectionHeading}>
+          <View style={styles.commitmentHeading}>
+            <View>
+              <Text style={styles.sectionTitle}>Monthly commitments</Text>
+              <Text style={styles.sectionHint}>Bills that repeat every month</Text>
+            </View>
+            <View style={styles.commitmentProgressArea}>
+              <Text style={styles.commitmentProgress}>
+                {commitmentTotals.paidCount} of {commitmentTotals.count} paid · RM{' '}
+                {formatExpenseAmount(commitmentTotals.remaining)} left
+              </Text>
+              {commitmentTotals.paidCount > 0 && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.resetPaidButton,
+                    pressed && styles.actionsMenuItemPressed,
+                  ]}
+                  onPress={resetCommitmentPaidStatus}
+                  accessibilityRole="button"
+                  accessibilityLabel="Reset all monthly bills to unpaid"
+                >
+                  <Ionicons name="refresh-outline" size={17} color={colors.primary} />
+                  <Text style={styles.resetPaidText}>Reset</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.commitmentCard}>
+            {!monthlyCommitments.length && (
+              <View style={styles.commitmentEmpty}>
+                <View style={styles.commitmentEmptyIcon}>
+                  <Ionicons name="calendar-outline" size={21} color={colors.primary} />
+                </View>
+                <View style={styles.commitmentInfo}>
+                  <Text style={styles.commitmentName}>No monthly bills yet</Text>
+                  <Text style={styles.commitmentMeta}>
+                    Add rent, subscriptions, insurance, or other fixed bills.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {monthlyCommitments.map((commitment, index) => (
+              <React.Fragment key={commitment.id}>
+                {insertionBeforeCommitmentId === commitment.id && (
+                  <View style={styles.rowInsertionGap}>
+                    <View style={styles.rowInsertionDot} />
+                    <View style={styles.rowInsertionLine} />
+                    <Text style={styles.rowInsertionText}>Bill moves here</Text>
+                  </View>
+                )}
+                <View
+                  onLayout={({ nativeEvent }) => {
+                    commitmentLayouts.current[commitment.id] = nativeEvent.layout;
+                  }}
+                  style={[
+                    styles.commitmentRow,
+                    activeDrag?.kind === 'commitment' &&
+                      activeDrag.rowId === commitment.id &&
+                      styles.draggingRow,
+                  ]}
+                >
+                  <ExpenseRowDragHandle
+                    rowId={commitment.id}
+                    rowIndex={index}
+                    colors={colors}
+                    styles={styles}
+                    dragX={dragX}
+                    dragY={dragY}
+                    dragAreaX={dragAreaBounds.x}
+                    dragAreaY={dragAreaBounds.y}
+                    onDragStart={(id) => handleDragStart(id, 'commitment')}
+                    onDragUpdate={handleDragUpdate}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
+                    onMove={moveCommitment}
+                    onDelete={confirmRemoveCommitment}
+                    itemLabel="monthly bill"
+                  />
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.commitmentCheckboxTouch,
+                      pressed && styles.actionsMenuItemPressed,
+                    ]}
+                    onPress={() => toggleCommitmentPaid(commitment.id)}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={`Mark ${commitment.remark} as ${commitment.isPaid ? 'unpaid' : 'paid'}`}
+                    accessibilityState={{ checked: commitment.isPaid }}
+                  >
+                    <View
+                      style={[
+                        styles.commitmentCheckbox,
+                        commitment.isPaid && styles.commitmentCheckboxChecked,
+                      ]}
+                    >
+                      {commitment.isPaid && (
+                        <Ionicons name="checkmark" size={16} color={colors.card} />
+                      )}
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.commitmentInfoButton,
+                      pressed && styles.commitmentPressed,
+                    ]}
+                    onPress={() => openCommitment(commitment)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit ${commitment.remark}`}
+                  >
+                    <Text
+                      style={[
+                        styles.commitmentName,
+                        commitment.isPaid && styles.commitmentNamePaid,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {commitment.remark}
+                    </Text>
+                    <Text style={styles.commitmentMeta} numberOfLines={1}>
+                      {commitment.day ? `Due day ${commitment.day}` : 'No due day'}
+                      {commitment.isPaid ? ' · Paid' : ''}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.commitmentAmountButton,
+                      pressed && styles.commitmentPressed,
+                    ]}
+                    onPress={() => openCommitment(commitment)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit amount for ${commitment.remark}`}
+                  >
+                    <Text style={styles.commitmentAmount} numberOfLines={1}>
+                      RM {formatExpenseAmount(commitment.amount)}
+                    </Text>
+                  </Pressable>
+                </View>
+              </React.Fragment>
+            ))}
+
+            {showEndCommitmentGap && (
+              <View style={styles.rowInsertionGap}>
+                <View style={styles.rowInsertionDot} />
+                <View style={styles.rowInsertionLine} />
+                <Text style={styles.rowInsertionText}>Bill moves here</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.addCommitmentButton}
+              onPress={openNewCommitment}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Add monthly bill"
+            >
+              <Ionicons name="add-circle" size={23} color={colors.primary} />
+              <Text style={styles.addCommitmentText}>Add monthly bill</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.expenseTableHeading}>
             <View>
               <Text style={styles.sectionTitle}>Expense entries</Text>
-              <Text style={styles.sectionHint}>Tap any cell to edit</Text>
+              <Text style={styles.sectionHint}>Drag a grip to reorder or delete</Text>
             </View>
-            <View style={styles.liveBadge}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveBadgeText}>Auto total</Text>
-            </View>
-          </View> */}
+          </View>
 
           <View style={styles.table}>
             <View style={[styles.tableRow, styles.tableHeader]}>
@@ -951,7 +1286,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       styles.tableRow,
                       index % 2 === 0 ? styles.evenRow : styles.oddRow,
                       focusedCell?.startsWith(`${row.id}:`) && styles.focusedRow,
-                      activeDrag?.rowId === row.id && styles.draggingRow,
+                      activeDrag?.kind === 'expense' &&
+                        activeDrag.rowId === row.id &&
+                        styles.draggingRow,
                     ]}
                   >
                     <ExpenseRowDragHandle
@@ -1152,7 +1489,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             />
             <View style={styles.dragPreviewContent}>
               <Text style={styles.dragPreviewRemark} numberOfLines={1}>
-                {activeDrag.row.remark.trim() || 'Empty expense row'}
+                {activeDrag.row.remark.trim() ||
+                  (activeDrag.kind === 'commitment'
+                    ? 'Monthly bill'
+                    : 'Empty expense row')}
               </Text>
               <Text
                 style={[
@@ -1162,7 +1502,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               >
                 {activeDrag.overDelete
                   ? 'Release to delete'
-                  : `Move to row ${activeDrag.targetIndex + 1}`}
+                  : `Move to ${activeDrag.kind === 'commitment' ? 'bill' : 'row'} ${activeDrag.targetIndex + 1}`}
               </Text>
             </View>
             <Text style={styles.dragPreviewAmount} numberOfLines={1}>
@@ -1338,8 +1678,124 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         total={total}
         categories={categories}
         summaryNote={summaryNote}
+        monthlyCommitments={monthlyCommitments}
         type="expense"
       />
+
+      <Modal
+        visible={!!commitmentDraft}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setCommitmentDraft(null)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={[styles.modalContent, styles.commitmentModalContent]}>
+            <View style={styles.commitmentModalHeader}>
+              <View>
+                <Text style={styles.commitmentModalEyebrow}>MONTHLY COMMITMENT</Text>
+                <Text style={styles.commitmentModalTitle}>
+                  {latest.current.monthlyCommitments.some(
+                    (item) => item.id === commitmentDraft?.id
+                  )
+                    ? 'Edit monthly bill'
+                    : 'Add monthly bill'}
+                </Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.commitmentModalClose,
+                  pressed && styles.actionsMenuItemPressed,
+                ]}
+                onPress={() => setCommitmentDraft(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Close monthly bill form"
+              >
+                <Ionicons name="close" size={21} color={colors.text} />
+              </Pressable>
+            </View>
+
+            <View style={styles.commitmentForm}>
+              <Text style={styles.commitmentInputLabel}>Bill name</Text>
+              <TextInput
+                style={styles.commitmentInput}
+                value={commitmentDraft?.remark ?? ''}
+                onChangeText={(value) => handleCommitmentDraftChange('remark', value)}
+                placeholder="e.g. Internet subscription"
+                placeholderTextColor={colors.textTertiary}
+                autoFocus
+                returnKeyType="next"
+                accessibilityLabel="Monthly bill name"
+              />
+
+              <View style={styles.commitmentFormRow}>
+                <View style={styles.commitmentFormField}>
+                  <Text style={styles.commitmentInputLabel}>Due day (optional)</Text>
+                  <TextInput
+                    style={styles.commitmentInput}
+                    value={commitmentDraft?.day ?? ''}
+                    onChangeText={(value) =>
+                      handleCommitmentDraftChange(
+                        'day',
+                        sanitizeExpenseDateInput(value).slice(0, 2)
+                      )
+                    }
+                    placeholder="1–31"
+                    placeholderTextColor={colors.textTertiary}
+                    inputMode="numeric"
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    accessibilityLabel="Monthly bill due day"
+                  />
+                </View>
+                <View style={styles.commitmentFormField}>
+                  <Text style={styles.commitmentInputLabel}>Amount (RM)</Text>
+                  <TextInput
+                    style={[styles.commitmentInput, styles.commitmentAmountInput]}
+                    value={commitmentDraft?.amount ?? ''}
+                    onChangeText={(value) =>
+                      handleCommitmentDraftChange(
+                        'amount',
+                        sanitizeExpenseAmountInput(value)
+                      )
+                    }
+                    placeholder="0.00"
+                    placeholderTextColor={colors.textTertiary}
+                    inputMode="decimal"
+                    keyboardType="decimal-pad"
+                    accessibilityLabel="Monthly bill amount in ringgit"
+                  />
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                activeOpacity={0.7}
+                onPress={() => setCommitmentDraft(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel monthly bill changes"
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.setButton]}
+                activeOpacity={0.7}
+                onPress={saveCommitment}
+                accessibilityRole="button"
+                accessibilityLabel="Save monthly bill"
+              >
+                <Text style={[styles.modalButtonText, styles.setButtonText]}>
+                  Save bill
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       <Modal visible={showLockModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
@@ -1578,7 +2034,7 @@ const makeStyles = (colors) =>
     summaryCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'flex-end',
+      justifyContent: 'space-between',
       gap: 12,
       backgroundColor: colors.primarySoft,
       borderWidth: 1,
@@ -1605,6 +2061,9 @@ const makeStyles = (colors) =>
       justifyContent: 'space-between',
       gap: 12,
       paddingHorizontal: 2,
+    },
+    hiddenLegacySummaryRow: {
+      display: 'none',
     },
     summaryActionTitle: {
       color: colors.text,
@@ -1645,6 +2104,158 @@ const makeStyles = (colors) =>
       fontSize: 20,
       fontWeight: '800',
       fontVariant: ['tabular-nums'],
+    },
+    commitmentHeading: {
+      minHeight: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingHorizontal: 2,
+    },
+    commitmentProgressArea: {
+      alignItems: 'flex-end',
+      gap: 3,
+    },
+    commitmentProgress: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      lineHeight: 16,
+      fontWeight: '700',
+      textAlign: 'right',
+      fontVariant: ['tabular-nums'],
+    },
+    resetPaidButton: {
+      minWidth: 72,
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      borderRadius: radius.full,
+    },
+    resetPaidText: {
+      color: colors.primary,
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    commitmentCard: {
+      overflow: 'hidden',
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.lg,
+      ...shadow.card,
+    },
+    commitmentEmpty: {
+      minHeight: 76,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    commitmentEmptyIcon: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.md,
+      backgroundColor: colors.primarySoft,
+    },
+    commitmentRow: {
+      minHeight: MONTHLY_COMMITMENT_MIN_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    commitmentCheckboxTouch: {
+      width: 48,
+      minHeight: MONTHLY_COMMITMENT_MIN_HEIGHT,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    commitmentCheckbox: {
+      width: 24,
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: colors.textTertiary,
+      borderRadius: 7,
+      backgroundColor: colors.card,
+    },
+    commitmentCheckboxChecked: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    commitmentInfo: {
+      flex: 1,
+      minWidth: 0,
+    },
+    commitmentInfoButton: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: MONTHLY_COMMITMENT_MIN_HEIGHT,
+      justifyContent: 'center',
+      paddingVertical: 9,
+      paddingRight: 6,
+    },
+    commitmentPressed: {
+      opacity: 0.65,
+    },
+    commitmentName: {
+      color: colors.text,
+      fontSize: 15,
+      lineHeight: 20,
+      fontWeight: '700',
+    },
+    commitmentNamePaid: {
+      color: colors.textSecondary,
+      textDecorationLine: 'line-through',
+    },
+    commitmentMeta: {
+      color: colors.textTertiary,
+      fontSize: 11,
+      lineHeight: 16,
+      marginTop: 2,
+    },
+    commitmentAmountButton: {
+      minWidth: 96,
+      minHeight: MONTHLY_COMMITMENT_MIN_HEIGHT,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+    },
+    commitmentAmount: {
+      color: colors.text,
+      fontSize: 13,
+      fontWeight: '800',
+      textAlign: 'right',
+      fontVariant: ['tabular-nums'],
+    },
+    addCommitmentButton: {
+      minHeight: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      backgroundColor: colors.primarySoft,
+    },
+    addCommitmentText: {
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    expenseTableHeading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 2,
     },
     sectionHeading: {
       flexDirection: 'row',
@@ -1974,6 +2585,71 @@ const makeStyles = (colors) =>
       maxWidth: 400,
       alignItems: 'center',
       ...shadow.card,
+    },
+    commitmentModalContent: {
+      alignItems: 'stretch',
+      padding: 20,
+    },
+    commitmentModalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 18,
+    },
+    commitmentModalEyebrow: {
+      color: colors.primary,
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.9,
+    },
+    commitmentModalTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: '800',
+      marginTop: 2,
+    },
+    commitmentModalClose: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.full,
+      backgroundColor: colors.inputBg,
+    },
+    commitmentForm: {
+      gap: 8,
+    },
+    commitmentFormRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    commitmentFormField: {
+      flex: 1,
+      minWidth: 0,
+    },
+    commitmentInputLabel: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '700',
+    },
+    commitmentInput: {
+      minHeight: 50,
+      color: colors.text,
+      fontSize: 16,
+      paddingHorizontal: 13,
+      paddingVertical: 11,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
+      backgroundColor: colors.inputBg,
+      outlineStyle: 'none',
+      marginBottom: 6,
+    },
+    commitmentAmountInput: {
+      textAlign: 'right',
+      fontVariant: ['tabular-nums'],
     },
     modalIconCircle: {
       width: 56,

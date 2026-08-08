@@ -1,6 +1,6 @@
 # Monthly Commitments Section
 
-Status: approved design direction (Option C), not yet implemented.
+Status: implemented with approved design Option C.
 
 ![Option C monthly commitments mock](../assets/design/monthly-expense-checklist-option-c.png)
 
@@ -15,12 +15,12 @@ The existing expense note keeps:
 - its total summary and Summary action;
 - the Day, Remark, and RM expense table;
 - editable rows, three-line Remark wrapping, drag-to-reorder, and drag-to-delete;
-- long-press deletion confirmation;
+- recycle-bin drag deletion with an accessibility confirmation fallback;
 - local persistence and 800 ms auto-save.
 
 ## Placement
 
-Place the new section after **Monthly categories** and before the existing expense table:
+Place the new section after the combined Summary/Total card and before the existing expense table:
 
 1. Existing Summary action and expense total on the same row
 2. New monthly commitments checklist
@@ -66,7 +66,8 @@ The example totals are:
 - A checked row remains part of the commitments total.
 - Checking a commitment does not automatically create an expense-table row, preventing duplicate amounts.
 - `Add monthly bill` adds a commitment without affecting existing expense rows.
-- Reordering and deletion should reuse the existing expense-row gestures and detailed confirmation pattern.
+- Reordering and deletion reuse the existing expense-row gestures: a full-width insertion gap previews the drop position, and releasing over the large recycle-bin target deletes the bill.
+- There is no long-press-to-delete interaction.
 - Checkbox and row actions must keep at least a 44 × 44 point touch target and have descriptive accessibility labels.
 - Paid state must use a visible checkmark and text/progress feedback; color alone is not sufficient.
 
@@ -88,17 +89,15 @@ Store commitments inside the expense note's versioned JSON payload, independentl
 }
 ```
 
-An implementation will require a payload-version migration that defaults `monthlyCommitments` to an empty array for existing notes. It should not require new repository methods because expense-note content remains versioned JSON.
+Payload version 5 defaults `monthlyCommitments` to an empty array for existing notes. No new repository methods are required because expense-note content remains versioned JSON. Commitments also appear in expense PDF and image exports.
 
 ## Totals and existing behavior
 
 Commitment totals are displayed inside the new section. The current expense total continues to represent only rows recorded in the existing expense table. This avoids changing current calculations or counting a commitment twice.
 
-## Remaining product decision
+## Paid-state reset
 
-Decide how checked states start a new month before implementation:
-
-- Recommended initial behavior: keep paid state per note and provide a confirmed `Reset paid status` action.
+- Paid state is kept per note and a confirmed `Reset paid status` action marks every commitment unpaid.
 - Possible later behavior: copy commitments into a new monthly note with every checkbox reset.
 - Avoid silently resetting checkboxes by calendar date because a user may still be finishing the previous month's note.
 
