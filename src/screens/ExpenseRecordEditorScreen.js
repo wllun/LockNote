@@ -64,6 +64,7 @@ const DELETE_TARGET_TOLERANCE = 28;
 const MONTHLY_COMMITMENT_MIN_HEIGHT = 68;
 const DRAG_PREVIEW_MAX_WIDTH = 280;
 const DRAG_PREVIEW_POINTER_OFFSET = 50;
+const DRAG_ACTIVATION_DELAY_MS = 1000;
 
 const ExpenseRowDragHandle = ({
   rowId,
@@ -131,6 +132,7 @@ const ExpenseRowDragHandle = ({
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
+        .activateAfterLongPress(DRAG_ACTIVATION_DELAY_MS)
         .minDistance(5)
         .shouldCancelWhenOutside(false)
         .runOnJS(true)
@@ -180,7 +182,7 @@ const ExpenseRowDragHandle = ({
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel={`Move ${itemLabel} ${rowIndex + 1}`}
-        accessibilityHint="Drag to another row to move, or drag to the recycle bin to delete"
+        accessibilityHint="Press and hold for one second, then drag to move or delete"
         accessibilityActions={[
           { name: 'increment', label: 'Move row down' },
           { name: 'decrement', label: 'Move row up' },
