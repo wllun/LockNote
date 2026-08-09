@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyMonthlyCommitmentTemplate,
+  calculateExpenseGrandTotal,
   calculateExpenseTotal,
   calculateExpenseCategory,
   calculateCategorizedTotal,
@@ -146,6 +147,20 @@ test('calculates a total while ignoring incomplete or invalid amounts', () => {
   ];
 
   assert.equal(calculateExpenseTotal(rows), 187.5);
+});
+
+test('calculates the grand total from expense entries and monthly commitments', () => {
+  const rows = [
+    createExpenseRow({ amount: '187.50' }),
+    createExpenseRow({ amount: 'invalid' }),
+  ];
+  const commitments = [
+    createMonthlyCommitment({ remark: 'Food', amount: '600', isPaid: true }),
+    createMonthlyCommitment({ remark: 'Petrol', amount: '250.50' }),
+    createMonthlyCommitment({ remark: 'Insurance', amount: '' }),
+  ];
+
+  assert.equal(calculateExpenseGrandTotal(rows, commitments), 1038);
 });
 
 test('normalizes valid expense amounts to two decimal places', () => {

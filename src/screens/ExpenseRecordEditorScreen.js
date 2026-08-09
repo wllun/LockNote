@@ -35,7 +35,7 @@ import {
 } from '../utils/note-limits.mjs';
 import {
   applyMonthlyCommitmentTemplate,
-  calculateExpenseTotal,
+  calculateExpenseGrandTotal,
   calculateMonthlyCommitmentTotals,
   createExpenseRow,
   createMonthlyCommitment,
@@ -265,8 +265,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     deleted: false,
   });
 
-  const total = calculateExpenseTotal(rows);
   const commitmentTotals = calculateMonthlyCommitmentTotals(monthlyCommitments);
+  const total = calculateExpenseGrandTotal(rows, monthlyCommitments);
   const savedCommitmentTotals = calculateMonthlyCommitmentTotals(
     savedCommitmentTemplate
   );
@@ -1162,7 +1162,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               <Text style={styles.summaryButtonText}>Summary</Text>
             </TouchableOpacity>
             <View style={styles.summaryContent}>
-              <Text style={styles.totalLabel}>TOTAL</Text>
+              <Text style={styles.totalLabel}>GRAND TOTAL</Text>
               <Text style={styles.totalText}>
                 RM {formatExpenseAmount(total)}
               </Text>
@@ -1192,7 +1192,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 </Text>
                 <View style={styles.commitmentDisclosureIcon}>
                   <Ionicons
-                    name={isCommitmentsExpanded ? 'chevron-up' : 'chevron-down'}
+                    name={isCommitmentsExpanded ? 'chevron-down' : 'chevron-up'}
                     size={19}
                     color={colors.primary}
                   />
@@ -1438,7 +1438,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
           <View style={styles.expenseTableHeading}>
             <View>
-              <Text style={styles.sectionTitle}>Expense entries</Text>
+              <Text style={styles.sectionTitle}>Daily Expense</Text>
               <Text style={styles.sectionHint}>Drag a grip to reorder or delete</Text>
             </View>
           </View>

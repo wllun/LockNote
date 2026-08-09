@@ -317,6 +317,9 @@ export const calculateMonthlyCommitmentTotals = (commitments) => {
   );
 };
 
+export const calculateExpenseGrandTotal = (rows, commitments) =>
+  calculateExpenseTotal(rows) + calculateMonthlyCommitmentTotals(commitments).total;
+
 export const calculateExpenseCategory = (rows, keywords) => {
   const cleanedKeywords = normalizeKeywordList(keywords);
   const normalizedKeywords = cleanedKeywords.map(normalizeExpenseCategoryKeyword);
