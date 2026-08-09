@@ -229,7 +229,6 @@ const ExpenseSummaryModal = ({
           <View style={styles.handle} />
           <View style={styles.header}>
             <View>
-              <Text style={styles.eyebrow}>THIS EXPENSE NOTE</Text>
               <Text style={styles.title}>
                 {mode === 'list' ? 'Monthly summary' : isUpdating ? 'Edit category' : 'Add category'}
               </Text>
@@ -504,8 +503,7 @@ const makeStyles = (colors) =>
     sheet: { maxHeight: '90%', backgroundColor: colors.card, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, ...shadow.card },
     handle: { width: 42, height: 4, borderRadius: radius.full, backgroundColor: colors.border, alignSelf: 'center', marginTop: 9 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 13, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
-    eyebrow: { color: colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 0.9 },
-    title: { color: colors.text, fontSize: 21, fontWeight: '800', marginTop: 2 },
+    title: { color: colors.text, fontSize: 21, fontWeight: '800' },
     iconButton: { width: 48, height: 48, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.inputBg },
     pressed: { opacity: 0.72 },
     body: { padding: 20, gap: 12 },

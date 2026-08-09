@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import {
   Gesture,
   GestureDetector,
@@ -28,6 +28,7 @@ import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
+import { confirmDestructiveAction } from '../utils/confirm-action';
 import { monthlyCommitmentTemplate } from '../utils/monthly-commitment-template';
 import {
   EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS,
@@ -201,7 +202,7 @@ const ExpenseRowDragHandle = ({
           }
         }}
       >
-        <Ionicons name="reorder-three-outline" size={25} color={colors.textSecondary} />
+        <MaterialIcons name="drag-indicator" size={25} color={colors.textSecondary} />
       </View>
     </GestureDetector>
   );
@@ -553,24 +554,19 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const resetCommitmentPaidStatus = () => {
-    Alert.alert(
-      'Reset paid status?',
-      'All monthly bills will be marked as unpaid. The bills and amounts will stay unchanged.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () =>
-            updateMonthlyCommitments(
-              latest.current.monthlyCommitments.map((item) => ({
-                ...item,
-                isPaid: false,
-              }))
-            ),
-        },
-      ]
-    );
+    confirmDestructiveAction({
+      title: 'Reset paid status?',
+      message:
+        'All monthly bills will be marked as unpaid. The bills and amounts will stay unchanged.',
+      confirmLabel: 'Reset',
+      onConfirm: () =>
+        updateMonthlyCommitments(
+          latest.current.monthlyCommitments.map((item) => ({
+            ...item,
+            isPaid: false,
+          }))
+        ),
+    });
   };
 
   const saveCommitmentsForNextNote = async () => {
@@ -1170,56 +1166,51 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.commitmentHeading}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.commitmentHeadingToggle,
-                pressed && styles.actionsMenuItemPressed,
-              ]}
-              onPress={() => setIsCommitmentsExpanded((expanded) => !expanded)}
-              accessibilityRole="button"
-              accessibilityLabel={`${isCommitmentsExpanded ? 'Collapse' : 'Expand'} monthly commitments`}
-              accessibilityHint="Shows or hides monthly bills and their actions"
-              accessibilityState={{ expanded: isCommitmentsExpanded }}
-            >
-              <View style={styles.commitmentHeadingCopy}>
-                <Text style={styles.sectionTitle}>Monthly commitments</Text>
-                <Text style={styles.sectionHint}>Bills that repeat every month</Text>
-              </View>
-              <View style={styles.commitmentProgressArea}>
-                <Text style={styles.commitmentProgress} numberOfLines={2}>
+            <View style={styles.commitmentHeadingCopy}>
+              <Text style={styles.sectionTitle}>Monthly commitments</Text>
+              <View style={styles.commitmentStatusRow}>
+                <Text style={styles.commitmentProgress} numberOfLines={1}>
                   {commitmentTotals.paidCount} of {commitmentTotals.count} paid · RM{' '}
                   {formatExpenseAmount(commitmentTotals.remaining)} left
                 </Text>
-                <View style={styles.commitmentDisclosureIcon}>
-                  <Ionicons
-                    name={isCommitmentsExpanded ? 'chevron-down' : 'chevron-up'}
-                    size={19}
-                    color={colors.primary}
-                  />
-                </View>
               </View>
-            </Pressable>
+            </View>
+            <View style={styles.commitmentHeadingActions}>
+              {commitmentTotals.paidCount > 0 && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.resetPaidIconButton,
+                    pressed && styles.actionsMenuItemPressed,
+                  ]}
+                  onPress={resetCommitmentPaidStatus}
+                  accessibilityRole="button"
+                  accessibilityLabel="Reset all monthly bills to unpaid"
+                >
+                  <Ionicons name="refresh-outline" size={18} color={colors.primary} />
+                </Pressable>
+              )}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.commitmentDisclosureButton,
+                  pressed && styles.actionsMenuItemPressed,
+                ]}
+                onPress={() => setIsCommitmentsExpanded((expanded) => !expanded)}
+                accessibilityRole="button"
+                accessibilityLabel={`${isCommitmentsExpanded ? 'Collapse' : 'Expand'} monthly commitments`}
+                accessibilityHint="Shows or hides monthly bills and their actions"
+                accessibilityState={{ expanded: isCommitmentsExpanded }}
+              >
+                <Ionicons
+                  name={isCommitmentsExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={19}
+                  color={colors.primary}
+                />
+              </Pressable>
+            </View>
           </View>
 
           {isCommitmentsExpanded && (
             <View style={styles.commitmentExpandedContent}>
-              {commitmentTotals.paidCount > 0 && (
-                <View style={styles.resetPaidRow}>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.resetPaidButton,
-                      pressed && styles.actionsMenuItemPressed,
-                    ]}
-                    onPress={resetCommitmentPaidStatus}
-                    accessibilityRole="button"
-                    accessibilityLabel="Reset all monthly bills to unpaid"
-                  >
-                    <Ionicons name="refresh-outline" size={17} color={colors.primary} />
-                    <Text style={styles.resetPaidText}>Reset</Text>
-                  </Pressable>
-                </View>
-              )}
-
               <View style={styles.commitmentCard}>
             {!monthlyCommitments.length && (
               <View style={styles.commitmentEmpty}>
@@ -1367,6 +1358,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 <Text style={styles.rowInsertionText}>Bill moves here</Text>
               </View>
             )}
+              </View>
 
             <View style={styles.commitmentActions}>
               <TouchableOpacity
@@ -1374,10 +1366,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 onPress={openNewCommitment}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel="Add monthly bill"
+                accessibilityLabel="Add bill"
               >
                 <Ionicons name="add-circle" size={23} color={colors.primary} />
-                <Text style={styles.addCommitmentText}>Add monthly bill</Text>
+                <Text style={styles.addCommitmentText}>Add bill</Text>
               </TouchableOpacity>
               {!!monthlyCommitments.length && (
                 <Pressable
@@ -1394,7 +1386,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                   }
                   accessibilityRole="button"
                   accessibilityLabel={
-                    currentCommitmentsMatchSavedTemplate
+                    isSavingCommitmentTemplate
+                      ? 'Saving monthly bills for the next expense note'
+                      : currentCommitmentsMatchSavedTemplate
                       ? 'Monthly bills saved for the next expense note'
                       : 'Save monthly bills for the next expense note'
                   }
@@ -1402,28 +1396,23 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     disabled:
                       isSavingCommitmentTemplate ||
                       currentCommitmentsMatchSavedTemplate,
+                    busy: isSavingCommitmentTemplate,
                   }}
                 >
                   <Ionicons
                     name={
-                      currentCommitmentsMatchSavedTemplate
+                      isSavingCommitmentTemplate
+                        ? 'hourglass-outline'
+                        : currentCommitmentsMatchSavedTemplate
                         ? 'checkmark-circle-outline'
                         : 'copy-outline'
                     }
                     size={20}
                     color={colors.primary}
                   />
-                  <Text style={styles.saveTemplateText} numberOfLines={1}>
-                    {isSavingCommitmentTemplate
-                      ? 'Saving…'
-                      : currentCommitmentsMatchSavedTemplate
-                        ? 'Saved for next note'
-                        : 'Save for next note'}
-                  </Text>
                 </Pressable>
               )}
             </View>
-              </View>
 
               {!!commitmentTemplateMessage && (
                 <Text
@@ -1446,7 +1435,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           <View style={styles.table}>
             <View style={[styles.tableRow, styles.tableHeader]}>
               <View style={[styles.actionColumn, styles.actionHeaderColumn]} />
-              <Text style={[styles.headerCell, styles.dateColumn]}>Day</Text>
+              <Text
+                style={[styles.headerCell, styles.dateColumn, styles.dateHeaderCell]}
+              >
+                Day
+              </Text>
               <Text style={[styles.headerCell, styles.remarkColumn]}>Remark</Text>
               <Text style={[styles.headerCell, styles.amountColumn]}>RM</Text>
             </View>
@@ -1505,7 +1498,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       ref={(ref) => {
                         inputRefs.current[`${row.id}:date`] = ref;
                       }}
-                      style={[styles.cellInput, styles.singleLineCellInput]}
+                      style={[
+                        styles.cellInput,
+                        styles.singleLineCellInput,
+                        styles.dateInput,
+                      ]}
                       value={row.date}
                       onChangeText={(value) =>
                         handleRowChange(row.id, 'date', sanitizeExpenseDateInput(value))
@@ -1883,13 +1880,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           <View style={[styles.modalContent, styles.commitmentModalContent]}>
             <View style={styles.commitmentModalHeader}>
               <View>
-                <Text style={styles.commitmentModalEyebrow}>MONTHLY COMMITMENT</Text>
                 <Text style={styles.commitmentModalTitle}>
                   {latest.current.monthlyCommitments.some(
                     (item) => item.id === commitmentDraft?.id
                   )
-                    ? 'Edit monthly bill'
-                    : 'Add monthly bill'}
+                    ? 'Edit bill'
+                    : 'Add bill'}
                 </Text>
               </View>
               <Pressable
@@ -2301,28 +2297,20 @@ const makeStyles = (colors) =>
       fontVariant: ['tabular-nums'],
     },
     commitmentHeading: {
-      minHeight: 54,
-      paddingHorizontal: 2,
-    },
-    commitmentHeadingToggle: {
-      minHeight: 54,
-      width: '100%',
+      minHeight: 64,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
-      borderRadius: radius.md,
+      paddingHorizontal: 2,
     },
     commitmentHeadingCopy: {
       flex: 1,
       minWidth: 0,
     },
-    commitmentProgressArea: {
-      maxWidth: '55%',
+    commitmentStatusRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'flex-end',
-      gap: 8,
     },
     commitmentProgress: {
       flexShrink: 1,
@@ -2330,12 +2318,24 @@ const makeStyles = (colors) =>
       fontSize: 11,
       lineHeight: 16,
       fontWeight: '700',
-      textAlign: 'right',
+      textAlign: 'left',
       fontVariant: ['tabular-nums'],
     },
-    commitmentDisclosureIcon: {
-      width: 38,
-      height: 38,
+    commitmentHeadingActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    resetPaidIconButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radius.full,
+    },
+    commitmentDisclosureButton: {
+      width: 44,
+      height: 44,
       flexShrink: 0,
       alignItems: 'center',
       justifyContent: 'center',
@@ -2343,26 +2343,7 @@ const makeStyles = (colors) =>
       borderRadius: radius.full,
     },
     commitmentExpandedContent: {
-      gap: 12,
-    },
-    resetPaidRow: {
-      minHeight: 44,
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-    },
-    resetPaidButton: {
-      minWidth: 72,
-      minHeight: 44,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
-      borderRadius: radius.full,
-    },
-    resetPaidText: {
-      color: colors.primary,
-      fontSize: 12,
-      fontWeight: '800',
+      gap: 8,
     },
     commitmentCard: {
       overflow: 'hidden',
@@ -2513,18 +2494,21 @@ const makeStyles = (colors) =>
       fontVariant: ['tabular-nums'],
     },
     commitmentActions: {
-      minHeight: 54,
+      minHeight: 44,
       flexDirection: 'row',
-      alignItems: 'stretch',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 8,
     },
     addCommitmentButton: {
-      flex: 1,
-      minHeight: 54,
+      minHeight: 44,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 7,
+      paddingHorizontal: 14,
       backgroundColor: colors.primarySoft,
+      borderRadius: radius.full,
     },
     addCommitmentText: {
       color: colors.primary,
@@ -2532,26 +2516,17 @@ const makeStyles = (colors) =>
       fontWeight: '800',
     },
     saveTemplateButton: {
-      flex: 1,
-      minHeight: 54,
-      flexDirection: 'row',
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
-      paddingHorizontal: 10,
-      borderLeftWidth: 1,
-      borderLeftColor: colors.border,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.full,
       backgroundColor: colors.card,
     },
     saveTemplateButtonComplete: {
       backgroundColor: colors.primarySoft,
-    },
-    saveTemplateText: {
-      flexShrink: 1,
-      color: colors.primary,
-      fontSize: 12,
-      fontWeight: '800',
-      textAlign: 'center',
     },
     commitmentTemplateMessage: {
       color: colors.textSecondary,
@@ -2663,7 +2638,15 @@ const makeStyles = (colors) =>
       color: colors.text,
     },
     dateColumn: {
-      width: 52,
+      width: 44,
+    },
+    dateHeaderCell: {
+      paddingHorizontal: 4,
+      textAlign: 'center',
+    },
+    dateInput: {
+      paddingHorizontal: 4,
+      textAlign: 'center',
     },
     remarkColumn: {
       flex: 1,
@@ -2890,17 +2873,10 @@ const makeStyles = (colors) =>
       gap: 12,
       marginBottom: 18,
     },
-    commitmentModalEyebrow: {
-      color: colors.primary,
-      fontSize: 10,
-      fontWeight: '800',
-      letterSpacing: 0.9,
-    },
     commitmentModalTitle: {
       color: colors.text,
       fontSize: 20,
       fontWeight: '800',
-      marginTop: 2,
     },
     commitmentModalClose: {
       width: 44,

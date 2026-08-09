@@ -1,4 +1,5 @@
 import { Alert, Platform } from 'react-native';
+import { requestConfirmation } from './confirmation.mjs';
 
 export const confirmDestructiveAction = ({
   title,
@@ -6,19 +7,13 @@ export const confirmDestructiveAction = ({
   confirmLabel = 'Delete',
   onConfirm,
 }) => {
-  if (Platform.OS === 'web') {
-    if (globalThis.confirm?.(`${title}\n\n${message}`)) {
-      onConfirm();
-    }
-    return;
-  }
-
-  Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
-    {
-      text: confirmLabel,
-      style: 'destructive',
-      onPress: onConfirm,
-    },
-  ]);
+  requestConfirmation({
+    isWeb: Platform.OS === 'web',
+    webConfirm: (prompt) => globalThis.confirm?.(prompt),
+    nativeAlert: (...args) => Alert.alert(...args),
+    title,
+    message,
+    confirmLabel,
+    onConfirm,
+  });
 };
