@@ -20,6 +20,7 @@ import {
   ScrollView,
 } from 'react-native-gesture-handler';
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
@@ -130,23 +131,33 @@ const ExpenseRowDragHandle = ({
     () => callbacks.current.onDragCancel(rowId),
     [rowId]
   );
+  const dragTouchStartedAt = useSharedValue(0);
 
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
-        .activateAfterLongPress(DRAG_ACTIVATION_DELAY_MS)
-        .minDistance(5)
+        .manualActivation(true)
         .shouldCancelWhenOutside(false)
-        .runOnJS(true)
+        .onTouchesDown(() => {
+          dragTouchStartedAt.value = Date.now();
+        })
+        .onTouchesMove((_, stateManager) => {
+          const heldFor = Date.now() - dragTouchStartedAt.value;
+          if (heldFor >= DRAG_ACTIVATION_DELAY_MS) {
+            stateManager.activate();
+          } else {
+            stateManager.fail();
+          }
+        })
         .onStart((event) => {
           dragX.value = event.absoluteX - dragAreaX;
           dragY.value = event.absoluteY - dragAreaY;
-          startDrag();
+          runOnJS(startDrag)();
         })
         .onUpdate((event) => {
           dragX.value = event.absoluteX - dragAreaX;
           dragY.value = event.absoluteY - dragAreaY;
-          updateDrag(
+          runOnJS(updateDrag)(
             event.translationY,
             event.absoluteX,
             event.absoluteY
@@ -155,19 +166,21 @@ const ExpenseRowDragHandle = ({
         .onEnd((event) => {
           dragX.value = event.absoluteX - dragAreaX;
           dragY.value = event.absoluteY - dragAreaY;
-          endDrag(
+          runOnJS(endDrag)(
             event.translationY,
             event.absoluteX,
             event.absoluteY
           );
         })
         .onFinalize((_, success) => {
-          if (!success) cancelDrag();
+          dragTouchStartedAt.value = 0;
+          if (!success) runOnJS(cancelDrag)();
         }),
     [
       cancelDrag,
       dragAreaX,
       dragAreaY,
+      dragTouchStartedAt,
       dragX,
       dragY,
       endDrag,
