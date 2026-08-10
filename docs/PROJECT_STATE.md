@@ -38,7 +38,7 @@ _Snapshot: 2026-07-30. Check off items as they land._
 - [X] Password recovery/reset — an app-wide recovery PIN (Settings → Security), persisted in AsyncStorage via `src/utils/recovery.js`, hashed with the same SHA-256 helper as item passwords. `PasswordModal` gets a "Forgot password?" link that verifies the PIN and clears the item's password. Note: this resets the gate, it does not recover the original password (impossible from a hash) — consistent with the "gating, not encryption" model.
 - [ ] Data export / cross-platform portability (native SQLite and web AsyncStorage are separate, no sync)
 - [X] Pinning — `is_pinned` column added to both SQLite tables (migrated via guarded `ALTER TABLE`) and to the web AsyncStorage records. Pinned folders/notes sort first everywhere (lists + search). List actions open by long-press on native or three dots on web; editor actions use a three-dots menu.
-- [X] Contextual list actions — notes can be pinned, moved between Home/folders, or soft-deleted; folders can be pinned or soft-deleted together with their contained notes.
+- [X] Contextual list actions — notes can be pinned, moved between Home/folders, or soft-deleted; folders can be renamed, pinned, or soft-deleted together with their contained notes.
 
 ## Roadmap
 

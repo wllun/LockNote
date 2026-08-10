@@ -17,6 +17,7 @@ const ItemActionsModal = ({
   isPinned,
   onClose,
   onTogglePin,
+  onRename,
   onMove,
   onDelete,
 }) => {
@@ -113,6 +114,27 @@ const ItemActionsModal = ({
                 />
               </View>
               <Text style={styles.actionText}>Move to folder</Text>
+            </Pressable>
+          )}
+
+          {!isNote && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.action,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => runAction(onRename)}
+              accessibilityRole="button"
+              accessibilityLabel="Rename folder"
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons
+                  name="create-outline"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </View>
+              <Text style={styles.actionText}>Rename folder</Text>
             </Pressable>
           )}
 

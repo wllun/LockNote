@@ -38,7 +38,7 @@ Screens reload their data on the navigation `focus` event (listener registered i
 
 List items expose contextual actions through long-press on native and a visible
 three-dots button on web. Note actions are pin, move, and soft-delete; folder
-actions are pin and soft-delete. Moving a note updates `folder_id`, with `null`
+actions are rename, pin, and soft-delete. Moving a note updates `folder_id`, with `null`
 representing Home. Deleting a folder soft-deletes its contained notes first so
 normal reads do not leave inaccessible active notes behind.
 
