@@ -5,6 +5,7 @@ import {
   getExpenseExportCategories,
   getExpenseExportCategoryDescription,
   getExpenseExportMonthlyCommitments,
+  getExpenseExportRows,
   getChecklistExportItems,
   getExportFileName,
   getExportTitle,
@@ -15,6 +16,31 @@ test('uses clear fallback titles and filesystem-safe export names', () => {
   assert.equal(getExportTitle('  ', 'expense'), 'Untitled expense record');
   assert.equal(getExportTitle('  ', 'checklist'), 'Untitled checklist');
   assert.equal(getExportFileName('Bills: July / August?', 'pdf'), 'Bills July August.pdf');
+  assert.equal(getExportTitle(undefined), 'Untitled note');
+  assert.equal(getExportTitle(null, 'expense'), 'Untitled expense record');
+  assert.equal(getExportFileName(undefined, undefined), 'Untitled note.pdf');
+});
+
+test('normalizes malformed expense rows without exporting undefined values', () => {
+  const rows = getExpenseExportRows([
+    { id: '1', date: undefined, remark: ' Lunch ', amount: null },
+    { id: '2', date: 12, remark: undefined, amount: 18.5 },
+    null,
+  ]);
+  const html = buildNoteExportHtml({ title: undefined, rows, total: undefined });
+
+  assert.deepEqual(rows[0], { id: '1', date: '', remark: 'Lunch', amount: '' });
+  assert.deepEqual(rows[1], { id: '2', date: '12', remark: '', amount: '18.5' });
+  assert.doesNotMatch(html, /\b(?:undefined|null)\b/i);
+  assert.match(html, /<title>Untitled expense record<\/title>/);
+});
+
+test('builds a complete empty-note export when no data object is provided', () => {
+  const html = buildNoteExportHtml();
+
+  assert.match(html, /<title>Untitled note<\/title>/);
+  assert.match(html, /This note is empty\./);
+  assert.doesNotMatch(html, /\b(?:undefined|null)\b/i);
 });
 
 test('renders and normalizes checklist items in PDF HTML', () => {

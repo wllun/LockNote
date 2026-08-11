@@ -39,6 +39,7 @@ _Snapshot: 2026-07-30. Check off items as they land._
 - [ ] Data export / cross-platform portability (native SQLite and web AsyncStorage are separate, no sync)
 - [X] Pinning — `is_pinned` column added to both SQLite tables (migrated via guarded `ALTER TABLE`) and to the web AsyncStorage records. Pinned folders/notes sort first everywhere (lists + search). List actions open by long-press on native or three dots on web; editor actions use a three-dots menu.
 - [X] Contextual list actions — notes can be pinned, moved between Home/folders, or soft-deleted; folders can be renamed, pinned, or soft-deleted together with their contained notes.
+- [X] PDF/image export — normal, checklist, and expense notes export normalized content on native and web. Native shares generated cache files; web downloads PNG images and opens an isolated note document for printing or saving as PDF.
 
 ## Roadmap
 

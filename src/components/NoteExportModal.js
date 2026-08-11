@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { exportNoteImage, exportNotePdf } from '../utils/note-export';
 import {
@@ -8,6 +8,7 @@ import {
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
   getExpenseExportMonthlyCommitments,
+  getExpenseExportRows,
   getChecklistExportItems,
   getExportTitle,
 } from '../utils/note-export.mjs';
@@ -41,7 +42,7 @@ const NoteExportModal = ({
     checklistItems,
     type,
   };
-  const visibleRows = rows?.filter((row) => row.date?.trim() || row.remark?.trim() || row.amount?.trim()) ?? [];
+  const visibleRows = getExpenseExportRows(rows);
   const visibleCategories = getExpenseExportCategories(categories);
   const visibleCommitments = getExpenseExportMonthlyCommitments(monthlyCommitments);
   const visibleChecklistItems = getChecklistExportItems(checklistItems);
@@ -102,9 +103,9 @@ const NoteExportModal = ({
               ) : rows ? (
                 <>
                   <View style={[styles.tableRow, styles.tableHeader]}>
-                    <Text style={[styles.headerCell, styles.dateCell]}>Date</Text>
+                    <Text style={[styles.headerCell, styles.dateCell]}>Day</Text>
                     <Text style={[styles.headerCell, styles.remarkCell]}>Remark</Text>
-                    <Text style={[styles.headerCell, styles.amountCell]}>Amount (RM)</Text>
+                    <Text style={[styles.headerCell, styles.amountCell]}>RM</Text>
                   </View>
                   {visibleRows.map((row, index) => (
                     <View key={row.id || index} style={[styles.tableRow, index % 2 === 0 && styles.altRow]}>
@@ -184,7 +185,11 @@ const NoteExportModal = ({
 
           <View style={styles.actions}>
             {[
-              { format: 'pdf', icon: 'document-text-outline', label: 'Export PDF' },
+              {
+                format: 'pdf',
+                icon: 'document-text-outline',
+                label: Platform.OS === 'web' ? 'Print / save PDF' : 'Export PDF',
+              },
               { format: 'image', icon: 'image-outline', label: 'Export image' },
             ].map((item) => (
               <Pressable key={item.format} disabled={!!exporting} style={({ pressed }) => [styles.action, pressed && styles.pressed, exporting && styles.disabled]} onPress={() => runExport(item.format)} accessibilityRole="button" accessibilityLabel={item.label} accessibilityState={{ disabled: !!exporting, busy: exporting === item.format }}>

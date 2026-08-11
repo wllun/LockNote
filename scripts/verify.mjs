@@ -61,6 +61,17 @@ const sourceFiles = [
   ...['App.js', 'index.js', 'app.config.js', 'babel.config.js'].map((file) => path.join(root, file)),
 ];
 
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const runtimeDependencies = Object.keys(packageJson.dependencies ?? {});
+const missingDependencies = runtimeDependencies.filter(
+  (dependency) => !fs.existsSync(path.join(root, 'node_modules', ...dependency.split('/'), 'package.json'))
+);
+if (missingDependencies.length) {
+  fail(`Missing installed dependencies: ${missingDependencies.join(', ')}`);
+} else {
+  pass(`Resolved ${runtimeDependencies.length} runtime dependencies`);
+}
+
 let syntaxFailed = false;
 for (const file of sourceFiles) {
   try {

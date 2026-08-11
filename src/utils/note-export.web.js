@@ -1,4 +1,3 @@
-import * as Print from 'expo-print';
 import {
   buildNoteExportHtml,
   formatExportAmount,
@@ -6,13 +5,47 @@ import {
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
   getExpenseExportMonthlyCommitments,
+  getExpenseExportRows,
   getChecklistExportItems,
   getExportFileName,
   getExportTitle,
 } from './note-export.mjs';
 
 export const exportNotePdf = async (data) => {
-  await Print.printToFileAsync({ html: buildNoteExportHtml(data) });
+  data = data ?? {};
+  const fileName = getExportFileName(data?.title, 'pdf', data?.type);
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    throw new Error('Allow pop-ups to print or save this note as a PDF.');
+  }
+
+  printWindow.opener = null;
+  printWindow.document.open();
+  printWindow.document.write(buildNoteExportHtml(data));
+  printWindow.document.close();
+  printWindow.document.title = fileName;
+
+  await new Promise((resolve, reject) => {
+    let started = false;
+    const startPrint = () => {
+      if (started) return;
+      started = true;
+      try {
+        printWindow.focus();
+        printWindow.print();
+        resolve();
+      } catch {
+        reject(new Error('The browser could not open the PDF print dialog.'));
+      }
+    };
+
+    if (printWindow.document.readyState === 'complete') {
+      window.setTimeout(startPrint, 0);
+    } else {
+      printWindow.addEventListener('load', startPrint, { once: true });
+      window.setTimeout(startPrint, 250);
+    }
+  });
 };
 
 const wrapText = (context, text, maxWidth) => {
@@ -32,19 +65,24 @@ const wrapText = (context, text, maxWidth) => {
 };
 
 export const exportNoteImage = async (_viewRef, data) => {
+  data = data ?? {};
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
+  if (!context) throw new Error('The browser could not create the export image.');
   const width = 1080;
   const padding = 72;
   context.font = '32px sans-serif';
-  const rows = data.rows?.filter((row) => row.date?.trim() || row.remark?.trim() || row.amount?.trim());
+  const isExpense = Array.isArray(data?.rows);
+  const rows = isExpense ? getExpenseExportRows(data.rows) : null;
   const categories = getExpenseExportCategories(data.categories);
   const commitments = getExpenseExportMonthlyCommitments(data.monthlyCommitments);
   const isChecklist = data.type === 'checklist' || Array.isArray(data.checklistItems);
   const checklistItems = getChecklistExportItems(data.checklistItems);
   const summaryNote = typeof data.summaryNote === 'string' ? data.summaryNote.trim() : '';
   const hasMonthlySummary = categories.length > 0 || summaryNote.length > 0;
-  const contentLines = rows || isChecklist ? [] : wrapText(context, data.content, width - padding * 2);
+  const contentLines = rows || isChecklist
+    ? []
+    : wrapText(context, data.content || 'This note is empty.', width - padding * 2);
   const checklistLines = checklistItems.map((item) => ({
     ...item,
     lines: wrapText(context, item.text, width - padding * 2 - 70),
@@ -72,12 +110,12 @@ export const exportNoteImage = async (_viewRef, data) => {
   canvas.height = height;
   context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height);
   context.fillStyle = '#172033'; context.font = 'bold 48px sans-serif';
-  context.fillText(getExportTitle(data.title, data.type), padding, 90, width - padding * 2);
+  context.fillText(getExportTitle(data?.title, data?.type), padding, 90, width - padding * 2);
   context.fillStyle = '#5b67f1'; context.fillRect(padding, 125, width - padding * 2, 4);
   context.font = '32px sans-serif'; context.fillStyle = '#172033';
   if (rows) {
     let y = 190;
-    context.font = 'bold 28px sans-serif'; context.fillText('Date', padding, y); context.fillText('Remark', 260, y); context.fillText('Amount (RM)', 770, y);
+    context.font = 'bold 28px sans-serif'; context.fillText('Day', padding, y); context.fillText('Remark', 260, y); context.textAlign = 'right'; context.fillText('RM', width - padding, y); context.textAlign = 'left';
     context.font = '28px sans-serif';
     rows.forEach((row) => { y += 58; context.fillText(row.date || '', padding, y); context.fillText(row.remark || '', 260, y, 480); context.textAlign = 'right'; context.fillText(row.amount || '0.00', width - padding, y); context.textAlign = 'left'; });
     y += 72; context.font = 'bold 34px sans-serif'; context.textAlign = 'right'; context.fillText(`Total  RM ${formatExportAmount(data.total)}`, width - padding, y); context.textAlign = 'left';
@@ -91,7 +129,7 @@ export const exportNoteImage = async (_viewRef, data) => {
         context.textAlign = 'right'; context.fillText(`RM ${formatExportAmount(item.amount)}`, width - padding, y); context.textAlign = 'left';
         context.fillStyle = '#687086'; context.font = '19px sans-serif';
         context.fillText(
-          `${item.day ? `Due day ${item.day}` : 'No due day'} · ${item.isPaid ? 'Paid' : 'Unpaid'}`,
+          `${item.day ? `Due day ${item.day}` : 'No due day'} - ${item.isPaid ? 'Paid' : 'Unpaid'}`,
           padding,
           y + 27,
           width - padding * 2 - 220
@@ -144,7 +182,7 @@ export const exportNoteImage = async (_viewRef, data) => {
       context.strokeRect(padding + 14, y + 14, 28, 28);
       if (item.completed) {
         context.fillStyle = '#ffffff'; context.font = 'bold 22px sans-serif';
-        context.fillText('✓', padding + 18, y + 37);
+        context.fillText('\u2713', padding + 18, y + 37);
       }
       context.fillStyle = item.completed ? '#7b8498' : '#30384c';
       context.font = '28px sans-serif';
@@ -156,8 +194,18 @@ export const exportNoteImage = async (_viewRef, data) => {
   } else {
     let y = 190; contentLines.forEach((line) => { context.fillText(line, padding, y); y += 46; });
   }
+  const blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((result) => {
+      if (result) resolve(result);
+      else reject(new Error('The export image could not be created.'));
+    }, 'image/png');
+  });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.download = getExportFileName(data.title, 'png', data.type);
-  link.href = canvas.toDataURL('image/png');
+  link.download = getExportFileName(data?.title, 'png', data?.type);
+  link.href = url;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 };
