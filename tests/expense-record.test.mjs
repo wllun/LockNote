@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   applyMonthlyCommitmentTemplate,
   calculateExpenseGrandTotal,
+  calculateExpenseNoteGrandTotal,
   calculateExpenseTotal,
   calculateExpenseCategory,
   calculateCategorizedTotal,
@@ -161,6 +162,10 @@ test('calculates the grand total from expense entries and monthly commitments', 
   ];
 
   assert.equal(calculateExpenseGrandTotal(rows, commitments), 1038);
+  assert.equal(
+    calculateExpenseNoteGrandTotal(serializeExpenseNote(rows, [], '', commitments)),
+    1038
+  );
 });
 
 test('normalizes valid expense amounts to two decimal places', () => {

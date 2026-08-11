@@ -320,6 +320,11 @@ export const calculateMonthlyCommitmentTotals = (commitments) => {
 export const calculateExpenseGrandTotal = (rows, commitments) =>
   calculateExpenseTotal(rows) + calculateMonthlyCommitmentTotals(commitments).total;
 
+export const calculateExpenseNoteGrandTotal = (content) => {
+  const { rows, monthlyCommitments } = parseExpenseNote(content);
+  return calculateExpenseGrandTotal(rows, monthlyCommitments);
+};
+
 export const calculateExpenseCategory = (rows, keywords) => {
   const cleanedKeywords = normalizeKeywordList(keywords);
   const normalizedKeywords = cleanedKeywords.map(normalizeExpenseCategoryKeyword);

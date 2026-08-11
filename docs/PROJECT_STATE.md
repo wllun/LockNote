@@ -11,6 +11,7 @@ _Snapshot: 2026-07-30. Check off items as they land._
 - [X] Local persistence — SQLite on iOS/Android, AsyncStorage on web
 - [X] Bottom-tab navigation (Home, Settings) with pull-to-refresh
 - [X] Home folder cards show a soft-delete-aware note count badge
+- [X] Expense-note cards show the grand total of daily entries plus monthly commitments on Home, search results, and inside folders.
 
 ## To do
 

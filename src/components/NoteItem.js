@@ -11,10 +11,9 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { radius, shadow, useTheme } from '../theme';
 import {
-  calculateExpenseTotal,
+  calculateExpenseNoteGrandTotal,
   EXPENSE_NOTE_TYPE,
   formatExpenseAmount,
-  parseExpenseNote,
 } from '../utils/expense-record.mjs';
 import {
   CHECKLIST_NOTE_TYPE,
@@ -41,7 +40,6 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
   const locked = !!note.password;
   const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
   const isChecklist = note.note_type === CHECKLIST_NOTE_TYPE;
-  const expenseRows = isExpense ? parseExpenseNote(note.content).rows : [];
   const checklistItems = isChecklist ? parseChecklistNote(note.content).items : [];
   const displayTitle = isExpense
     ? note.title.trim() || 'Expense Record'
@@ -49,7 +47,7 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
       ? note.title.trim() || 'Checklist'
       : note.title || 'Untitled';
   const preview = isExpense
-    ? `RM ${formatExpenseAmount(calculateExpenseTotal(expenseRows))}`
+    ? `RM ${formatExpenseAmount(calculateExpenseNoteGrandTotal(note.content))}`
     : isChecklist
       ? getChecklistPreview(checklistItems)
       : note.content || 'No content';
