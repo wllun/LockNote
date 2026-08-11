@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+} from 'react';
 import {
   View,
   Text,
@@ -7,6 +13,7 @@ import {
   StyleSheet,
   Alert,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
@@ -28,11 +35,79 @@ const editorRouteFor = (note) => {
   return 'NoteEditor';
 };
 
+const FolderHeaderTitle = ({ name, onSave, colors, styles }) => {
+  const [draftName, setDraftName] = useState(name);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isEditing) setDraftName(name);
+  }, [isEditing, name]);
+
+  const finishEditing = async () => {
+    if (isSaving) return;
+
+    const nextName = draftName.trim();
+    setIsEditing(false);
+    if (!nextName) {
+      setDraftName(name);
+      Alert.alert('Error', 'Please enter a folder name');
+      return;
+    }
+    if (nextName === name) {
+      setDraftName(name);
+      return;
+    }
+
+    setIsSaving(true);
+    const didSave = await onSave(nextName);
+    setIsSaving(false);
+    if (!didSave) setDraftName(name);
+  };
+
+  if (isEditing) {
+    return (
+      <View style={[styles.headerTitleField, styles.headerTitleFieldFocused]}>
+        <TextInput
+          style={styles.headerTitleInput}
+          value={draftName}
+          onChangeText={setDraftName}
+          onBlur={finishEditing}
+          autoFocus
+          selectTextOnFocus
+          returnKeyType="done"
+          blurOnSubmit
+          editable={!isSaving}
+          accessibilityLabel="Folder name"
+          accessibilityHint="Edits the title of this folder"
+        />
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      style={styles.headerTitleButton}
+      activeOpacity={0.65}
+      onPress={() => setIsEditing(true)}
+      accessibilityRole="button"
+      accessibilityLabel={`Rename folder ${name}`}
+      accessibilityHint="Edits the folder name in the title"
+    >
+      <Text style={styles.headerTitleText} numberOfLines={1}>
+        {name}
+      </Text>
+      <Ionicons name="create-outline" size={17} color={colors.textSecondary} />
+    </TouchableOpacity>
+  );
+};
+
 const FolderScreen = ({ route, navigation }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { folderId, folderName } = route.params;
+  const [currentFolderName, setCurrentFolderName] = useState(folderName || 'Folder');
   const [notes, setNotes] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showNoteTypeModal, setShowNoteTypeModal] = useState(false);
@@ -62,6 +137,44 @@ const FolderScreen = ({ route, navigation }) => {
     setRefreshing(true);
     loadNotes();
   };
+
+  const loadFolder = useCallback(async () => {
+    try {
+      const folder = await folderRepo.getById(folderId);
+      if (folder) {
+        setCurrentFolderName(folder.name);
+        navigation.setParams({ folderName: folder.name });
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load folder');
+    }
+  }, [folderId, navigation]);
+
+  const handleRenameFolder = useCallback(async (nextName) => {
+    try {
+      await folderRepo.update(folderId, { name: nextName });
+      setCurrentFolderName(nextName);
+      navigation.setParams({ folderName: nextName });
+      return true;
+    } catch (error) {
+      Alert.alert('Error', 'Failed to rename folder');
+      return false;
+    }
+  }, [folderId, navigation]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: currentFolderName,
+      headerTitle: () => (
+        <FolderHeaderTitle
+          name={currentFolderName}
+          onSave={handleRenameFolder}
+          colors={colors}
+          styles={styles}
+        />
+      ),
+    });
+  }, [colors, currentFolderName, handleRenameFolder, navigation, styles]);
 
   const handleCreateNote = async (type = 'note') => {
     try {
@@ -148,9 +261,12 @@ const FolderScreen = ({ route, navigation }) => {
   };
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', loadNotes);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadNotes();
+      loadFolder();
+    });
     return unsubscribe;
-  }, [navigation, loadNotes]);
+  }, [navigation, loadNotes, loadFolder]);
 
   return (
     <View style={styles.container}>
@@ -243,6 +359,45 @@ const makeStyles = (colors) =>
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    headerTitleButton: {
+      minHeight: 44,
+      maxWidth: 240,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 8,
+    },
+    headerTitleText: {
+      flexShrink: 1,
+      color: colors.text,
+      fontSize: 17,
+      fontWeight: '700',
+    },
+    headerTitleField: {
+      width: 220,
+      maxWidth: '100%',
+      height: 40,
+      paddingHorizontal: 10,
+      justifyContent: 'center',
+      backgroundColor: colors.inputBg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.sm,
+    },
+    headerTitleFieldFocused: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
+    },
+    headerTitleInput: {
+      minWidth: 0,
+      height: 38,
+      paddingVertical: 0,
+      color: colors.text,
+      fontSize: 17,
+      fontWeight: '700',
+      outlineStyle: 'none',
     },
     listContent: {
       padding: 16,
