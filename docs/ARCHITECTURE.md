@@ -64,9 +64,11 @@ commitments; unchecked commitments are excluded.
 
 Checklist notes use `checklist` and store ordered `{id, text, completed}` items
 as versioned JSON in `content`. `ChecklistEditorScreen` supports inline editing,
-checkbox toggles, item deletion, progress, PDF/image export, and the same local
-pin/password gate used by other notes. Checklist item text remains searchable
-because repository search already checks the serialized `content` field.
+checkbox toggles, drag-handle reordering, item deletion, progress, PDF/image
+export, and the same local pin/password gate used by other notes. Reordered items
+are persisted through the existing debounced auto-save. Checklist item text
+remains searchable because repository search already checks the serialized
+`content` field.
 
 Users can explicitly save the current commitment list for reuse in another
 expense note. This app-level template is stored locally in AsyncStorage under
