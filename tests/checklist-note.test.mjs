@@ -6,10 +6,30 @@ import {
   createChecklistItem,
   getChecklistPreview,
   isChecklistNoteEmpty,
+  moveChecklistItem,
+  moveChecklistItemToIndex,
   parseChecklistNote,
   sanitizeChecklistItemText,
   serializeChecklistNote,
 } from '../src/utils/checklist-note.mjs';
+
+test('moves checklist items while preserving their data', () => {
+  const items = [
+    createChecklistItem({ id: 'one', text: 'One', completed: true }),
+    createChecklistItem({ id: 'two', text: 'Two' }),
+    createChecklistItem({ id: 'three', text: 'Three' }),
+  ];
+
+  const moved = moveChecklistItemToIndex(items, 'one', 2);
+  assert.deepEqual(moved.map((item) => item.id), ['two', 'three', 'one']);
+  assert.deepEqual(moved[2], items[0]);
+  assert.deepEqual(
+    moveChecklistItem(moved, 'one', 'up').map((item) => item.id),
+    ['two', 'one', 'three']
+  );
+  assert.equal(moveChecklistItem(items, 'one', 'up'), items);
+  assert.equal(moveChecklistItemToIndex(items, 'missing', 1), items);
+});
 
 test('serializes and parses ordered checklist items', () => {
   const items = [

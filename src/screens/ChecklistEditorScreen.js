@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,6 +13,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { FlatList, Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
@@ -22,11 +24,16 @@ import {
   CHECKLIST_MAX_ITEMS,
   createChecklistItem,
   isChecklistNoteEmpty,
+  moveChecklistItem,
+  moveChecklistItemToIndex,
   parseChecklistNote,
   sanitizeChecklistItemText,
   serializeChecklistNote,
 } from '../utils/checklist-note.mjs';
 import { radius, shadow, useTheme } from '../theme';
+
+const CHECKLIST_ITEM_MIN_HEIGHT = 60;
+const CHECKLIST_ITEM_GAP = 10;
 
 const ChecklistItemRow = React.memo(({
   item,
@@ -36,46 +43,151 @@ const ChecklistItemRow = React.memo(({
   onTextChange,
   onToggle,
   onDelete,
-}) => (
-  <View style={styles.itemRow}>
-    <Pressable
-      style={({ pressed }) => [
-        styles.checkboxButton,
-        pressed && styles.pressed,
-      ]}
-      onPress={() => onToggle(item.id)}
-      accessibilityRole="checkbox"
-      accessibilityLabel={`Mark ${item.text.trim() || `item ${index + 1}`} as ${item.completed ? 'not completed' : 'completed'}`}
-      accessibilityState={{ checked: item.completed }}
-    >
-      <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
-        {item.completed && (
-          <Ionicons name="checkmark" size={18} color={colors.card} />
-        )}
-      </View>
-    </Pressable>
-    <TextInput
-      style={[styles.itemInput, item.completed && styles.itemInputCompleted]}
-      value={item.text}
-      onChangeText={(value) => onTextChange(item.id, value)}
-      placeholder={`Item ${index + 1}`}
-      placeholderTextColor={colors.textTertiary}
-      maxLength={CHECKLIST_ITEM_MAX_CHARACTERS}
-      multiline
-      returnKeyType="done"
-      blurOnSubmit
-      accessibilityLabel={`Checklist item ${index + 1}`}
-    />
-    <Pressable
-      style={({ pressed }) => [styles.deleteItemButton, pressed && styles.pressed]}
-      onPress={() => onDelete(item.id)}
-      accessibilityRole="button"
-      accessibilityLabel={`Delete checklist item ${index + 1}`}
-    >
-      <Ionicons name="trash-outline" size={19} color={colors.danger} />
-    </Pressable>
-  </View>
-));
+  onMove,
+  onDragStart,
+  onDragUpdate,
+  onDragEnd,
+  onDragCancel,
+  onLayout,
+  dragOffsetY,
+  isDragging,
+  isDropTarget,
+  itemCount,
+}) => {
+  const callbacks = useRef({
+    onMove,
+    onDragStart,
+    onDragUpdate,
+    onDragEnd,
+    onDragCancel,
+  });
+  callbacks.current = {
+    onMove,
+    onDragStart,
+    onDragUpdate,
+    onDragEnd,
+    onDragCancel,
+  };
+
+  const startDrag = useCallback(() => {
+    callbacks.current.onDragStart(item.id);
+  }, [item.id]);
+  const updateDrag = useCallback((translationY) => {
+    callbacks.current.onDragUpdate(item.id, translationY);
+  }, [item.id]);
+  const endDrag = useCallback((translationY) => {
+    callbacks.current.onDragEnd(item.id, translationY);
+  }, [item.id]);
+  const cancelDrag = useCallback(() => {
+    callbacks.current.onDragCancel(item.id);
+  }, [item.id]);
+
+  const dragGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(4)
+        .shouldCancelWhenOutside(false)
+        .runOnJS(true)
+        .onStart(() => {
+          dragOffsetY.value = 0;
+          startDrag();
+        })
+        .onUpdate((event) => {
+          dragOffsetY.value = event.translationY;
+          updateDrag(event.translationY);
+        })
+        .onEnd((event) => {
+          dragOffsetY.value = event.translationY;
+          endDrag(event.translationY);
+        })
+        .onFinalize((_, success) => {
+          if (!success) cancelDrag();
+        }),
+    [cancelDrag, dragOffsetY, endDrag, startDrag, updateDrag]
+  );
+
+  const draggedRowStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ translateY: isDragging ? dragOffsetY.value : 0 }],
+    }),
+    [isDragging]
+  );
+
+  return (
+    <View style={styles.itemShell} onLayout={onLayout}>
+      {isDropTarget && <View style={styles.dropIndicator} />}
+      <Animated.View
+        style={[
+          styles.itemRow,
+          isDragging && styles.itemRowDragging,
+          draggedRowStyle,
+        ]}
+      >
+        <GestureDetector gesture={dragGesture}>
+          <View
+            collapsable={false}
+            style={styles.dragHandle}
+            accessible
+            accessibilityRole="adjustable"
+            accessibilityLabel={`Move checklist item ${index + 1}`}
+            accessibilityHint="Drag this handle up or down to move the item"
+            accessibilityValue={{ text: `Position ${index + 1} of ${itemCount}` }}
+            accessibilityActions={[
+              { name: 'increment', label: 'Move item down' },
+              { name: 'decrement', label: 'Move item up' },
+            ]}
+            onAccessibilityAction={({ nativeEvent }) => {
+              if (nativeEvent.actionName === 'increment') {
+                callbacks.current.onMove(item.id, 'down');
+              }
+              if (nativeEvent.actionName === 'decrement') {
+                callbacks.current.onMove(item.id, 'up');
+              }
+            }}
+          >
+            <Ionicons name="reorder-three-outline" size={24} color={colors.textSecondary} />
+          </View>
+        </GestureDetector>
+        <Pressable
+          style={({ pressed }) => [
+            styles.checkboxButton,
+            pressed && styles.pressed,
+          ]}
+          onPress={() => onToggle(item.id)}
+          accessibilityRole="checkbox"
+          accessibilityLabel={`Mark ${item.text.trim() || `item ${index + 1}`} as ${item.completed ? 'not completed' : 'completed'}`}
+          accessibilityState={{ checked: item.completed }}
+        >
+          <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
+            {item.completed && (
+              <Ionicons name="checkmark" size={18} color={colors.card} />
+            )}
+          </View>
+        </Pressable>
+        <TextInput
+          style={[styles.itemInput, item.completed && styles.itemInputCompleted]}
+          value={item.text}
+          onChangeText={(value) => onTextChange(item.id, value)}
+          placeholder={`Item ${index + 1}`}
+          placeholderTextColor={colors.textTertiary}
+          maxLength={CHECKLIST_ITEM_MAX_CHARACTERS}
+          multiline
+          returnKeyType="done"
+          blurOnSubmit
+          accessibilityLabel={`Checklist item ${index + 1}`}
+        />
+        <Pressable
+          style={({ pressed }) => [styles.deleteItemButton, pressed && styles.pressed]}
+          onPress={() => onDelete(item.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`Delete checklist item ${index + 1}`}
+        >
+          <Ionicons name="trash-outline" size={19} color={colors.danger} />
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+});
 
 const ChecklistEditorScreen = ({ route, navigation }) => {
   const { noteId } = route.params;
@@ -94,9 +206,13 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
+  const [activeDrag, setActiveDrag] = useState(null);
 
   const saveTimeout = useRef(null);
   const newItemInputRef = useRef(null);
+  const activeDragRef = useRef(null);
+  const itemHeightsRef = useRef({});
+  const dragOffsetY = useSharedValue(0);
   const latest = useRef({
     title: '',
     items: [],
@@ -106,6 +222,15 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   });
 
   const progress = calculateChecklistProgress(items);
+  const itemsWithoutDraggedItem = activeDrag
+    ? items.filter((item) => item.id !== activeDrag.itemId)
+    : items;
+  const insertionBeforeItemId = activeDrag
+    ? itemsWithoutDraggedItem[activeDrag.targetIndex]?.id ?? null
+    : null;
+  const showEndDropIndicator = !!activeDrag &&
+    activeDrag.targetIndex >= itemsWithoutDraggedItem.length &&
+    activeDrag.targetIndex !== activeDrag.startIndex;
 
   const loadChecklist = useCallback(async () => {
     try {
@@ -184,6 +309,93 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     setItems(nextItems);
     updateDraft(latest.current.title, nextItems);
   }, [updateDraft]);
+
+  const moveItem = useCallback((itemId, direction) => {
+    const nextItems = moveChecklistItem(latest.current.items, itemId, direction);
+    if (nextItems === latest.current.items) return;
+
+    setItems(nextItems);
+    updateDraft(latest.current.title, nextItems);
+  }, [updateDraft]);
+
+  const getDragTargetIndex = useCallback((itemId, translationY) => {
+    const currentItems = latest.current.items;
+    const sourceIndex = currentItems.findIndex((item) => item.id === itemId);
+    if (sourceIndex < 0) return 0;
+
+    let cursor = 0;
+    const layouts = Object.fromEntries(
+      currentItems.map((item) => {
+        const height = itemHeightsRef.current[item.id] ?? CHECKLIST_ITEM_MIN_HEIGHT;
+        const layout = { y: cursor, height };
+        cursor += height + CHECKLIST_ITEM_GAP;
+        return [item.id, layout];
+      })
+    );
+    const sourceLayout = layouts[itemId];
+    const projectedCenter =
+      sourceLayout.y + sourceLayout.height / 2 + translationY;
+    const remainingItems = currentItems.filter((item) => item.id !== itemId);
+
+    for (let index = 0; index < remainingItems.length; index += 1) {
+      const layout = layouts[remainingItems[index].id];
+      if (projectedCenter < layout.y + layout.height / 2) return index;
+    }
+    return remainingItems.length;
+  }, []);
+
+  const handleItemLayout = useCallback((itemId, height) => {
+    itemHeightsRef.current[itemId] = Math.max(CHECKLIST_ITEM_MIN_HEIGHT, height);
+  }, []);
+
+  const handleDragStart = useCallback((itemId) => {
+    Keyboard.dismiss();
+    const startIndex = latest.current.items.findIndex((item) => item.id === itemId);
+    if (startIndex < 0) return;
+
+    const nextDrag = { itemId, startIndex, targetIndex: startIndex };
+    activeDragRef.current = nextDrag;
+    setActiveDrag(nextDrag);
+  }, []);
+
+  const handleDragUpdate = useCallback((itemId, translationY) => {
+    const currentDrag = activeDragRef.current;
+    if (!currentDrag || currentDrag.itemId !== itemId) return;
+
+    const targetIndex = getDragTargetIndex(itemId, translationY);
+    if (targetIndex === currentDrag.targetIndex) return;
+    const nextDrag = { ...currentDrag, targetIndex };
+    activeDragRef.current = nextDrag;
+    setActiveDrag(nextDrag);
+  }, [getDragTargetIndex]);
+
+  const finishDrag = useCallback(() => {
+    activeDragRef.current = null;
+    dragOffsetY.value = 0;
+    setActiveDrag(null);
+  }, [dragOffsetY]);
+
+  const handleDragEnd = useCallback((itemId, translationY) => {
+    const currentDrag = activeDragRef.current;
+    if (!currentDrag || currentDrag.itemId !== itemId) return;
+
+    const targetIndex = getDragTargetIndex(itemId, translationY);
+    const nextItems = moveChecklistItemToIndex(
+      latest.current.items,
+      itemId,
+      targetIndex
+    );
+    finishDrag();
+    if (nextItems === latest.current.items) return;
+
+    setItems(nextItems);
+    updateDraft(latest.current.title, nextItems);
+  }, [finishDrag, getDragTargetIndex, updateDraft]);
+
+  const handleDragCancel = useCallback((itemId) => {
+    if (activeDragRef.current?.itemId !== itemId) return;
+    finishDrag();
+  }, [finishDrag]);
 
   const addItem = () => {
     const text = newItemText.trim();
@@ -303,8 +515,34 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       onTextChange={handleItemTextChange}
       onToggle={toggleItem}
       onDelete={removeItem}
+      onMove={moveItem}
+      onDragStart={handleDragStart}
+      onDragUpdate={handleDragUpdate}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+      onLayout={({ nativeEvent }) => handleItemLayout(item.id, nativeEvent.layout.height)}
+      dragOffsetY={dragOffsetY}
+      isDragging={activeDrag?.itemId === item.id}
+      isDropTarget={insertionBeforeItemId === item.id && activeDrag?.itemId !== item.id}
+      itemCount={items.length}
     />
-  ), [colors, styles, handleItemTextChange, toggleItem, removeItem]);
+  ), [
+    activeDrag,
+    colors,
+    dragOffsetY,
+    handleDragCancel,
+    handleDragEnd,
+    handleDragStart,
+    handleDragUpdate,
+    handleItemLayout,
+    handleItemTextChange,
+    insertionBeforeItemId,
+    items.length,
+    moveItem,
+    removeItem,
+    styles,
+    toggleItem,
+  ]);
 
   return (
     <KeyboardAvoidingView
@@ -360,6 +598,9 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        extraData={activeDrag}
+        scrollEnabled={!activeDrag}
+        removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[
@@ -405,40 +646,48 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
           </View>
         }
         ListFooterComponent={
-          <View style={styles.addCard}>
-            <Text style={styles.addLabel}>ADD ITEM</Text>
-            <View style={styles.addRow}>
-              <TextInput
-                ref={newItemInputRef}
-                style={styles.addInput}
-                value={newItemText}
-                onChangeText={(value) => setNewItemText(sanitizeChecklistItemText(value))}
-                placeholder="What needs to be done?"
-                placeholderTextColor={colors.textTertiary}
-                maxLength={CHECKLIST_ITEM_MAX_CHARACTERS}
-                returnKeyType="done"
-                onSubmitEditing={addItem}
-                accessibilityLabel="New checklist item"
-              />
-              <Pressable
-                style={({ pressed }) => [
-                  styles.addButton,
-                  !newItemText.trim() && styles.addButtonDisabled,
-                  pressed && newItemText.trim() && styles.pressed,
-                ]}
-                disabled={!newItemText.trim()}
-                onPress={addItem}
-                accessibilityRole="button"
-                accessibilityLabel="Add checklist item"
-                accessibilityState={{ disabled: !newItemText.trim() }}
-              >
-                <Ionicons name="add" size={22} color={colors.card} />
-              </Pressable>
+          <>
+            {showEndDropIndicator && (
+              <View style={styles.endDropIndicator}>
+                <View style={styles.dropIndicatorLine} />
+                <Text style={styles.dropIndicatorText}>Item moves here</Text>
+              </View>
+            )}
+            <View style={styles.addCard}>
+              <Text style={styles.addLabel}>ADD ITEM</Text>
+              <View style={styles.addRow}>
+                <TextInput
+                  ref={newItemInputRef}
+                  style={styles.addInput}
+                  value={newItemText}
+                  onChangeText={(value) => setNewItemText(sanitizeChecklistItemText(value))}
+                  placeholder="What needs to be done?"
+                  placeholderTextColor={colors.textTertiary}
+                  maxLength={CHECKLIST_ITEM_MAX_CHARACTERS}
+                  returnKeyType="done"
+                  onSubmitEditing={addItem}
+                  accessibilityLabel="New checklist item"
+                />
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.addButton,
+                    !newItemText.trim() && styles.addButtonDisabled,
+                    pressed && newItemText.trim() && styles.pressed,
+                  ]}
+                  disabled={!newItemText.trim()}
+                  onPress={addItem}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add checklist item"
+                  accessibilityState={{ disabled: !newItemText.trim() }}
+                >
+                  <Ionicons name="add" size={22} color={colors.card} />
+                </Pressable>
+              </View>
+              <Text style={styles.itemLimit}>
+                {items.length} / {CHECKLIST_MAX_ITEMS} items
+              </Text>
             </View>
-            <Text style={styles.itemLimit}>
-              {items.length} / {CHECKLIST_MAX_ITEMS} items
-            </Text>
-          </View>
+          </>
         }
       />
 
@@ -663,17 +912,44 @@ const makeStyles = (colors) =>
     progressFill: { height: '100%', borderRadius: radius.full, backgroundColor: colors.primary },
     saveStatus: { color: colors.textTertiary, fontSize: 12 },
     saveStatusError: { color: colors.danger, fontWeight: '600' },
+    itemShell: {
+      position: 'relative',
+      zIndex: 1,
+    },
     itemRow: {
-      minHeight: 60,
+      minHeight: CHECKLIST_ITEM_MIN_HEIGHT,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 8,
+      gap: 2,
+      paddingRight: 8,
       paddingVertical: 4,
       borderRadius: radius.md,
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
+    },
+    itemRowDragging: {
+      zIndex: 20,
+      opacity: 0.65,
+      borderColor: colors.primary,
+      ...shadow.card,
+    },
+    dragHandle: {
+      width: 44,
+      minHeight: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      opacity: 0.65,
+    },
+    dropIndicator: {
+      position: 'absolute',
+      top: -7,
+      left: 10,
+      right: 10,
+      zIndex: 30,
+      height: 3,
+      borderRadius: radius.full,
+      backgroundColor: colors.primary,
     },
     checkboxButton: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
     checkbox: {
@@ -704,6 +980,26 @@ const makeStyles = (colors) =>
     emptyIcon: { width: 56, height: 56, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
     emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
     emptyHint: { color: colors.textSecondary, fontSize: 14 },
+    endDropIndicator: {
+      minHeight: 28,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 10,
+      borderRadius: radius.sm,
+      backgroundColor: colors.primarySoft,
+    },
+    dropIndicatorLine: {
+      flex: 1,
+      height: 3,
+      borderRadius: radius.full,
+      backgroundColor: colors.primary,
+    },
+    dropIndicatorText: {
+      color: colors.primary,
+      fontSize: 11,
+      fontWeight: '700',
+    },
     addCard: {
       gap: 9,
       marginTop: 6,
