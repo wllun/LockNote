@@ -13,6 +13,7 @@ import {
   createMonthlyCommitmentTemplate,
   expenseRowHasContent,
   isExpenseNoteEmpty,
+  isPointWithinDropTarget,
   moveExpenseRow,
   moveExpenseRowToIndex,
   moveMonthlyCommitment,
@@ -29,6 +30,16 @@ import {
   upsertExpenseCategory,
   removeExpenseCategory,
 } from '../src/utils/expense-record.mjs';
+
+test('detects drops on the recycle-bin target and its touch tolerance', () => {
+  const target = { left: 150, top: 620, width: 56, height: 56 };
+
+  assert.equal(isPointWithinDropTarget(178, 648, target, 28), true);
+  assert.equal(isPointWithinDropTarget(130, 600, target, 28), true);
+  assert.equal(isPointWithinDropTarget(121, 648, target, 28), false);
+  assert.equal(isPointWithinDropTarget(178, 705, target, 28), false);
+  assert.equal(isPointWithinDropTarget(Number.NaN, 648, target, 28), false);
+});
 
 test('moves expense rows up and down without changing their data', () => {
   const rows = [

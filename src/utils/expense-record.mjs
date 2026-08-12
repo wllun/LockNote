@@ -27,6 +27,33 @@ export const createMonthlyCommitment = (values = {}) => ({
   isPaid: values.isPaid === true,
 });
 
+export const isPointWithinDropTarget = (
+  pointX,
+  pointY,
+  target,
+  tolerance = 0
+) => {
+  if (
+    !Number.isFinite(pointX) ||
+    !Number.isFinite(pointY) ||
+    !target ||
+    !Number.isFinite(target.left) ||
+    !Number.isFinite(target.top) ||
+    !Number.isFinite(target.width) ||
+    !Number.isFinite(target.height)
+  ) {
+    return false;
+  }
+
+  const safeTolerance = Math.max(0, Number(tolerance) || 0);
+  return (
+    pointX >= target.left - safeTolerance &&
+    pointX <= target.left + target.width + safeTolerance &&
+    pointY >= target.top - safeTolerance &&
+    pointY <= target.top + target.height + safeTolerance
+  );
+};
+
 export const moveExpenseRowToIndex = (rows, rowId, targetIndex) => {
   if (!Array.isArray(rows) || !Number.isInteger(targetIndex)) {
     return rows;
