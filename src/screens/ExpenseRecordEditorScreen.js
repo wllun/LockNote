@@ -1686,7 +1686,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 <Text style={styles.rowInsertionText}>Row moves here</Text>
               </View>
             )}
+          </View>
 
+          <View style={styles.addRowActions}>
             <TouchableOpacity
               style={styles.addRowButton}
               onPress={() => addRow(true)}
@@ -1694,11 +1696,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               accessibilityRole="button"
               accessibilityLabel="Add expense row"
             >
-              <View style={styles.addRowIcon}>
-                <Ionicons name="add" size={17} color={colors.card} />
-              </View>
+              <Ionicons name="add-circle" size={23} color={colors.primary} />
               <Text style={styles.addRowText}>Add row</Text>
-              <Text style={styles.addRowHint}>or press Enter after an amount</Text>
             </TouchableOpacity>
           </View>
 
@@ -2870,30 +2869,27 @@ const makeStyles = (colors) =>
       color: colors.danger,
       backgroundColor: colors.dangerSoft,
     },
+    addRowActions: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      paddingHorizontal: 2,
+    },
     addRowButton: {
-      minHeight: 54,
+      minHeight: 44,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 7,
+      paddingHorizontal: 14,
       backgroundColor: colors.primarySoft,
-    },
-    addRowIcon: {
-      width: 26,
-      height: 26,
       borderRadius: radius.full,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     addRowText: {
       color: colors.primary,
       fontSize: 14,
       fontWeight: '800',
-    },
-    addRowHint: {
-      color: colors.textTertiary,
-      fontSize: 10,
     },
     expenseInputLimitRow: {
       minHeight: 24,
