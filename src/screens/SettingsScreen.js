@@ -79,7 +79,10 @@ const SettingsScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+    >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Appearance</Text>
         <View style={styles.card}>
@@ -258,6 +261,9 @@ const makeStyles = (colors) =>
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    contentContainer: {
+      paddingBottom: 24,
     },
     section: {
       marginTop: 24,
