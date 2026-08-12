@@ -19,9 +19,7 @@ import {
   calculateExpenseCategory,
   findExpenseCategory,
   formatExpenseAmount,
-  normalizeExpenseAmountInput,
-  parseExpenseAmount,
-  sanitizeExpenseAmountInput,
+  recalculateExpenseCategories,
 } from '../utils/expense-record.mjs';
 import { EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS } from '../utils/note-limits.mjs';
 import { radius, shadow, useTheme } from '../theme';
@@ -47,9 +45,10 @@ const ExpenseSummaryModal = ({
   const [categoryName, setCategoryName] = useState('');
   const [keywordInput, setKeywordInput] = useState('');
   const [keywords, setKeywords] = useState([]);
-  const [amount, setAmount] = useState('');
-  const [calculation, setCalculation] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [categoryActionId, setCategoryActionId] = useState(null);
+  const [categoryActionMode, setCategoryActionMode] = useState('actions');
+  const [deletingCategory, setDeletingCategory] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -58,15 +57,23 @@ const ExpenseSummaryModal = ({
     setCategoryName('');
     setKeywordInput('');
     setKeywords([]);
-    setAmount('');
-    setCalculation(null);
     setSaving(false);
+    setCategoryActionId(null);
+    setCategoryActionMode('actions');
+    setDeletingCategory(false);
   }, [visible]);
 
-  const categorizedTotal = calculateCategorizedTotal(categories);
+  const liveCategories = useMemo(
+    () => recalculateExpenseCategories(rows, categories),
+    [categories, rows]
+  );
+  const categorizedTotal = calculateCategorizedTotal(liveCategories);
   const categoryWithSameName = categoryName.trim()
-    ? findExpenseCategory(categories, categoryName)
+    ? findExpenseCategory(liveCategories, categoryName)
     : null;
+  const activeCategory = liveCategories.find(
+    (category) => category.id === categoryActionId
+  );
   const isUpdating = !!categoryId || !!categoryWithSameName;
   const summaryNoteCharacterCount = String(summaryNote ?? '').length;
   const isSummaryNoteNearLimit =
@@ -77,12 +84,6 @@ const ExpenseSummaryModal = ({
     setCategoryName(category?.name ?? '');
     setKeywordInput('');
     setKeywords(category?.keywords ?? []);
-    setAmount(category ? String(category.amount.toFixed(2)) : '');
-    setCalculation(
-      category?.keywords?.length
-        ? { matchCount: category.match_count, amount: category.amount }
-        : null
-    );
     setMode('form');
   };
 
@@ -99,12 +100,10 @@ const ExpenseSummaryModal = ({
     }
     setKeywords([...keywords, nextKeyword]);
     setKeywordInput('');
-    setCalculation(null);
   };
 
   const removeKeyword = (keywordToRemove) => {
     setKeywords(keywords.filter((keyword) => keyword !== keywordToRemove));
-    setCalculation(null);
   };
 
   const keywordsWithPendingInput = () => {
@@ -120,29 +119,10 @@ const ExpenseSummaryModal = ({
     return [...keywords, pendingKeyword];
   };
 
-  const calculate = () => {
-    const nextKeywords = keywordsWithPendingInput();
-    if (!nextKeywords.length) {
-      Alert.alert('Add a keyword', 'Add at least one remark keyword to calculate from the table.');
-      return;
-    }
-    setKeywords(nextKeywords);
-    setKeywordInput('');
-    const result = calculateExpenseCategory(rows, nextKeywords);
-    setCalculation(result);
-    setAmount(result.amount.toFixed(2));
-  };
-
   const save = async () => {
     const name = cleanText(categoryName);
     if (!name) {
       Alert.alert('Enter a category name', 'Give this saved category a name such as Food or Petrol.');
-      return;
-    }
-    const normalizedAmount = normalizeExpenseAmountInput(amount);
-    const parsedAmount = parseExpenseAmount(normalizedAmount);
-    if (parsedAmount === null) {
-      Alert.alert('Enter a valid amount', 'Use a positive amount with up to two decimal places.');
       return;
     }
     if (
@@ -158,16 +138,21 @@ const ExpenseSummaryModal = ({
     }
 
     const nextKeywords = keywordsWithPendingInput();
-    const currentCalculation = nextKeywords.length
-      ? calculateExpenseCategory(rows, nextKeywords)
-      : { matchCount: 0 };
+    if (!nextKeywords.length) {
+      Alert.alert(
+        'Add a remark keyword',
+        'Category amounts are calculated automatically. Add at least one keyword to match daily expenses.'
+      );
+      return;
+    }
+    const currentCalculation = calculateExpenseCategory(rows, nextKeywords);
     setSaving(true);
     try {
       await onSave({
         id: categoryId,
         name,
         keywords: nextKeywords,
-        amount: parsedAmount,
+        amount: currentCalculation.amount,
         matchCount: currentCalculation.matchCount,
       });
       setMode('list');
@@ -179,37 +164,49 @@ const ExpenseSummaryModal = ({
   };
 
   const showCategoryActions = (category) => {
-    Alert.alert(category.name, `RM ${formatExpenseAmount(category.amount)}`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Edit category', onPress: () => startForm(category) },
-      {
-        text: 'Delete category',
-        style: 'destructive',
-        onPress: () =>
-          Alert.alert(
-            'Delete category?',
-            `Remove ${category.name} from this monthly summary? Your expense rows will not be deleted.`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => onDelete(category.id),
-              },
-            ]
-          ),
-      },
-    ]);
+    setCategoryActionId(category.id);
+    setCategoryActionMode('actions');
+  };
+
+  const closeCategoryActions = () => {
+    if (deletingCategory) return;
+    setCategoryActionId(null);
+    setCategoryActionMode('actions');
+  };
+
+  const editActiveCategory = () => {
+    if (!activeCategory) return;
+    const category = activeCategory;
+    setCategoryActionId(null);
+    setCategoryActionMode('actions');
+    startForm(category);
+  };
+
+  const deleteActiveCategory = async () => {
+    if (!activeCategory || deletingCategory) return;
+    const categoryIdToDelete = activeCategory.id;
+    setDeletingCategory(true);
+    try {
+      await onDelete(categoryIdToDelete);
+      setCategoryActionId(null);
+      setCategoryActionMode('actions');
+    } finally {
+      setDeletingCategory(false);
+    }
   };
 
   const categoryDescription = (category) =>
-    category.keywords.length
-      ? `${category.keywords.join(', ')} · ${category.match_count} matching ${
-          category.match_count === 1 ? 'entry' : 'entries'
-        }`
-      : 'Manual amount';
+    `${category.keywords.join(', ')} · ${category.match_count} matching ${
+      category.match_count === 1 ? 'entry' : 'entries'
+    }`;
+
+  const formCalculation = calculateExpenseCategory(
+    rows,
+    keywordsWithPendingInput()
+  );
 
   return (
+    <>
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={styles.overlay}
@@ -265,12 +262,12 @@ const ExpenseSummaryModal = ({
               </View>
 
               <Text style={styles.sectionTitle}>Saved categories</Text>
-              {categories.length ? (
-                categories.map((category) => (
+              {liveCategories.length ? (
+                liveCategories.map((category) => (
                   <View key={category.id} style={styles.categoryRow}>
                     <View style={styles.categoryIcon}>
                       <Ionicons
-                        name={category.keywords.length ? 'search-outline' : 'create-outline'}
+                        name="calculator-outline"
                         size={20}
                         color={colors.primary}
                       />
@@ -299,7 +296,7 @@ const ExpenseSummaryModal = ({
                   <Ionicons name="albums-outline" size={28} color={colors.textTertiary} />
                   <Text style={styles.emptyTitle}>No saved categories yet</Text>
                   <Text style={styles.emptyText}>
-                    Add a category and calculate from remarks, or enter an amount yourself.
+                    Add a category with remark keywords. Its amount will update automatically from matching daily expenses.
                   </Text>
                 </View>
               )}
@@ -362,7 +359,7 @@ const ExpenseSummaryModal = ({
                     : `Maximum ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters`}
               </Text>
               <Text style={styles.footerHint}>
-                Use keywords to calculate, or type an amount directly.
+                Category amounts update automatically when daily expenses change.
               </Text>
             </ScrollView>
           ) : (
@@ -392,7 +389,7 @@ const ExpenseSummaryModal = ({
                 accessibilityLabel="Expense category name"
               />
 
-              <Text style={styles.inputLabel}>Match remarks (optional)</Text>
+              <Text style={styles.inputLabel}>Match remarks</Text>
               {!!keywords.length && (
                 <View style={styles.keywordWrap}>
                   {keywords.map((keyword) => (
@@ -431,35 +428,32 @@ const ExpenseSummaryModal = ({
                   <Text style={styles.addKeywordText}>Add keyword</Text>
                 </Pressable>
               </View>
-              <Text style={styles.helper}>Leave empty to enter the amount yourself.</Text>
+              <Text style={styles.helper}>
+                Keywords match any part of a daily expense remark, without case sensitivity.
+              </Text>
 
-              <Pressable
-                style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
-                onPress={calculate}
-                accessibilityRole="button"
-                accessibilityLabel="Calculate category amount from table"
+              <Text style={styles.inputLabel}>Calculated amount</Text>
+              <View
+                style={styles.calculatedAmountCard}
+                accessible
+                accessibilityLabel={`Automatically calculated amount RM ${formatExpenseAmount(formCalculation.amount)} from ${formCalculation.matchCount} matching ${formCalculation.matchCount === 1 ? 'entry' : 'entries'}`}
               >
-                <Ionicons name="search-outline" size={19} color={colors.primary} />
-                <Text style={styles.outlineButtonText}>Calculate from table</Text>
-              </Pressable>
-
-              <Text style={styles.inputLabel}>Amount (RM)</Text>
-              <TextInput
-                style={styles.formInput}
-                value={amount}
-                onChangeText={(value) => setAmount(sanitizeExpenseAmountInput(value))}
-                onBlur={() => setAmount(normalizeExpenseAmountInput(amount))}
-                placeholder="0.00"
-                placeholderTextColor={colors.textTertiary}
-                inputMode="decimal"
-                keyboardType="decimal-pad"
-                accessibilityLabel="Saved category amount in ringgit"
-              />
-              {calculation && (
-                <Text style={styles.helper}>
-                  Calculated from {calculation.matchCount} matching {calculation.matchCount === 1 ? 'entry' : 'entries'} · You can edit this amount.
-                </Text>
-              )}
+                <View style={styles.calculatedAmountIcon}>
+                  <Ionicons name="calculator-outline" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.calculatedAmountInfo}>
+                  <Text style={styles.calculatedAmountValue}>
+                    RM {formatExpenseAmount(formCalculation.amount)}
+                  </Text>
+                  <Text style={styles.calculatedAmountMeta}>
+                    {formCalculation.matchCount} matching {formCalculation.matchCount === 1 ? 'entry' : 'entries'} · Updates automatically
+                  </Text>
+                </View>
+                <View style={styles.autoBadge}>
+                  <Ionicons name="sync-outline" size={13} color={colors.primary} />
+                  <Text style={styles.autoBadgeText}>AUTO</Text>
+                </View>
+              </View>
 
               <Pressable
                 disabled={saving}
@@ -479,7 +473,7 @@ const ExpenseSummaryModal = ({
                 </Text>
               </Pressable>
 
-              {categories.length > 0 && (
+              {liveCategories.length > 0 && (
                 <Pressable
                   style={({ pressed }) => [styles.textButton, pressed && styles.pressed]}
                   onPress={() => setMode('list')}
@@ -494,6 +488,163 @@ const ExpenseSummaryModal = ({
         </View>
       </KeyboardAvoidingView>
     </Modal>
+
+    <Modal
+      visible={!!activeCategory}
+      animationType="fade"
+      transparent
+      statusBarTranslucent
+      onRequestClose={closeCategoryActions}
+    >
+      <View
+        style={[
+          styles.categoryActionOverlay,
+          Platform.OS === 'web'
+            ? styles.categoryActionOverlayWeb
+            : styles.categoryActionOverlayPhone,
+        ]}
+      >
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={closeCategoryActions}
+          accessible={false}
+        />
+        <View
+          style={[
+            styles.categoryActionPanel,
+            Platform.OS === 'web'
+              ? styles.categoryActionPanelWeb
+              : styles.categoryActionPanelPhone,
+            Platform.OS !== 'web' && {
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+          accessibilityViewIsModal
+          testID="expense-category-actions"
+        >
+          {categoryActionMode === 'actions' ? (
+            <>
+              <View style={styles.categoryActionHeader}>
+                <View style={styles.categoryActionHeading}>
+                  <Text style={styles.categoryActionTitle} numberOfLines={1}>
+                    {activeCategory?.name}
+                  </Text>
+                  <Text style={styles.categoryActionAmount}>
+                    RM {formatExpenseAmount(activeCategory?.amount ?? 0)} ·{' '}
+                    {activeCategory?.match_count ?? 0} matching
+                  </Text>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.categoryActionClose,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={closeCategoryActions}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close category actions"
+                >
+                  <Ionicons name="close" size={21} color={colors.textSecondary} />
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.categoryActionItem,
+                  pressed && styles.categoryActionItemPressed,
+                ]}
+                onPress={editActiveCategory}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${activeCategory?.name ?? ''} category`}
+              >
+                <View style={styles.categoryActionItemIcon}>
+                  <Ionicons name="create-outline" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.categoryActionItemText}>
+                  <Text style={styles.categoryActionItemTitle}>Edit category</Text>
+                  <Text style={styles.categoryActionItemDescription}>
+                    Change its name or matching keywords
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.categoryActionItem,
+                  styles.categoryDeleteItem,
+                  pressed && styles.categoryActionItemPressed,
+                ]}
+                onPress={() => setCategoryActionMode('delete')}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${activeCategory?.name ?? ''} category`}
+              >
+                <View style={[styles.categoryActionItemIcon, styles.categoryDeleteIcon]}>
+                  <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                </View>
+                <View style={styles.categoryActionItemText}>
+                  <Text style={[styles.categoryActionItemTitle, styles.categoryDeleteText]}>
+                    Delete category
+                  </Text>
+                  <Text style={styles.categoryActionItemDescription}>
+                    Daily expense rows will stay unchanged
+                  </Text>
+                </View>
+              </Pressable>
+            </>
+          ) : (
+            <View style={styles.categoryDeleteConfirmation}>
+              <View style={styles.categoryDeleteConfirmationIcon}>
+                <Ionicons name="trash-outline" size={25} color={colors.danger} />
+              </View>
+              <Text style={styles.categoryDeleteConfirmationTitle}>
+                Delete {activeCategory?.name}?
+              </Text>
+              <Text style={styles.categoryDeleteConfirmationText}>
+                This removes the category from the summary. Your daily expense rows will not be deleted.
+              </Text>
+              <View style={styles.categoryDeleteButtons}>
+                <Pressable
+                  disabled={deletingCategory}
+                  style={({ pressed }) => [
+                    styles.categoryDeleteButton,
+                    styles.categoryCancelButton,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => setCategoryActionMode('actions')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel category deletion"
+                >
+                  <Text style={styles.categoryCancelButtonText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  disabled={deletingCategory}
+                  style={({ pressed }) => [
+                    styles.categoryDeleteButton,
+                    styles.categoryConfirmDeleteButton,
+                    pressed && styles.pressed,
+                    deletingCategory && styles.disabled,
+                  ]}
+                  onPress={deleteActiveCategory}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Confirm delete ${activeCategory?.name ?? ''} category`}
+                  accessibilityState={{ busy: deletingCategory, disabled: deletingCategory }}
+                >
+                  {deletingCategory ? (
+                    <ActivityIndicator size="small" color={colors.onDanger} />
+                  ) : (
+                    <Ionicons name="trash-outline" size={18} color={colors.onDanger} />
+                  )}
+                  <Text style={styles.categoryConfirmDeleteText}>
+                    {deletingCategory ? 'Deleting...' : 'Delete'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 };
 
@@ -543,6 +694,13 @@ const makeStyles = (colors) =>
     addKeywordButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md },
     addKeywordText: { color: colors.primary, fontSize: 12, fontWeight: '800' },
     helper: { color: colors.textTertiary, fontSize: 11, lineHeight: 17, marginTop: -6 },
+    calculatedAmountCard: { minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg },
+    calculatedAmountIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.primarySoft },
+    calculatedAmountInfo: { flex: 1, minWidth: 0 },
+    calculatedAmountValue: { color: colors.text, fontSize: 18, lineHeight: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
+    calculatedAmountMeta: { marginTop: 2, color: colors.textSecondary, fontSize: 11, lineHeight: 16 },
+    autoBadge: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, borderRadius: radius.full, backgroundColor: colors.primarySoft },
+    autoBadgeText: { color: colors.primary, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
     primaryButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.md, backgroundColor: colors.primary },
     primaryButtonText: { color: colors.card, fontSize: 15, fontWeight: '800' },
     disabled: { opacity: 0.55 },
@@ -550,6 +708,36 @@ const makeStyles = (colors) =>
     infoText: { flex: 1, color: colors.primary, fontSize: 13, fontWeight: '600' },
     textButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
     textButtonText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+    categoryActionOverlay: { flex: 1, padding: 16, backgroundColor: 'rgba(15,23,42,0.56)' },
+    categoryActionOverlayPhone: { justifyContent: 'flex-end' },
+    categoryActionOverlayWeb: { justifyContent: 'center', alignItems: 'center' },
+    categoryActionPanel: { width: '100%', overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, ...shadow.card },
+    categoryActionPanelPhone: { borderRadius: radius.lg },
+    categoryActionPanelWeb: { maxWidth: 400, borderRadius: radius.lg },
+    categoryActionHeader: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 18, paddingRight: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+    categoryActionHeading: { flex: 1, minWidth: 0 },
+    categoryActionTitle: { color: colors.text, fontSize: 18, lineHeight: 23, fontWeight: '800' },
+    categoryActionAmount: { marginTop: 2, color: colors.textSecondary, fontSize: 12, lineHeight: 17, fontVariant: ['tabular-nums'] },
+    categoryActionClose: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full },
+    categoryActionItem: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, backgroundColor: colors.card },
+    categoryActionItemPressed: { backgroundColor: colors.inputBg },
+    categoryActionItemIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.primarySoft },
+    categoryActionItemText: { flex: 1, minWidth: 0 },
+    categoryActionItemTitle: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '700' },
+    categoryActionItemDescription: { marginTop: 2, color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
+    categoryDeleteItem: { borderTopWidth: 1, borderTopColor: colors.border },
+    categoryDeleteIcon: { backgroundColor: colors.dangerSoft },
+    categoryDeleteText: { color: colors.danger },
+    categoryDeleteConfirmation: { alignItems: 'center', padding: 24 },
+    categoryDeleteConfirmationIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full, backgroundColor: colors.dangerSoft },
+    categoryDeleteConfirmationTitle: { marginTop: 16, color: colors.text, fontSize: 20, lineHeight: 26, fontWeight: '800', textAlign: 'center' },
+    categoryDeleteConfirmationText: { marginTop: 8, color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+    categoryDeleteButtons: { width: '100%', flexDirection: 'row', gap: 12, marginTop: 20 },
+    categoryDeleteButton: { minHeight: 50, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: radius.md },
+    categoryCancelButton: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border },
+    categoryCancelButtonText: { color: colors.text, fontSize: 15, fontWeight: '700' },
+    categoryConfirmDeleteButton: { backgroundColor: colors.dangerAction },
+    categoryConfirmDeleteText: { color: colors.onDanger, fontSize: 15, fontWeight: '800' },
   });
 
 export default ExpenseSummaryModal;

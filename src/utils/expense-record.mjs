@@ -209,10 +209,11 @@ export const parseExpenseNote = (content) => {
     }
 
     if (Array.isArray(parsed.rows)) {
+      const rows = normalizeRows(parsed.rows);
       return {
         sourceVersion: Number(parsed.version) || 2,
-        rows: normalizeRows(parsed.rows),
-        categories: normalizeCategories(parsed.categories),
+        rows,
+        categories: recalculateExpenseCategories(rows, parsed.categories),
         summaryNote: typeof parsed.summary_note === 'string' ? parsed.summary_note : '',
         monthlyCommitments: normalizeMonthlyCommitments(
           parsed.monthlyCommitments ?? parsed.monthly_commitments
@@ -261,7 +262,7 @@ export const serializeExpenseNote = (
       ...row,
       amount: normalizeExpenseAmountInput(row.amount),
     })),
-    categories: normalizeCategories(categories),
+    categories: recalculateExpenseCategories(rows, categories),
     summary_note: typeof summaryNote === 'string' ? summaryNote : '',
     monthlyCommitments: normalizeMonthlyCommitments(monthlyCommitments),
   });
@@ -345,7 +346,7 @@ export const calculateMonthlyCommitmentTotals = (commitments) => {
 };
 
 export const calculateExpenseGrandTotal = (rows, commitments) =>
-  calculateExpenseTotal(rows) + calculateMonthlyCommitmentTotals(commitments).total;
+  calculateExpenseTotal(rows) + calculateMonthlyCommitmentTotals(commitments).paid;
 
 export const calculateExpenseNoteGrandTotal = (content) => {
   const { rows, monthlyCommitments } = parseExpenseNote(content);
@@ -370,6 +371,22 @@ export const calculateExpenseCategory = (rows, keywords) => {
     matchCount: matches.length,
     matches,
   };
+};
+
+export const recalculateExpenseCategories = (rows, categories) => {
+  const normalizedRows = normalizeRows(rows);
+  return normalizeCategories(categories).map((category) => {
+    const keywords = category.keywords.length
+      ? category.keywords
+      : [category.name];
+    const calculation = calculateExpenseCategory(normalizedRows, keywords);
+    return {
+      ...category,
+      keywords: calculation.keywords,
+      amount: calculation.amount,
+      match_count: calculation.matchCount,
+    };
+  });
 };
 
 export const findExpenseCategory = (categories, name) => {

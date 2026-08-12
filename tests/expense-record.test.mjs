@@ -23,6 +23,7 @@ import {
   parseExpenseAmount,
   parseMonthlyCommitmentTemplate,
   parseExpenseNote,
+  recalculateExpenseCategories,
   sanitizeExpenseAmountInput,
   sanitizeExpenseDateInput,
   serializeExpenseNote,
@@ -161,7 +162,7 @@ test('calculates a total while ignoring incomplete or invalid amounts', () => {
   assert.equal(calculateExpenseTotal(rows), 187.5);
 });
 
-test('calculates the grand total from expense entries and monthly commitments', () => {
+test('calculates the grand total from expense entries and checked monthly commitments', () => {
   const rows = [
     createExpenseRow({ amount: '187.50' }),
     createExpenseRow({ amount: 'invalid' }),
@@ -172,10 +173,10 @@ test('calculates the grand total from expense entries and monthly commitments', 
     createMonthlyCommitment({ remark: 'Insurance', amount: '' }),
   ];
 
-  assert.equal(calculateExpenseGrandTotal(rows, commitments), 1038);
+  assert.equal(calculateExpenseGrandTotal(rows, commitments), 787.5);
   assert.equal(
     calculateExpenseNoteGrandTotal(serializeExpenseNote(rows, [], '', commitments)),
-    1038
+    787.5
   );
 });
 
@@ -242,6 +243,35 @@ test('calculates categories from multiple case-insensitive partial remark matche
   assert.deepEqual(result.matches.map((row) => row.id), ['1', '2', '3', '4']);
 });
 
+test('automatically recalculates saved categories when daily expenses change', () => {
+  const categories = [
+    {
+      id: 'food',
+      name: 'Food',
+      keywords: ['Lunch', 'Groceries'],
+      amount: 999,
+      match_count: 99,
+    },
+  ];
+  const firstRows = [
+    createExpenseRow({ id: '1', remark: 'Lunch', amount: '12.00' }),
+    createExpenseRow({ id: '2', remark: 'Parking', amount: '5.00' }),
+  ];
+  const firstResult = recalculateExpenseCategories(firstRows, categories);
+
+  assert.equal(firstResult[0].amount, 12);
+  assert.equal(firstResult[0].match_count, 1);
+
+  const nextRows = [
+    ...firstRows,
+    createExpenseRow({ id: '3', remark: 'Weekend groceries', amount: '88.50' }),
+  ];
+  const nextResult = recalculateExpenseCategories(nextRows, firstResult);
+
+  assert.equal(nextResult[0].amount, 100.5);
+  assert.equal(nextResult[0].match_count, 2);
+});
+
 test('saving the same normalized category name updates instead of duplicating it', () => {
   const first = upsertExpenseCategory([], {
     name: 'Petrol', keywords: ['Petrol'], amount: 250, matchCount: 3,
@@ -262,7 +292,7 @@ test('saving the same normalized category name updates instead of duplicating it
   });
 });
 
-test('migrates version 3 single-keyword categories', () => {
+test('migrates and recalculates version 3 single-keyword categories', () => {
   const parsed = parseExpenseNote(JSON.stringify({
     version: 3,
     rows: [],
@@ -272,7 +302,7 @@ test('migrates version 3 single-keyword categories', () => {
   }));
 
   assert.deepEqual(parsed.categories, [
-    { id: 'petrol', name: 'Petrol', keywords: ['Petrol'], amount: 250, match_count: 3 },
+    { id: 'petrol', name: 'Petrol', keywords: ['Petrol'], amount: 0, match_count: 0 },
   ]);
   assert.equal(parsed.summaryNote, '');
 });
@@ -289,12 +319,22 @@ test('persists categories and shared notes in version 5 content', () => {
   );
 
   assert.equal(parsed.sourceVersion, 5);
-  assert.deepEqual(parsed.categories, categories);
+  const calculatedCategories = [
+    { ...categories[0], amount: 12, match_count: 1 },
+    { ...categories[1], amount: 0, match_count: 0 },
+    {
+      ...categories[2],
+      keywords: ['Miscellaneous'],
+      amount: 0,
+      match_count: 0,
+    },
+  ];
+  assert.deepEqual(parsed.categories, calculatedCategories);
   assert.equal(parsed.summaryNote, 'Check cash receipts.');
-  assert.equal(calculateCategorizedTotal(parsed.categories), 900);
+  assert.equal(calculateCategorizedTotal(parsed.categories), 12);
   assert.deepEqual(
     removeExpenseCategory(parsed.categories, 'food'),
-    [categories[1], categories[2]]
+    [calculatedCategories[1], calculatedCategories[2]]
   );
 });
 

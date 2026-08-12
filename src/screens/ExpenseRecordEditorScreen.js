@@ -38,6 +38,7 @@ import {
 } from '../utils/note-limits.mjs';
 import {
   applyMonthlyCommitmentTemplate,
+  calculateExpenseCategory,
   calculateExpenseGrandTotal,
   calculateMonthlyCommitmentTotals,
   createExpenseRow,
@@ -53,6 +54,7 @@ import {
   normalizeExpenseAmountInput,
   parseExpenseAmount,
   parseExpenseNote,
+  recalculateExpenseCategories,
   removeExpenseCategory,
   sanitizeExpenseAmountInput,
   sanitizeExpenseDateInput,
@@ -366,7 +368,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       setTitle(loadedTitle);
       setRows(loadedRows);
-      setCategories(parsed.categories);
+      const loadedCategories = recalculateExpenseCategories(
+        loadedRows,
+        parsed.categories
+      );
+      setCategories(loadedCategories);
       setSummaryNote(parsed.summaryNote);
       setMonthlyCommitments(parsed.monthlyCommitments);
       setHasPassword(!!note.password);
@@ -375,7 +381,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         ...latest.current,
         title: loadedTitle,
         rows: loadedRows,
-        categories: parsed.categories,
+        categories: loadedCategories,
         summaryNote: parsed.summaryNote,
         monthlyCommitments: parsed.monthlyCommitments,
         hasPassword: !!note.password,
@@ -428,12 +434,18 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   );
 
   const updateDraft = (nextTitle, nextRows) => {
+    const nextCategories = recalculateExpenseCategories(
+      nextRows,
+      latest.current.categories
+    );
     latest.current.title = nextTitle;
     latest.current.rows = nextRows;
+    latest.current.categories = nextCategories;
+    setCategories(nextCategories);
     scheduleSave(
       nextTitle,
       nextRows,
-      latest.current.categories,
+      nextCategories,
       latest.current.summaryNote,
       latest.current.monthlyCommitments
     );
@@ -476,7 +488,15 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleSaveCategory = async (result) => {
-    const nextCategories = upsertExpenseCategory(latest.current.categories, result);
+    const calculation = calculateExpenseCategory(
+      latest.current.rows,
+      result.keywords
+    );
+    const nextCategories = upsertExpenseCategory(latest.current.categories, {
+      ...result,
+      amount: calculation.amount,
+      matchCount: calculation.matchCount,
+    });
     await persistCategories(nextCategories);
   };
 

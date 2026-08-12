@@ -55,10 +55,12 @@ Two tables / collections. Timestamps are ISO strings; IDs are generated client-s
 as versioned JSON in `content` and edited by `ExpenseRecordEditorScreen`. Version
 4 also stores named monthly-summary categories and one shared summary note in the
 same payload. Version 5 adds an independent monthly-commitment checklist with a
-bill name, optional due day, amount, and paid state. Categories may contain multiple case-insensitive remark keywords or
-a manually entered amount; saving a normalized category name again updates it
+bill name, optional due day, amount, and paid state. Categories contain multiple
+case-insensitive remark keywords and use a calculated amount derived from matching
+daily-expense rows; saving a normalized category name again updates it
 instead of creating a duplicate. The note's `title` remains in the normal title
-column.
+column. Expense grand totals add daily-expense rows and checked monthly
+commitments; unchecked commitments are excluded.
 
 Checklist notes use `checklist` and store ordered `{id, text, completed}` items
 as versioned JSON in `content`. `ChecklistEditorScreen` supports inline editing,

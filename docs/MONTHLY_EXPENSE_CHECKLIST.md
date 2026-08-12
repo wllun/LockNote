@@ -99,6 +99,8 @@ The reusable last-saved list is separate from note content and is stored locally
 
 Commitment totals are displayed inside the new section. The current expense total continues to represent only rows recorded in the existing expense table. This avoids changing current calculations or counting a commitment twice.
 
+The Grand total shown by the editor and expense-note cards combines daily expense rows with checked monthly commitments only. Unchecked commitments remain visible in the checklist and remaining balance but do not contribute to Grand total.
+
 ## Paid-state reset
 
 - Paid state is kept per note and a confirmed `Reset paid status` action marks every commitment unpaid.
