@@ -56,7 +56,12 @@ const HomeScreen = ({ navigation }) => {
     folder: null,
     name: '',
   });
-  const [passwordModal, setPasswordModal] = useState({ visible: false, item: null, type: '' });
+  const [passwordModal, setPasswordModal] = useState({
+    visible: false,
+    item: null,
+    type: '',
+    action: 'open',
+  });
   const [query, setQuery] = useState('');
   const [results, setResults] = useState({ folders: [], notes: [] });
   const [itemActions, setItemActions] = useState({
@@ -172,7 +177,7 @@ const HomeScreen = ({ navigation }) => {
 
   const handleFolderPress = (folder) => {
     if (folder.password) {
-      setPasswordModal({ visible: true, item: folder, type: 'folder' });
+      setPasswordModal({ visible: true, item: folder, type: 'folder', action: 'open' });
     } else {
       navigation.navigate('Folder', { folderId: folder.id, folderName: folder.name });
     }
@@ -180,14 +185,19 @@ const HomeScreen = ({ navigation }) => {
 
   const handleNotePress = (note) => {
     if (note.password) {
-      setPasswordModal({ visible: true, item: note, type: 'note' });
+      setPasswordModal({ visible: true, item: note, type: 'note', action: 'open' });
     } else {
       navigation.navigate(editorRouteFor(note), { noteId: note.id });
     }
   };
 
-  const handlePasswordVerified = (item, type) => {
-    setPasswordModal({ visible: false, item: null, type: '' });
+  const handlePasswordVerified = (item, type, action) => {
+    setPasswordModal({ visible: false, item: null, type: '', action: 'open' });
+    if (action === 'delete') {
+      if (type === 'folder') confirmDeleteFolder(item);
+      else confirmDeleteNote(item);
+      return;
+    }
     if (type === 'folder') {
       navigation.navigate('Folder', { folderId: item.id, folderName: item.name });
     } else {
@@ -251,7 +261,7 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handleDeleteNote = (note) => {
+  const confirmDeleteNote = (note) => {
     confirmDestructiveAction({
       title: 'Delete Note',
       message: 'Are you sure you want to delete this note?',
@@ -266,7 +276,20 @@ const HomeScreen = ({ navigation }) => {
     });
   };
 
-  const handleDeleteFolder = async (folder) => {
+  const handleDeleteNote = (note) => {
+    if (note.password) {
+      setPasswordModal({
+        visible: true,
+        item: note,
+        type: 'note',
+        action: 'delete',
+      });
+      return;
+    }
+    confirmDeleteNote(note);
+  };
+
+  const confirmDeleteFolder = async (folder) => {
     try {
       const folderNotes = await noteRepo.getByFolderId(folder.id);
       const noteCount = folderNotes.length;
@@ -295,6 +318,19 @@ const HomeScreen = ({ navigation }) => {
     } catch (error) {
       Alert.alert('Error', 'Failed to inspect folder contents');
     }
+  };
+
+  const handleDeleteFolder = (folder) => {
+    if (folder.password) {
+      setPasswordModal({
+        visible: true,
+        item: folder,
+        type: 'folder',
+        action: 'delete',
+      });
+      return;
+    }
+    confirmDeleteFolder(folder);
   };
 
   const openMoveNote = async (note) => {
@@ -632,21 +668,33 @@ const HomeScreen = ({ navigation }) => {
 
       <PasswordModal
         visible={passwordModal.visible}
-        onClose={() => setPasswordModal({ visible: false, item: null, type: '' })}
+        onClose={() => setPasswordModal({
+          visible: false,
+          item: null,
+          type: '',
+          action: 'open',
+        })}
         onVerify={async (password) => {
+          if (!passwordModal.item) return false;
           const hash = await hashPassword(password);
           return hash === passwordModal.item.password;
         }}
-        onVerified={() => handlePasswordVerified(passwordModal.item, passwordModal.type)}
-        onReset={async () => {
+        onVerified={() => handlePasswordVerified(
+          passwordModal.item,
+          passwordModal.type,
+          passwordModal.action
+        )}
+        onReset={passwordModal.action === 'open' ? async () => {
           const { item, type } = passwordModal;
-          if (type === 'folder') {
-            await folderRepo.update(item.id, { password: null });
-          } else {
-            await noteRepo.update(item.id, { password: null });
-          }
+          if (type === 'folder') await folderRepo.update(item.id, { password: null });
+          else await noteRepo.update(item.id, { password: null });
           refreshCurrent();
-        }}
+        } : undefined}
+        title={passwordModal.action === 'delete' ? 'Password required' : 'Locked'}
+        subtitle={passwordModal.action === 'delete'
+          ? `Enter this ${passwordModal.type}'s password before deleting it.`
+          : 'Enter the password to continue'}
+        verifyLabel={passwordModal.action === 'delete' ? 'Continue' : 'Unlock'}
       />
     </View>
   );

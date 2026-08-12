@@ -15,7 +15,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
+import PasswordModal from '../components/PasswordModal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
+import { verifyPassword } from '../utils/crypto';
+import { confirmDestructiveAction } from '../utils/confirm-action';
 import { radius, shadow, useTheme } from '../theme';
 import {
   getNormalNoteCharacterCount,
@@ -34,6 +37,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const saveTimeout = useRef(null);
@@ -138,31 +142,32 @@ const NoteEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const confirmDelete = () => {
+    confirmDestructiveAction({
+      title: 'Delete Note',
+      message: 'Are you sure you want to delete this note?',
+      onConfirm: async () => {
+        try {
+          if (saveTimeout.current) {
+            clearTimeout(saveTimeout.current);
+            saveTimeout.current = null;
+          }
+          latest.current.deleted = true;
+          await noteRepo.softDelete(noteId);
+          navigation.goBack();
+        } catch (error) {
+          Alert.alert('Error', 'Failed to delete note');
+        }
+      },
+    });
+  };
+
   const handleDelete = () => {
-    Alert.alert(
-      'Delete Note',
-      'Are you sure you want to delete this note?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (saveTimeout.current) {
-                clearTimeout(saveTimeout.current);
-                saveTimeout.current = null;
-              }
-              latest.current.deleted = true;
-              await noteRepo.softDelete(noteId);
-              navigation.goBack();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete note');
-            }
-          },
-        },
-      ]
-    );
+    if (hasPassword) {
+      setShowDeletePasswordModal(true);
+      return;
+    }
+    confirmDelete();
   };
 
   useEffect(() => {
@@ -391,6 +396,22 @@ const NoteEditorScreen = ({ route, navigation }) => {
         onClose={() => setShowExportModal(false)}
         title={title}
         content={content}
+      />
+
+      <PasswordModal
+        visible={showDeletePasswordModal}
+        onClose={() => setShowDeletePasswordModal(false)}
+        onVerify={async (password) => {
+          const note = await noteRepo.getById(noteId);
+          return !!note?.password && verifyPassword(password, note.password);
+        }}
+        onVerified={() => {
+          setShowDeletePasswordModal(false);
+          confirmDelete();
+        }}
+        title="Password required"
+        subtitle="Enter this note's password before deleting it."
+        verifyLabel="Continue"
       />
 
       <Modal visible={showLockModal} animationType="fade" transparent>

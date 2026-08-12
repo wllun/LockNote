@@ -40,7 +40,9 @@ List items expose contextual actions through long-press on native and a visible
 three-dots button on web. Note actions are pin, move, and soft-delete; folder
 actions are rename, pin, and soft-delete. Moving a note updates `folder_id`, with `null`
 representing Home. Deleting a folder soft-deletes its contained notes first so
-normal reads do not leave inaccessible active notes behind.
+normal reads do not leave inaccessible active notes behind. Deleting a locked
+note or locked folder requires its item password before the normal destructive
+confirmation is shown; unlocked-item deletion is unchanged.
 
 ## Data model
 
@@ -86,6 +88,11 @@ On native, `notes.folder_id` has `ON DELETE CASCADE` and there are indexes on `f
 ## Password protection
 
 `utils/crypto.js` hashes with SHA-256 (`expo-crypto`). On create/update, a plaintext password is hashed and stored in the `password` column (null = unlocked). To open a locked item, `PasswordModal` hashes the entered password and compares to the stored hash.
+
+The same hash verification gates every user-facing delete path for a locked
+note or folder, including list actions and note-editor actions. The recovery PIN
+can reset an access gate, but it is not offered as a substitute in the delete
+password prompt.
 
 This is **gating, not encryption** — note `content` is stored in cleartext. See the security note in [README.md](../README.md).
 

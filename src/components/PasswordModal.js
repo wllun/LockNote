@@ -15,7 +15,16 @@ import KeyboardAwareModalContent from './keyboard-aware-modal-content';
 
 // onReset (optional): async () => void — clears the item's password after a
 // successful recovery-PIN check. Omit to disable the "Forgot password?" link.
-const PasswordModal = ({ visible, onClose, onVerify, onVerified, onReset }) => {
+const PasswordModal = ({
+  visible,
+  onClose,
+  onVerify,
+  onVerified,
+  onReset,
+  title = 'Locked',
+  subtitle = 'Enter the password to continue',
+  verifyLabel = 'Unlock',
+}) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [password, setPassword] = useState('');
@@ -95,7 +104,12 @@ const PasswordModal = ({ visible, onClose, onVerify, onVerified, onReset }) => {
   const recovering = mode === 'recovery';
 
   return (
-    <Modal visible={visible} animationType="fade" transparent>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      onRequestClose={handleClose}
+    >
       <KeyboardAwareModalContent>
         <View style={styles.content}>
           <View style={styles.iconCircle}>
@@ -105,11 +119,11 @@ const PasswordModal = ({ visible, onClose, onVerify, onVerified, onReset }) => {
               color={colors.primary}
             />
           </View>
-          <Text style={styles.title}>{recovering ? 'Recover Access' : 'Locked'}</Text>
+          <Text style={styles.title}>{recovering ? 'Recover Access' : title}</Text>
           <Text style={styles.subtitle}>
             {recovering
               ? 'Enter your recovery PIN to remove this password'
-              : 'Enter the password to continue'}
+              : subtitle}
           </Text>
           {recovering ? (
             <TextInput
@@ -123,6 +137,8 @@ const PasswordModal = ({ visible, onClose, onVerify, onVerified, onReset }) => {
               }}
               secureTextEntry
               autoFocus
+              accessibilityLabel="Recovery PIN"
+              onSubmitEditing={handleRecover}
             />
           ) : (
             <TextInput
@@ -136,6 +152,8 @@ const PasswordModal = ({ visible, onClose, onVerify, onVerified, onReset }) => {
               }}
               secureTextEntry
               autoFocus
+              accessibilityLabel="Password"
+              onSubmitEditing={handleVerify}
             />
           )}
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -149,6 +167,8 @@ const PasswordModal = ({ visible, onClose, onVerify, onVerified, onReset }) => {
               style={[styles.button, styles.cancelButton]}
               onPress={recovering ? () => { setMode('password'); setError(''); } : handleClose}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={recovering ? 'Back to password entry' : 'Cancel password entry'}
             >
               <Text style={styles.buttonText}>{recovering ? 'Back' : 'Cancel'}</Text>
             </TouchableOpacity>
@@ -157,11 +177,14 @@ const PasswordModal = ({ visible, onClose, onVerify, onVerified, onReset }) => {
               onPress={recovering ? handleRecover : handleVerify}
               disabled={verifying}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={recovering ? 'Verify recovery PIN' : verifyLabel}
+              accessibilityState={{ disabled: verifying }}
             >
               <Text style={[styles.buttonText, styles.verifyButtonText]}>
                 {verifying
                   ? (recovering ? 'Recovering...' : 'Verifying...')
-                  : (recovering ? 'Reset Password' : 'Unlock')}
+                  : (recovering ? 'Reset Password' : verifyLabel)}
               </Text>
             </TouchableOpacity>
           </View>

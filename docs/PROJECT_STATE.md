@@ -8,6 +8,7 @@ _Snapshot: 2026-07-30. Check off items as they land._
 - [X] Create/open/delete notes, at root or inside a folder (soft delete)
 - [X] Auto-saving note editor (debounced 800ms)
 - [X] Password lock/unlock on folders and notes (SHA-256 gate)
+- [X] Require the item password before deleting a locked note or locked folder from lists or editors.
 - [X] Local persistence — SQLite on iOS/Android, AsyncStorage on web
 - [X] Bottom-tab navigation (Home, Settings) with pull-to-refresh
 - [X] Home folder cards show a soft-delete-aware note count badge

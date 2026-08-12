@@ -27,10 +27,12 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
+import PasswordModal from '../components/PasswordModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
 import DestructiveConfirmationModal from '../components/DestructiveConfirmationModal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { confirmDestructiveAction } from '../utils/confirm-action';
+import { verifyPassword } from '../utils/crypto';
 import { monthlyCommitmentTemplate } from '../utils/monthly-commitment-template';
 import {
   EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS,
@@ -251,6 +253,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
@@ -1084,31 +1087,32 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const confirmDelete = () => {
+    confirmDestructiveAction({
+      title: 'Delete Expense Record',
+      message: 'Are you sure you want to delete this expense record?',
+      onConfirm: async () => {
+        try {
+          if (saveTimeout.current) {
+            clearTimeout(saveTimeout.current);
+            saveTimeout.current = null;
+          }
+          latest.current.deleted = true;
+          await noteRepo.softDelete(noteId);
+          navigation.goBack();
+        } catch {
+          Alert.alert('Error', 'Failed to delete expense record');
+        }
+      },
+    });
+  };
+
   const handleDelete = () => {
-    Alert.alert(
-      'Delete Expense Record',
-      'Are you sure you want to delete this expense record?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (saveTimeout.current) {
-                clearTimeout(saveTimeout.current);
-                saveTimeout.current = null;
-              }
-              latest.current.deleted = true;
-              await noteRepo.softDelete(noteId);
-              navigation.goBack();
-            } catch {
-              Alert.alert('Error', 'Failed to delete expense record');
-            }
-          },
-        },
-      ]
-    );
+    if (hasPassword) {
+      setShowDeletePasswordModal(true);
+      return;
+    }
+    confirmDelete();
   };
 
   useEffect(() => {
@@ -1951,6 +1955,22 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         summaryNote={summaryNote}
         monthlyCommitments={monthlyCommitments}
         type="expense"
+      />
+
+      <PasswordModal
+        visible={showDeletePasswordModal}
+        onClose={() => setShowDeletePasswordModal(false)}
+        onVerify={async (password) => {
+          const note = await noteRepo.getById(noteId);
+          return !!note?.password && verifyPassword(password, note.password);
+        }}
+        onVerified={() => {
+          setShowDeletePasswordModal(false);
+          confirmDelete();
+        }}
+        title="Password required"
+        subtitle="Enter this expense record's password before deleting it."
+        verifyLabel="Continue"
       />
 
       <Modal

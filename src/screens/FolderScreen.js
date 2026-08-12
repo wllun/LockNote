@@ -111,7 +111,11 @@ const FolderScreen = ({ route, navigation }) => {
   const [notes, setNotes] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showNoteTypeModal, setShowNoteTypeModal] = useState(false);
-  const [passwordModal, setPasswordModal] = useState({ visible: false, note: null });
+  const [passwordModal, setPasswordModal] = useState({
+    visible: false,
+    note: null,
+    action: 'open',
+  });
   const [itemActions, setItemActions] = useState({
     visible: false,
     note: null,
@@ -194,7 +198,7 @@ const FolderScreen = ({ route, navigation }) => {
 
   const handleNotePress = (note) => {
     if (note.password) {
-      setPasswordModal({ visible: true, note });
+      setPasswordModal({ visible: true, note, action: 'open' });
     } else {
       navigation.navigate(editorRouteFor(note), { noteId: note.id });
     }
@@ -217,7 +221,7 @@ const FolderScreen = ({ route, navigation }) => {
     setItemActions((current) => ({ ...current, visible: false }));
   };
 
-  const handleDeleteNote = (note) => {
+  const confirmDeleteNote = (note) => {
     confirmDestructiveAction({
       title: 'Delete Note',
       message: 'Are you sure you want to delete this note?',
@@ -230,6 +234,14 @@ const FolderScreen = ({ route, navigation }) => {
         }
       },
     });
+  };
+
+  const handleDeleteNote = (note) => {
+    if (note.password) {
+      setPasswordModal({ visible: true, note, action: 'delete' });
+      return;
+    }
+    confirmDeleteNote(note);
   };
 
   const openMoveNote = async (note) => {
@@ -334,21 +346,34 @@ const FolderScreen = ({ route, navigation }) => {
 
       <PasswordModal
         visible={passwordModal.visible}
-        onClose={() => setPasswordModal({ visible: false, note: null })}
+        onClose={() => setPasswordModal({
+          visible: false,
+          note: null,
+          action: 'open',
+        })}
         onVerify={async (password) => {
+          if (!passwordModal.note) return false;
           const hash = await hashPassword(password);
           return hash === passwordModal.note.password;
         }}
         onVerified={() => {
-          setPasswordModal({ visible: false, note: null });
-          navigation.navigate(editorRouteFor(passwordModal.note), {
-            noteId: passwordModal.note.id,
-          });
+          const { note, action } = passwordModal;
+          setPasswordModal({ visible: false, note: null, action: 'open' });
+          if (action === 'delete') {
+            confirmDeleteNote(note);
+          } else {
+            navigation.navigate(editorRouteFor(note), { noteId: note.id });
+          }
         }}
-        onReset={async () => {
+        onReset={passwordModal.action === 'open' ? async () => {
           await noteRepo.update(passwordModal.note.id, { password: null });
           loadNotes();
-        }}
+        } : undefined}
+        title={passwordModal.action === 'delete' ? 'Password required' : 'Locked'}
+        subtitle={passwordModal.action === 'delete'
+          ? "Enter this note's password before deleting it."
+          : 'Enter the password to continue'}
+        verifyLabel={passwordModal.action === 'delete' ? 'Continue' : 'Unlock'}
       />
     </View>
   );

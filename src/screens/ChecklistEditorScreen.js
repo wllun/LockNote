@@ -18,6 +18,9 @@ import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanima
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
+import PasswordModal from '../components/PasswordModal';
+import { verifyPassword } from '../utils/crypto';
+import { confirmDestructiveAction } from '../utils/confirm-action';
 import {
   calculateChecklistProgress,
   CHECKLIST_ITEM_MAX_CHARACTERS,
@@ -203,6 +206,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
@@ -454,31 +458,32 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const confirmDelete = () => {
+    confirmDestructiveAction({
+      title: 'Delete Checklist',
+      message: 'Are you sure you want to delete this checklist?',
+      onConfirm: async () => {
+        try {
+          if (saveTimeout.current) {
+            clearTimeout(saveTimeout.current);
+            saveTimeout.current = null;
+          }
+          latest.current.deleted = true;
+          await noteRepo.softDelete(noteId);
+          navigation.goBack();
+        } catch {
+          Alert.alert('Error', 'Failed to delete checklist');
+        }
+      },
+    });
+  };
+
   const handleDelete = () => {
-    Alert.alert(
-      'Delete Checklist',
-      'Are you sure you want to delete this checklist?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (saveTimeout.current) {
-                clearTimeout(saveTimeout.current);
-                saveTimeout.current = null;
-              }
-              latest.current.deleted = true;
-              await noteRepo.softDelete(noteId);
-              navigation.goBack();
-            } catch {
-              Alert.alert('Error', 'Failed to delete checklist');
-            }
-          },
-        },
-      ]
-    );
+    if (hasPassword) {
+      setShowDeletePasswordModal(true);
+      return;
+    }
+    confirmDelete();
   };
 
   useEffect(() => {
@@ -777,6 +782,22 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         title={title}
         checklistItems={items}
         type="checklist"
+      />
+
+      <PasswordModal
+        visible={showDeletePasswordModal}
+        onClose={() => setShowDeletePasswordModal(false)}
+        onVerify={async (password) => {
+          const note = await noteRepo.getById(noteId);
+          return !!note?.password && verifyPassword(password, note.password);
+        }}
+        onVerified={() => {
+          setShowDeletePasswordModal(false);
+          confirmDelete();
+        }}
+        title="Password required"
+        subtitle="Enter this checklist's password before deleting it."
+        verifyLabel="Continue"
       />
 
       <Modal
