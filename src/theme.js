@@ -20,6 +20,8 @@ const lightColors = {
   inputBg: '#F4F5FA',
   danger: '#EF4444',
   dangerSoft: '#FEEFEF',
+  dangerAction: '#DC2626',
+  onDanger: '#FFFFFF',
   folder: '#F59E0B',
   folderSoft: '#FEF4E4',
 };
@@ -36,6 +38,8 @@ const darkColors = {
   inputBg: '#283047',
   danger: '#FF7B7B',
   dangerSoft: '#46232A',
+  dangerAction: '#FF8A8A',
+  onDanger: '#1A1D29',
   folder: '#FFC94A',
   folderSoft: '#453A1D',
 };

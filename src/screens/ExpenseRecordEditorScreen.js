@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import NoteExportModal from '../components/NoteExportModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
+import DestructiveConfirmationModal from '../components/DestructiveConfirmationModal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { monthlyCommitmentTemplate } from '../utils/monthly-commitment-template';
@@ -254,6 +255,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [focusedCell, setFocusedCell] = useState(null);
   const [remarkInputHeights, setRemarkInputHeights] = useState({});
   const [activeDrag, setActiveDrag] = useState(null);
+  const [pendingDeletion, setPendingDeletion] = useState(null);
   const [dragAreaBounds, setDragAreaBounds] = useState({
     x: 0,
     y: 0,
@@ -633,11 +635,35 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       (commitment) => commitment.id === commitmentId
     );
     if (!item) return;
-    confirmDestructiveAction({
-      title: `Delete ${item.remark}?`,
-      message: 'This monthly bill will be removed from the checklist.',
+    const amount = parseExpenseAmount(item.amount);
+    setPendingDeletion({
+      kind: 'commitment',
+      itemId: commitmentId,
+      title: 'Delete monthly bill?',
+      description: 'Review the bill below before removing it from your checklist.',
+      details: [
+        {
+          label: 'Bill',
+          value: item.remark.trim() || 'Untitled bill',
+          numberOfLines: 3,
+        },
+        {
+          label: 'Due day',
+          value: item.day.trim() ? `Day ${item.day.trim()}` : 'Not set',
+        },
+        {
+          label: 'Amount',
+          value:
+            amount === null
+              ? item.amount.trim() || 'Not entered'
+              : `RM ${formatExpenseAmount(amount)}`,
+        },
+        {
+          label: 'Status',
+          value: item.isPaid ? 'Paid' : 'Not paid',
+        },
+      ],
       confirmLabel: 'Delete bill',
-      onConfirm: () => removeCommitment(commitmentId),
     });
   };
 
@@ -703,18 +729,40 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
     const row = currentRows[rowIndex];
     const amount = parseExpenseAmount(row.amount);
-    confirmDestructiveAction({
+    setPendingDeletion({
+      kind: 'row',
+      itemId: rowId,
       title: `Delete expense row ${rowIndex + 1}?`,
-      message: [
-        `Date: ${row.date.trim() || 'Not entered'}`,
-        `Remark: ${row.remark.trim() || 'Not entered'}`,
-        `Amount: ${amount === null ? row.amount.trim() || 'Not entered' : `RM ${formatExpenseAmount(amount)}`}`,
-        '',
-        'This row will be removed from the expense note.',
-      ].join('\n'),
+      description: 'Review the details below before removing this row from the expense note.',
+      details: [
+        { label: 'Day', value: row.date.trim() || 'Not entered' },
+        {
+          label: 'Remark',
+          value: row.remark.trim() || 'Not entered',
+          numberOfLines: 3,
+        },
+        {
+          label: 'Amount',
+          value:
+            amount === null
+              ? row.amount.trim() || 'Not entered'
+              : `RM ${formatExpenseAmount(amount)}`,
+        },
+      ],
       confirmLabel: 'Delete row',
-      onConfirm: () => removeRow(rowId),
     });
+  };
+
+  const handleConfirmDeletion = () => {
+    const deletion = pendingDeletion;
+    if (!deletion) return;
+
+    setPendingDeletion(null);
+    if (deletion.kind === 'commitment') {
+      removeCommitment(deletion.itemId);
+    } else {
+      removeRow(deletion.itemId);
+    }
   };
 
   const moveRow = (rowId, direction) => {
@@ -1862,6 +1910,16 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}
         onNoteChange={handleSummaryNoteChange}
+      />
+
+      <DestructiveConfirmationModal
+        visible={!!pendingDeletion}
+        title={pendingDeletion?.title ?? ''}
+        description={pendingDeletion?.description ?? ''}
+        details={pendingDeletion?.details ?? []}
+        confirmLabel={pendingDeletion?.confirmLabel ?? 'Delete'}
+        onCancel={() => setPendingDeletion(null)}
+        onConfirm={handleConfirmDeletion}
       />
 
       <NoteExportModal

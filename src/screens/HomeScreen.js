@@ -218,7 +218,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const closeItemActions = () => {
-    setItemActions({ visible: false, item: null, type: '' });
+    setItemActions((current) => ({ ...current, visible: false }));
   };
 
   const openRenameFolder = (folder) => {

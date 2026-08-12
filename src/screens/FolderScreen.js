@@ -214,7 +214,7 @@ const FolderScreen = ({ route, navigation }) => {
   };
 
   const closeItemActions = () => {
-    setItemActions({ visible: false, note: null });
+    setItemActions((current) => ({ ...current, visible: false }));
   };
 
   const handleDeleteNote = (note) => {
