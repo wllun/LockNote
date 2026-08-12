@@ -44,6 +44,7 @@ import {
   createMonthlyCommitmentTemplate,
   formatExpenseAmount,
   isExpenseNoteEmpty,
+  isPointWithinDropTarget,
   moveExpenseRow,
   moveExpenseRowToIndex,
   moveMonthlyCommitment,
@@ -86,6 +87,7 @@ const ExpenseRowDragHandle = ({
   onDelete,
   itemLabel = 'expense row',
 }) => {
+  const [isHolding, setIsHolding] = useState(false);
   const callbacks = useRef({
     onDragStart,
     onDragUpdate,
@@ -131,23 +133,15 @@ const ExpenseRowDragHandle = ({
     () => callbacks.current.onDragCancel(rowId),
     [rowId]
   );
-  const dragTouchStartedAt = useSharedValue(0);
-
+  const beginHold = useCallback(() => setIsHolding(true), []);
+  const endHold = useCallback(() => setIsHolding(false), []);
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
-        .manualActivation(true)
+        .activateAfterLongPress(DRAG_ACTIVATION_DELAY_MS)
         .shouldCancelWhenOutside(false)
-        .onTouchesDown(() => {
-          dragTouchStartedAt.value = Date.now();
-        })
-        .onTouchesMove((_, stateManager) => {
-          const heldFor = Date.now() - dragTouchStartedAt.value;
-          if (heldFor >= DRAG_ACTIVATION_DELAY_MS) {
-            stateManager.activate();
-          } else {
-            stateManager.fail();
-          }
+        .onBegin(() => {
+          runOnJS(beginHold)();
         })
         .onStart((event) => {
           dragX.value = event.absoluteX - dragAreaX;
@@ -173,16 +167,17 @@ const ExpenseRowDragHandle = ({
           );
         })
         .onFinalize((_, success) => {
-          dragTouchStartedAt.value = 0;
+          runOnJS(endHold)();
           if (!success) runOnJS(cancelDrag)();
         }),
     [
+      beginHold,
       cancelDrag,
       dragAreaX,
       dragAreaY,
-      dragTouchStartedAt,
       dragX,
       dragY,
+      endHold,
       endDrag,
       startDrag,
       updateDrag,
@@ -193,11 +188,15 @@ const ExpenseRowDragHandle = ({
     <GestureDetector gesture={panGesture}>
       <View
         collapsable={false}
-        style={[styles.actionColumn, styles.rowDragHandle]}
+        style={[
+          styles.actionColumn,
+          styles.rowDragHandle,
+          isHolding && styles.rowDragHandleHolding,
+        ]}
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel={`Move ${itemLabel} ${rowIndex + 1}`}
-        accessibilityHint="Press and hold for one second, then drag to move or delete"
+        accessibilityHint="Hold still for one second, then drag to move or delete"
         accessibilityActions={[
           { name: 'increment', label: 'Move row down' },
           { name: 'decrement', label: 'Move row up' },
@@ -215,7 +214,12 @@ const ExpenseRowDragHandle = ({
           }
         }}
       >
-        <MaterialIcons name="drag-indicator" size={25} color={colors.textSecondary} />
+        <MaterialIcons
+          name="drag-indicator"
+          size={25}
+          color={isHolding ? colors.primary : colors.textSecondary}
+          style={styles.dragIndicatorIcon}
+        />
       </View>
     </GestureDetector>
   );
@@ -629,18 +633,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       (commitment) => commitment.id === commitmentId
     );
     if (!item) return;
-    Alert.alert(
-      `Delete ${item.remark}?`,
-      'This monthly bill will be removed from the checklist.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete bill',
-          style: 'destructive',
-          onPress: () => removeCommitment(commitmentId),
-        },
-      ]
-    );
+    confirmDestructiveAction({
+      title: `Delete ${item.remark}?`,
+      message: 'This monthly bill will be removed from the checklist.',
+      confirmLabel: 'Delete bill',
+      onConfirm: () => removeCommitment(commitmentId),
+    });
   };
 
   const moveCommitment = (commitmentId, direction) => {
@@ -705,24 +703,18 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
     const row = currentRows[rowIndex];
     const amount = parseExpenseAmount(row.amount);
-    Alert.alert(
-      `Delete expense row ${rowIndex + 1}?`,
-      [
+    confirmDestructiveAction({
+      title: `Delete expense row ${rowIndex + 1}?`,
+      message: [
         `Date: ${row.date.trim() || 'Not entered'}`,
         `Remark: ${row.remark.trim() || 'Not entered'}`,
         `Amount: ${amount === null ? row.amount.trim() || 'Not entered' : `RM ${formatExpenseAmount(amount)}`}`,
         '',
         'This row will be removed from the expense note.',
       ].join('\n'),
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete row',
-          style: 'destructive',
-          onPress: () => removeRow(rowId),
-        },
-      ]
-    );
+      confirmLabel: 'Delete row',
+      onConfirm: () => removeRow(rowId),
+    });
   };
 
   const moveRow = (rowId, direction) => {
@@ -830,11 +822,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         width: DELETE_TARGET_SIZE,
         height: DELETE_TARGET_SIZE,
       };
-    return (
-      absoluteX >= target.left - DELETE_TARGET_TOLERANCE &&
-      absoluteX <= target.left + target.width + DELETE_TARGET_TOLERANCE &&
-      absoluteY >= target.top - DELETE_TARGET_TOLERANCE &&
-      absoluteY <= target.top + target.height + DELETE_TARGET_TOLERANCE
+    return isPointWithinDropTarget(
+      absoluteX,
+      absoluteY,
+      target,
+      DELETE_TARGET_TOLERANCE
     );
   };
 
@@ -1710,10 +1702,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               dragPreviewStyle,
             ]}
           >
-            <Ionicons
-              name="reorder-three-outline"
-              size={20}
+            <MaterialIcons
+              name="drag-indicator"
+              size={25}
               color={activeDrag.overDelete ? colors.danger : colors.primary}
+              style={styles.dragIndicatorIcon}
             />
             <View style={styles.dragPreviewContent}>
               <Text style={styles.dragPreviewRemark} numberOfLines={1}>
@@ -2693,6 +2686,9 @@ const makeStyles = (colors) =>
       alignSelf: 'stretch',
       backgroundColor: 'transparent',
     },
+    rowDragHandleHolding: {
+      backgroundColor: colors.primarySoft,
+    },
     draggingRow: {
       backgroundColor: colors.primarySoft,
       opacity: 0.35,
@@ -2728,6 +2724,7 @@ const makeStyles = (colors) =>
       position: 'absolute',
       left: 0,
       top: 0,
+      opacity: 0.65,
       minHeight: 50,
       flexDirection: 'row',
       alignItems: 'center',
@@ -2743,6 +2740,9 @@ const makeStyles = (colors) =>
     dragPreviewDeleting: {
       backgroundColor: colors.dangerSoft,
       borderColor: colors.danger,
+    },
+    dragIndicatorIcon: {
+      opacity: 0.65,
     },
     dragPreviewContent: {
       flex: 1,
