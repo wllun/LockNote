@@ -11,6 +11,13 @@ import {
   getExportTitle,
 } from './note-export.mjs';
 
+const callBrowserMethod = (target, method, errorMessage, ...args) => {
+  if (!target || typeof target[method] !== 'function') {
+    throw new Error(errorMessage);
+  }
+  return target[method](...args);
+};
+
 export const exportNotePdf = async (data) => {
   data = data ?? {};
   const fileName = getExportFileName(data?.title, 'pdf', data?.type);
@@ -20,9 +27,14 @@ export const exportNotePdf = async (data) => {
   }
 
   printWindow.opener = null;
-  printWindow.document.open();
-  printWindow.document.write(buildNoteExportHtml(data));
-  printWindow.document.close();
+  callBrowserMethod(printWindow.document, 'open', 'The browser could not prepare the PDF document.');
+  callBrowserMethod(
+    printWindow.document,
+    'write',
+    'The browser could not write the PDF document.',
+    buildNoteExportHtml(data)
+  );
+  callBrowserMethod(printWindow.document, 'close', 'The browser could not finish the PDF document.');
   printWindow.document.title = fileName;
 
   await new Promise((resolve, reject) => {
@@ -31,21 +43,66 @@ export const exportNotePdf = async (data) => {
       if (started) return;
       started = true;
       try {
-        printWindow.focus();
-        printWindow.print();
+        if (typeof printWindow.focus === 'function') printWindow.focus();
+        callBrowserMethod(printWindow, 'print', 'Printing is not supported by this browser.');
         resolve();
-      } catch {
-        reject(new Error('The browser could not open the PDF print dialog.'));
+      } catch (error) {
+        reject(error instanceof Error
+          ? error
+          : new Error('The browser could not open the PDF print dialog.'));
       }
     };
 
     if (printWindow.document.readyState === 'complete') {
       window.setTimeout(startPrint, 0);
     } else {
-      printWindow.addEventListener('load', startPrint, { once: true });
+      if (typeof printWindow.addEventListener === 'function') {
+        printWindow.addEventListener('load', startPrint, { once: true });
+      } else {
+        printWindow.onload = startPrint;
+      }
       window.setTimeout(startPrint, 250);
     }
   });
+};
+
+const getCanvasDownload = async (canvas) => {
+  if (
+    typeof canvas.toBlob === 'function'
+    && typeof URL !== 'undefined'
+    && typeof URL.createObjectURL === 'function'
+  ) {
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob((result) => {
+        if (result) resolve(result);
+        else reject(new Error('The export image could not be created.'));
+      }, 'image/png');
+    });
+    const url = URL.createObjectURL(blob);
+    return {
+      url,
+      release: () => {
+        if (typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(url);
+      },
+    };
+  }
+
+  if (typeof canvas.toDataURL !== 'function') {
+    throw new Error('PNG export is not supported by this browser.');
+  }
+
+  return { url: canvas.toDataURL('image/png'), release: null };
+};
+
+const clickDownloadLink = (link) => {
+  if (document.body && typeof document.body.appendChild === 'function') {
+    document.body.appendChild(link);
+  }
+  callBrowserMethod(link, 'click', 'The browser could not start the image download.');
+  if (typeof link.remove === 'function') link.remove();
+  else if (link.parentNode && typeof link.parentNode.removeChild === 'function') {
+    link.parentNode.removeChild(link);
+  }
 };
 
 const wrapText = (context, text, maxWidth) => {
@@ -194,18 +251,10 @@ export const exportNoteImage = async (_viewRef, data) => {
   } else {
     let y = 190; contentLines.forEach((line) => { context.fillText(line, padding, y); y += 46; });
   }
-  const blob = await new Promise((resolve, reject) => {
-    canvas.toBlob((result) => {
-      if (result) resolve(result);
-      else reject(new Error('The export image could not be created.'));
-    }, 'image/png');
-  });
-  const url = URL.createObjectURL(blob);
+  const download = await getCanvasDownload(canvas);
   const link = document.createElement('a');
   link.download = getExportFileName(data?.title, 'png', data?.type);
-  link.href = url;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  link.href = download.url;
+  clickDownloadLink(link);
+  if (download.release) window.setTimeout(download.release, 0);
 };

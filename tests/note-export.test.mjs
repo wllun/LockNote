@@ -73,6 +73,22 @@ test('escapes note text and preserves line breaks in PDF HTML', () => {
   assert.doesNotMatch(html, /<script>alert/);
 });
 
+test('builds PDF HTML when String.replaceAll is unavailable', () => {
+  const originalReplaceAll = String.prototype.replaceAll;
+  try {
+    String.prototype.replaceAll = undefined;
+    const html = buildNoteExportHtml({
+      title: 'Compatibility & safety',
+      content: 'First line\nSecond line',
+    });
+
+    assert.match(html, /Compatibility &amp; safety/);
+    assert.match(html, /First line<br>Second line/);
+  } finally {
+    String.prototype.replaceAll = originalReplaceAll;
+  }
+});
+
 test('renders expense rows and the calculated total in PDF HTML', () => {
   const html = buildNoteExportHtml({
     title: 'July expenses',
