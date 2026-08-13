@@ -148,7 +148,7 @@ export const exportNoteImage = async (_viewRef, data) => {
   const summaryNoteLines = summaryNote
     ? wrapText(context, summaryNote, width - padding * 2 - 32)
     : [];
-  const expenseHeight = rows ? 262 + rows.length * 58 : 0;
+  const expenseHeight = rows ? 312 + rows.length * 58 : 0;
   const commitmentHeight = commitments.length
     ? 172 + commitments.length * 62
     : 0;
@@ -163,8 +163,12 @@ export const exportNoteImage = async (_viewRef, data) => {
         ? 250 + checklistLines.reduce((sum, item) => sum + Math.max(58, item.lines.length * 38 + 20), 0)
         : 210 + contentLines.length * 46
   );
-  canvas.width = width;
-  canvas.height = height;
+  const preferredScale = 2;
+  const maxScaleForMemory = Math.sqrt(24000000 / (width * height));
+  const resolutionScale = Math.max(1, Math.min(preferredScale, maxScaleForMemory));
+  canvas.width = Math.round(width * resolutionScale);
+  canvas.height = Math.round(height * resolutionScale);
+  context.scale(resolutionScale, resolutionScale);
   context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height);
   context.fillStyle = '#172033'; context.font = 'bold 48px sans-serif';
   context.fillText(getExportTitle(data?.title, data?.type), padding, 90, width - padding * 2);
@@ -172,13 +176,7 @@ export const exportNoteImage = async (_viewRef, data) => {
   context.font = '32px sans-serif'; context.fillStyle = '#172033';
   if (rows) {
     let y = 190;
-    context.font = 'bold 28px sans-serif'; context.fillText('Day', padding, y); context.fillText('Remark', 260, y); context.textAlign = 'right'; context.fillText('RM', width - padding, y); context.textAlign = 'left';
-    context.font = '28px sans-serif';
-    rows.forEach((row) => { y += 58; context.fillText(row.date || '', padding, y); context.fillText(row.remark || '', 260, y, 480); context.textAlign = 'right'; context.fillText(row.amount || '0.00', width - padding, y); context.textAlign = 'left'; });
-    y += 72; context.font = 'bold 34px sans-serif'; context.textAlign = 'right'; context.fillText(`Total  RM ${formatExportAmount(data.total)}`, width - padding, y); context.textAlign = 'left';
     if (commitments.length) {
-      y += 72;
-      context.fillStyle = '#dfe3ee'; context.fillRect(padding, y - 34, width - padding * 2, 3);
       context.fillStyle = '#172033'; context.font = 'bold 34px sans-serif'; context.fillText('Monthly commitments', padding, y);
       y += 42;
       commitments.forEach((item) => {
@@ -200,6 +198,19 @@ export const exportNoteImage = async (_viewRef, data) => {
       context.fillText(`Remaining  RM ${formatExportAmount(remaining)}`, width - padding, y + 4);
       context.textAlign = 'left'; y += 58;
     }
+
+    if (commitments.length) {
+      y += 72;
+      context.fillStyle = '#dfe3ee'; context.fillRect(padding, y - 34, width - padding * 2, 3);
+    }
+    context.fillStyle = '#172033'; context.font = 'bold 34px sans-serif';
+    context.fillText('Daily expenses', padding, y);
+    y += 50;
+    context.font = 'bold 28px sans-serif'; context.fillText('Day', padding, y); context.fillText('Remark', 260, y); context.textAlign = 'right'; context.fillText('RM', width - padding, y); context.textAlign = 'left';
+    context.font = '28px sans-serif';
+    rows.forEach((row) => { y += 58; context.fillText(row.date || '', padding, y); context.fillText(row.remark || '', 260, y, 480); context.textAlign = 'right'; context.fillText(row.amount || '0.00', width - padding, y); context.textAlign = 'left'; });
+    y += 72; context.font = 'bold 34px sans-serif'; context.textAlign = 'right'; context.fillText(`Total  RM ${formatExportAmount(data.total)}`, width - padding, y); context.textAlign = 'left';
+
     if (hasMonthlySummary) {
       y += 72;
       context.fillStyle = '#dfe3ee'; context.fillRect(padding, y - 34, width - padding * 2, 3);

@@ -102,21 +102,8 @@ const NoteExportModal = ({
                 </View>
               ) : rows ? (
                 <>
-                  <View style={[styles.tableRow, styles.tableHeader]}>
-                    <Text style={[styles.headerCell, styles.dateCell]}>Day</Text>
-                    <Text style={[styles.headerCell, styles.remarkCell]}>Remark</Text>
-                    <Text style={[styles.headerCell, styles.amountCell]}>RM</Text>
-                  </View>
-                  {visibleRows.map((row, index) => (
-                    <View key={row.id || index} style={[styles.tableRow, index % 2 === 0 && styles.altRow]}>
-                      <Text style={[styles.cell, styles.dateCell]}>{row.date}</Text>
-                      <Text style={[styles.cell, styles.remarkCell]}>{row.remark}</Text>
-                      <Text style={[styles.cell, styles.amountCell]}>{row.amount || '0.00'}</Text>
-                    </View>
-                  ))}
-                  <Text style={styles.total}>Total  RM {formatExportAmount(total)}</Text>
                   {!!visibleCommitments.length && (
-                    <View style={styles.monthlySummary}>
+                    <View style={[styles.monthlySummary, styles.firstExpenseSection]}>
                       <Text style={styles.summaryTitle}>Monthly commitments</Text>
                       {visibleCommitments.map((item) => (
                         <View key={item.id || item.remark} style={styles.summaryCategoryRow}>
@@ -143,6 +130,22 @@ const NoteExportModal = ({
                       </View>
                     </View>
                   )}
+                  <View style={[styles.dailyExpenses, !visibleCommitments.length && styles.firstExpenseSection]}>
+                    <Text style={styles.summaryTitle}>Daily expenses</Text>
+                    <View style={[styles.tableRow, styles.tableHeader]}>
+                      <Text style={[styles.headerCell, styles.dateCell]}>Day</Text>
+                      <Text style={[styles.headerCell, styles.remarkCell]}>Remark</Text>
+                      <Text style={[styles.headerCell, styles.amountCell]}>RM</Text>
+                    </View>
+                    {visibleRows.map((row, index) => (
+                      <View key={row.id || index} style={[styles.tableRow, index % 2 === 0 && styles.altRow]}>
+                        <Text style={[styles.cell, styles.dateCell]}>{row.date}</Text>
+                        <Text style={[styles.cell, styles.remarkCell]}>{row.remark}</Text>
+                        <Text style={[styles.cell, styles.amountCell]}>{row.amount || '0.00'}</Text>
+                      </View>
+                    ))}
+                    <Text style={styles.total}>Total  RM {formatExportAmount(total)}</Text>
+                  </View>
                   {hasMonthlySummary && (
                     <View style={styles.monthlySummary}>
                       <Text style={styles.summaryTitle}>Monthly summary</Text>
@@ -233,7 +236,9 @@ const makeStyles = (colors) => StyleSheet.create({
   cell: { color: '#30384c', fontSize: 12, padding: 8 },
   dateCell: { width: 64 }, remarkCell: { flex: 1 }, amountCell: { width: 92, textAlign: 'right' },
   total: { color: '#4854dc', textAlign: 'right', fontSize: 17, fontWeight: '800', marginTop: 18 },
+  dailyExpenses: { marginTop: 28, paddingTop: 20, borderTopWidth: 2, borderTopColor: '#dfe3ee' },
   monthlySummary: { marginTop: 28, paddingTop: 20, borderTopWidth: 2, borderTopColor: '#dfe3ee' },
+  firstExpenseSection: { marginTop: 0, paddingTop: 0, borderTopWidth: 0 },
   summaryTitle: { color: '#172033', fontSize: 18, lineHeight: 23, fontWeight: '800', marginBottom: 10 },
   summaryCategoryRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#dfe3ee' },
   summaryCategoryInfo: { flex: 1, minWidth: 0 },

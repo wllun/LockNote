@@ -128,6 +128,24 @@ test('renders monthly categories and the summary note in expense PDF HTML', () =
   assert.match(html, /Check &lt;receipts&gt;<br>Claim before Friday\./);
 });
 
+test('orders expense export sections from commitments through summary', () => {
+  const html = buildNoteExportHtml({
+    rows: [{ date: '2', remark: 'Lunch', amount: '12.00' }],
+    total: 12,
+    monthlyCommitments: [{ remark: 'Rent', amount: 900, isPaid: true }],
+    categories: [{ name: 'Food', amount: 12 }],
+  });
+
+  const commitmentsAt = html.indexOf('Monthly commitments');
+  const dailyExpensesAt = html.indexOf('Daily expenses');
+  const totalAt = html.indexOf('<div class="total">');
+  const summaryAt = html.indexOf('Monthly summary');
+
+  assert.ok(commitmentsAt < dailyExpensesAt);
+  assert.ok(dailyExpensesAt < totalAt);
+  assert.ok(totalAt < summaryAt);
+});
+
 test('normalizes expense categories for export descriptions', () => {
   const categories = getExpenseExportCategories([
     null,
