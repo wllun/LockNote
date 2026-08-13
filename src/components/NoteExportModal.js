@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { exportNoteImage, exportNotePdf } from '../utils/note-export';
+import { exportNoteImage, exportNotePdf } from '../utils/note-export-adapter';
 import {
   formatExportAmount,
   getExpenseExportCategories,
