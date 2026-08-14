@@ -26,12 +26,14 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
+import EditorUndoButton from '../components/editor-undo-button';
 import NoteExportModal from '../components/NoteExportModal';
 import PasswordModal from '../components/PasswordModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
 import DestructiveConfirmationModal from '../components/DestructiveConfirmationModal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { confirmDestructiveAction } from '../utils/confirm-action';
+import { useEditorUndo } from '../utils/use-editor-undo';
 import { verifyPassword } from '../utils/crypto';
 import { monthlyCommitmentTemplate } from '../utils/monthly-commitment-template';
 import {
@@ -289,6 +291,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     isPinned: false,
     deleted: false,
   });
+  const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
+  const getUndoSnapshot = useCallback(() => ({
+    title: latest.current.title,
+    rows: latest.current.rows,
+    categories: latest.current.categories,
+    summaryNote: latest.current.summaryNote,
+    monthlyCommitments: latest.current.monthlyCommitments,
+  }), []);
 
   const commitmentTotals = calculateMonthlyCommitmentTotals(monthlyCommitments);
   const total = calculateExpenseGrandTotal(rows, monthlyCommitments);
@@ -390,10 +400,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
       };
+      clearUndo();
     } catch {
       Alert.alert('Error', 'Failed to load expense record');
     }
-  }, [noteId]);
+  }, [clearUndo, noteId]);
 
   const loadSavedCommitmentTemplate = useCallback(async () => {
     try {
@@ -435,6 +446,29 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     },
     [noteId]
   );
+
+  const handleUndo = () => {
+    const snapshot = takeUndo();
+    if (!snapshot) return;
+
+    setTitle(snapshot.title);
+    setRows(snapshot.rows);
+    setCategories(snapshot.categories);
+    setSummaryNote(snapshot.summaryNote);
+    setMonthlyCommitments(snapshot.monthlyCommitments);
+    latest.current.title = snapshot.title;
+    latest.current.rows = snapshot.rows;
+    latest.current.categories = snapshot.categories;
+    latest.current.summaryNote = snapshot.summaryNote;
+    latest.current.monthlyCommitments = snapshot.monthlyCommitments;
+    scheduleSave(
+      snapshot.title,
+      snapshot.rows,
+      snapshot.categories,
+      snapshot.summaryNote,
+      snapshot.monthlyCommitments
+    );
+  };
 
   const updateDraft = (nextTitle, nextRows) => {
     const nextCategories = recalculateExpenseCategories(
@@ -491,6 +525,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleSaveCategory = async (result) => {
+    const previousSnapshot = getUndoSnapshot();
     const calculation = calculateExpenseCategory(
       latest.current.rows,
       result.keywords
@@ -501,18 +536,22 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       matchCount: calculation.matchCount,
     });
     await persistCategories(nextCategories);
+    remember(previousSnapshot);
   };
 
   const handleDeleteCategory = async (categoryId) => {
+    const previousSnapshot = getUndoSnapshot();
     const nextCategories = removeExpenseCategory(latest.current.categories, categoryId);
     try {
       await persistCategories(nextCategories);
+      remember(previousSnapshot);
     } catch {
       Alert.alert('Error', 'Failed to delete the saved category.');
     }
   };
 
   const handleSummaryNoteChange = (value) => {
+    remember(getUndoSnapshot(), 'summary-note');
     setSummaryNote(value);
     latest.current.summaryNote = value;
     scheduleSave(
@@ -525,6 +564,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const updateMonthlyCommitments = (nextCommitments) => {
+    remember(getUndoSnapshot());
     latest.current.monthlyCommitments = nextCommitments;
     setMonthlyCommitments(nextCommitments);
     scheduleSave(
@@ -702,11 +742,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleTitleChange = (value) => {
+    remember(getUndoSnapshot(), 'title');
     setTitle(value);
     updateDraft(value, latest.current.rows);
   };
 
   const handleRowChange = (rowId, field, value) => {
+    remember(getUndoSnapshot(), `row:${rowId}:${field}`);
     const nextRows = latest.current.rows.map((row) =>
       row.id === rowId ? { ...row, [field]: value } : row
     );
@@ -733,6 +775,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const addRow = (focus = true) => {
     const newRow = createExpenseRow();
     const nextRows = [...latest.current.rows, newRow];
+    remember(getUndoSnapshot());
     setRows(nextRows);
     updateDraft(latest.current.title, nextRows);
     if (focus) focusCell(newRow.id, 'date');
@@ -741,6 +784,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const removeRow = (rowId) => {
     const remainingRows = latest.current.rows.filter((row) => row.id !== rowId);
     const nextRows = remainingRows.length ? remainingRows : [createExpenseRow()];
+    remember(getUndoSnapshot());
     setRows(nextRows);
     updateDraft(latest.current.title, nextRows);
   };
@@ -792,6 +836,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     const nextRows = moveExpenseRow(latest.current.rows, rowId, direction);
     if (nextRows === latest.current.rows) return;
 
+    remember(getUndoSnapshot());
     setRows(nextRows);
     updateDraft(latest.current.title, nextRows);
   };
@@ -1016,6 +1061,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         targetIndex
       );
       if (nextRows !== latest.current.rows) {
+        remember(getUndoSnapshot());
         setRows(nextRows);
         updateDraft(latest.current.title, nextRows);
       }
@@ -1198,6 +1244,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             accessibilityHint="Edits the title of this expense note"
           />
         </View>
+
+        <EditorUndoButton
+          canUndo={canUndo}
+          colors={colors}
+          disabledStyle={styles.headerButtonDisabled}
+          onUndo={handleUndo}
+          style={styles.headerButton}
+        />
 
         <TouchableOpacity
           onPress={() => setShowActionsMenu(true)}
@@ -2183,6 +2237,7 @@ const makeStyles = (colors) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    headerButtonDisabled: { opacity: 0.38 },
     headerTitleField: {
       flex: 1,
       minWidth: 0,

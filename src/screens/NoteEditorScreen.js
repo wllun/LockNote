@@ -14,11 +14,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
+import EditorUndoButton from '../components/editor-undo-button';
 import NoteExportModal from '../components/NoteExportModal';
 import PasswordModal from '../components/PasswordModal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { verifyPassword } from '../utils/crypto';
 import { confirmDestructiveAction } from '../utils/confirm-action';
+import { useEditorUndo } from '../utils/use-editor-undo';
 import { radius, shadow, useTheme } from '../theme';
 import {
   getNormalNoteCharacterCount,
@@ -44,6 +46,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const contentRef = useRef(null);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
   const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, deleted: false });
+  const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
   const insets = useSafeAreaInsets();
   const contentCharacterCount = getNormalNoteCharacterCount(content);
   const isNearContentLimit =
@@ -68,6 +71,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           hasPassword: !!note.password,
           isPinned: !!note.is_pinned,
         };
+        clearUndo();
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to load note');
@@ -92,15 +96,34 @@ const NoteEditorScreen = ({ route, navigation }) => {
   );
 
   const handleTitleChange = (text) => {
+    remember(
+      { title: latest.current.title, content: latest.current.content },
+      'title'
+    );
     setTitle(text);
     latest.current.title = text;
     autoSave(text, content);
   };
 
   const handleContentChange = (text) => {
+    remember(
+      { title: latest.current.title, content: latest.current.content },
+      'content'
+    );
     setContent(text);
     latest.current.content = text;
     autoSave(title, text);
+  };
+
+  const handleUndo = () => {
+    const snapshot = takeUndo();
+    if (!snapshot) return;
+
+    setTitle(snapshot.title);
+    setContent(snapshot.content);
+    latest.current.title = snapshot.title;
+    latest.current.content = snapshot.content;
+    autoSave(snapshot.title, snapshot.content);
   };
 
   const handleSetPassword = async () => {
@@ -231,6 +254,14 @@ const NoteEditorScreen = ({ route, navigation }) => {
             accessibilityHint="Edits the title of this note"
           />
         </View>
+
+        <EditorUndoButton
+          canUndo={canUndo}
+          colors={colors}
+          disabledStyle={styles.headerButtonDisabled}
+          onUndo={handleUndo}
+          style={styles.headerButton}
+        />
 
         <TouchableOpacity
           onPress={() => setShowActionsMenu(true)}
@@ -506,6 +537,7 @@ const makeStyles = (colors) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    headerButtonDisabled: { opacity: 0.38 },
     headerTitleField: {
       flex: 1,
       minWidth: 0,

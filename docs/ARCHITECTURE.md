@@ -105,6 +105,13 @@ cleared on unmount and before delete. Normal note bodies are limited to 100,000
 characters; checklist items are limited to 500 characters and 500 items; see
 [Note Character Limits](NOTE_LIMITS.md).
 
+All three editors also keep a bounded, in-memory undo history for the current
+editing session. Consecutive typing is grouped into short bursts, while add,
+delete, checkbox, monthly-commitment, and reorder operations create individual
+undo steps. Restoring a snapshot goes back through the same debounced auto-save
+path; the history is cleared when the note is loaded and is not persisted after
+leaving the editor.
+
 ## Auth
 
 Supabase is used for account auth only (Phase 2 of [ROADMAP.md](ROADMAP.md)) — it is not a data store, and note/folder content never leaves the device.

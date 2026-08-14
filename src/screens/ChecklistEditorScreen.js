@@ -17,10 +17,12 @@ import { FlatList, Gesture, GestureDetector } from 'react-native-gesture-handler
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
+import EditorUndoButton from '../components/editor-undo-button';
 import NoteExportModal from '../components/NoteExportModal';
 import PasswordModal from '../components/PasswordModal';
 import { verifyPassword } from '../utils/crypto';
 import { confirmDestructiveAction } from '../utils/confirm-action';
+import { useEditorUndo } from '../utils/use-editor-undo';
 import {
   calculateChecklistProgress,
   CHECKLIST_ITEM_MAX_CHARACTERS,
@@ -220,10 +222,17 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const latest = useRef({
     title: '',
     items: [],
+    newItemText: '',
     hasPassword: false,
     isPinned: false,
     deleted: false,
   });
+  const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
+  const getUndoSnapshot = useCallback(() => ({
+    title: latest.current.title,
+    items: latest.current.items,
+    newItemText: latest.current.newItemText,
+  }), []);
 
   const progress = calculateChecklistProgress(items);
   const itemsWithoutDraggedItem = activeDrag
@@ -250,13 +259,15 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         ...latest.current,
         title: note.title,
         items: parsed.items,
+        newItemText: '',
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
       };
+      clearUndo();
     } catch {
       Alert.alert('Error', 'Failed to load checklist');
     }
-  }, [noteId]);
+  }, [clearUndo, noteId]);
 
   const scheduleSave = useCallback(
     (nextTitle, nextItems) => {
@@ -286,11 +297,13 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }, [scheduleSave]);
 
   const handleTitleChange = (value) => {
+    remember(getUndoSnapshot(), 'title');
     setTitle(value);
     updateDraft(value, latest.current.items);
   };
 
   const handleItemTextChange = useCallback((itemId, value) => {
+    remember(getUndoSnapshot(), `item:${itemId}`);
     const nextItems = latest.current.items.map((item) =>
       item.id === itemId
         ? { ...item, text: sanitizeChecklistItemText(value) }
@@ -298,29 +311,32 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     );
     setItems(nextItems);
     updateDraft(latest.current.title, nextItems);
-  }, [updateDraft]);
+  }, [getUndoSnapshot, remember, updateDraft]);
 
   const toggleItem = useCallback((itemId) => {
+    remember(getUndoSnapshot());
     const nextItems = latest.current.items.map((item) =>
       item.id === itemId ? { ...item, completed: !item.completed } : item
     );
     setItems(nextItems);
     updateDraft(latest.current.title, nextItems);
-  }, [updateDraft]);
+  }, [getUndoSnapshot, remember, updateDraft]);
 
   const removeItem = useCallback((itemId) => {
+    remember(getUndoSnapshot());
     const nextItems = latest.current.items.filter((item) => item.id !== itemId);
     setItems(nextItems);
     updateDraft(latest.current.title, nextItems);
-  }, [updateDraft]);
+  }, [getUndoSnapshot, remember, updateDraft]);
 
   const moveItem = useCallback((itemId, direction) => {
     const nextItems = moveChecklistItem(latest.current.items, itemId, direction);
     if (nextItems === latest.current.items) return;
 
+    remember(getUndoSnapshot());
     setItems(nextItems);
     updateDraft(latest.current.title, nextItems);
-  }, [updateDraft]);
+  }, [getUndoSnapshot, remember, updateDraft]);
 
   const getDragTargetIndex = useCallback((itemId, translationY) => {
     const currentItems = latest.current.items;
@@ -392,9 +408,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     finishDrag();
     if (nextItems === latest.current.items) return;
 
+    remember(getUndoSnapshot());
     setItems(nextItems);
     updateDraft(latest.current.title, nextItems);
-  }, [finishDrag, getDragTargetIndex, updateDraft]);
+  }, [finishDrag, getDragTargetIndex, getUndoSnapshot, remember, updateDraft]);
 
   const handleDragCancel = useCallback((itemId) => {
     if (activeDragRef.current?.itemId !== itemId) return;
@@ -413,10 +430,30 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       ...latest.current.items,
       createChecklistItem({ text }),
     ];
+    remember(getUndoSnapshot());
     setItems(nextItems);
     setNewItemText('');
+    latest.current.newItemText = '';
     updateDraft(latest.current.title, nextItems);
     requestAnimationFrame(() => newItemInputRef.current?.focus());
+  };
+
+  const handleNewItemTextChange = (value) => {
+    remember(getUndoSnapshot(), 'new-item');
+    const nextValue = sanitizeChecklistItemText(value);
+    setNewItemText(nextValue);
+    latest.current.newItemText = nextValue;
+  };
+
+  const handleUndo = () => {
+    const snapshot = takeUndo();
+    if (!snapshot) return;
+
+    setTitle(snapshot.title);
+    setItems(snapshot.items);
+    setNewItemText(snapshot.newItemText);
+    latest.current.newItemText = snapshot.newItemText;
+    updateDraft(snapshot.title, snapshot.items);
   };
 
   const handleSetPassword = async () => {
@@ -586,6 +623,14 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
           />
         </View>
 
+        <EditorUndoButton
+          canUndo={canUndo}
+          colors={colors}
+          disabledStyle={styles.headerButtonDisabled}
+          onUndo={handleUndo}
+          style={styles.headerButton}
+        />
+
         <TouchableOpacity
           onPress={() => setShowActionsMenu(true)}
           style={styles.headerButton}
@@ -665,7 +710,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                   ref={newItemInputRef}
                   style={styles.addInput}
                   value={newItemText}
-                  onChangeText={(value) => setNewItemText(sanitizeChecklistItemText(value))}
+                  onChangeText={handleNewItemTextChange}
                   placeholder="What needs to be done?"
                   placeholderTextColor={colors.textTertiary}
                   maxLength={CHECKLIST_ITEM_MAX_CHARACTERS}
@@ -890,6 +935,7 @@ const makeStyles = (colors) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    headerButtonDisabled: { opacity: 0.38 },
     headerTitleField: {
       flex: 1,
       minWidth: 0,
