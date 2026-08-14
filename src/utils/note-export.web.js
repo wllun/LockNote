@@ -64,6 +64,7 @@ export const exportNotePdf = async (data) => {
       window.setTimeout(startPrint, 250);
     }
   });
+  return { canceled: false };
 };
 
 const getCanvasDownload = async (canvas) => {
@@ -268,4 +269,13 @@ export const exportNoteImage = async (_viewRef, data) => {
   link.href = download.url;
   clickDownloadLink(link);
   if (download.release) window.setTimeout(download.release, 0);
+  return { canceled: false };
 };
+
+export const saveNotePdf = exportNotePdf;
+export const saveNoteImage = exportNoteImage;
+
+// Web already exposes the browser's print/download UI, so these aliases keep
+// the native and web adapters identical without adding duplicate web actions.
+export const shareNotePdf = exportNotePdf;
+export const shareNoteImage = exportNoteImage;

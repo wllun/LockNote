@@ -39,6 +39,15 @@ export default {
     },
     plugins: [
       "expo-sqlite",
+      [
+        "expo-media-library",
+        {
+          photosPermission: "Allow LockNote to access your photos.",
+          savePhotosPermission: "Allow LockNote to save exported note images.",
+          isAccessMediaLocationEnabled: false,
+          granularPermissions: [],
+        },
+      ],
     ],
   },
 };

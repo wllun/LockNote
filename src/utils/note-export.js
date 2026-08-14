@@ -1,4 +1,6 @@
 import * as Print from 'expo-print';
+import { Directory, File } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { PixelRatio } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
@@ -52,20 +54,23 @@ const shareFile = async (uri, options) => {
   await shareAsync(uri, options);
 };
 
-export const exportNotePdf = async (data) => {
+const createNotePdf = async (data) => {
   const printToFileAsync = requireFunction(
     Print.printToFileAsync,
     'PDF export is unavailable in this app build.'
   );
   const result = await printToFileAsync({ html: buildNoteExportHtml(data) });
-  await shareFile(result?.uri, {
-    dialogTitle: `Export ${getExportFileName(data?.title, 'pdf', data?.type)}`,
+  if (typeof result?.uri !== 'string' || !result.uri.trim()) {
+    throw new Error('The PDF file could not be created.');
+  }
+  return {
+    uri: result.uri,
+    fileName: getExportFileName(data?.title, 'pdf', data?.type),
     mimeType: 'application/pdf',
-    UTI: 'com.adobe.pdf',
-  });
+  };
 };
 
-export const exportNoteImage = async (viewRef, data) => {
+const createNoteImage = async (viewRef, data) => {
   if (!viewRef) throw new Error('The export preview is not ready yet.');
   const captureView = requireFunction(
     captureRef,
@@ -78,9 +83,100 @@ export const exportNoteImage = async (viewRef, data) => {
     result: 'tmpfile',
     ...captureSize,
   });
-  await shareFile(uri, {
+  if (typeof uri !== 'string' || !uri.trim()) {
+    throw new Error('The image file could not be created.');
+  }
+  return {
+    uri,
+    fileName: getExportFileName(data?.title, 'png', data?.type),
+    mimeType: 'image/png',
+  };
+};
+
+const isDirectoryPickerCancellation = (error) => {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('pick') && (message.includes('cancelled') || message.includes('canceled'));
+};
+
+const addTimestampToFileName = (fileName) => {
+  const dotIndex = fileName.lastIndexOf('.');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  if (dotIndex <= 0) return `${fileName}-${stamp}`;
+  return `${fileName.slice(0, dotIndex)}-${stamp}${fileName.slice(dotIndex)}`;
+};
+
+const createDestinationFile = (directory, fileName, mimeType) => {
+  try {
+    return directory.createFile(fileName, mimeType);
+  } catch (error) {
+    if (!String(error?.message || error || '').toLowerCase().includes('exist')) throw error;
+    return directory.createFile(addTimestampToFileName(fileName), mimeType);
+  }
+};
+
+const saveFileToSelectedDirectory = async ({ uri, fileName, mimeType }) => {
+  let directory;
+  try {
+    directory = await Directory.pickDirectoryAsync();
+  } catch (error) {
+    if (isDirectoryPickerCancellation(error)) return { canceled: true };
+    throw error;
+  }
+
+  const source = new File(uri);
+  const destination = createDestinationFile(directory, fileName, mimeType);
+  destination.write(await source.bytes());
+  return { canceled: false, uri: destination.uri };
+};
+
+export const saveNotePdf = async (data) => {
+  const file = await createNotePdf(data);
+  return saveFileToSelectedDirectory(file);
+};
+
+export const saveNoteImage = async (viewRef, data) => {
+  const file = await createNoteImage(viewRef, data);
+  const isAvailableAsync = requireFunction(
+    MediaLibrary.isAvailableAsync,
+    'Saving images to the gallery is unavailable in this app build.'
+  );
+  if (!(await isAvailableAsync())) {
+    throw new Error('Saving images to the gallery is not available on this device.');
+  }
+  const requestPermissionsAsync = requireFunction(
+    MediaLibrary.requestPermissionsAsync,
+    'Gallery permission is unavailable in this app build.'
+  );
+  const permission = await requestPermissionsAsync(true);
+  if (!permission?.granted) {
+    throw new Error('Allow LockNote to add images to your gallery, then try again.');
+  }
+  const saveToLibraryAsync = requireFunction(
+    MediaLibrary.saveToLibraryAsync,
+    'Saving images to the gallery is unavailable in this app build.'
+  );
+  await saveToLibraryAsync(file.uri);
+  return { canceled: false };
+};
+
+export const shareNotePdf = async (data) => {
+  const file = await createNotePdf(data);
+  await shareFile(file.uri, {
+    dialogTitle: `Export ${getExportFileName(data?.title, 'pdf', data?.type)}`,
+    mimeType: 'application/pdf',
+    UTI: 'com.adobe.pdf',
+  });
+};
+
+export const shareNoteImage = async (viewRef, data) => {
+  const file = await createNoteImage(viewRef, data);
+  await shareFile(file.uri, {
     dialogTitle: `Export ${getExportFileName(data?.title, 'png', data?.type)}`,
     mimeType: 'image/png',
     UTI: 'public.png',
   });
 };
+
+// Preserve the original public names for any callers outside the export modal.
+export const exportNotePdf = shareNotePdf;
+export const exportNoteImage = shareNoteImage;

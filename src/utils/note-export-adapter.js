@@ -1,1 +1,8 @@
-export { exportNoteImage, exportNotePdf } from './note-export.js';
+export {
+  exportNoteImage,
+  exportNotePdf,
+  saveNoteImage,
+  saveNotePdf,
+  shareNoteImage,
+  shareNotePdf,
+} from './note-export.js';

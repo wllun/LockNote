@@ -67,7 +67,8 @@ commitments; unchecked commitments are excluded.
 Checklist notes use `checklist` and store ordered `{id, text, completed}` items
 as versioned JSON in `content`. `ChecklistEditorScreen` supports inline editing,
 checkbox toggles, drag-handle reordering, item deletion, progress, PDF/image
-export, and the same local pin/password gate used by other notes. Reordered items
+export to Gallery/Documents with optional sharing, and the same local pin/password
+gate used by other notes. Reordered items
 are persisted through the existing debounced auto-save. Checklist item text
 remains searchable because repository search already checks the serialized
 `content` field.

@@ -2,7 +2,12 @@ import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { exportNoteImage, exportNotePdf } from '../utils/note-export-adapter';
+import {
+  saveNoteImage,
+  saveNotePdf,
+  shareNoteImage,
+  shareNotePdf,
+} from '../utils/note-export-adapter';
 import {
   formatExportAmount,
   getExpenseExportCategories,
@@ -52,13 +57,33 @@ const NoteExportModal = ({
   const visibleSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
   const hasMonthlySummary = visibleCategories.length > 0 || visibleSummaryNote.length > 0;
 
-  const runExport = async (format) => {
-    setExporting(format);
+  const runExport = async (format, destination = 'save') => {
+    const actionKey = `${destination}:${format}`;
+    setExporting(actionKey);
     try {
-      if (format === 'pdf') await exportNotePdf(exportData);
-      else await exportNoteImage(previewRef.current, exportData);
+      let result;
+      if (destination === 'share') {
+        if (format === 'pdf') result = await shareNotePdf(exportData);
+        else result = await shareNoteImage(previewRef.current, exportData);
+      } else if (format === 'pdf') {
+        result = await saveNotePdf(exportData);
+      } else {
+        result = await saveNoteImage(previewRef.current, exportData);
+      }
+
+      if (result?.canceled || destination === 'share' || Platform.OS === 'web') return;
+      Alert.alert(
+        'Saved',
+        format === 'pdf'
+          ? 'The PDF was saved to the folder you selected.'
+          : 'The image was saved to your gallery.'
+      );
     } catch (error) {
-      Alert.alert('Export failed', error?.message || `Could not export the ${format.toUpperCase()}.`);
+      const action = destination === 'share' ? 'Share' : 'Save';
+      Alert.alert(
+        `${action} failed`,
+        error?.message || `Could not ${action.toLowerCase()} the ${format.toUpperCase()}.`
+      );
     } finally {
       setExporting(null);
     }
@@ -74,7 +99,9 @@ const NoteExportModal = ({
           <View style={styles.header}>
             <View>
               <Text style={styles.eyebrow}>EXPORT NOTE</Text>
-              <Text style={styles.title}>Choose a format</Text>
+              <Text style={styles.title}>
+                {Platform.OS === 'web' ? 'Choose a format' : 'Save or share'}
+              </Text>
             </View>
             <Pressable style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close export">
               <Ionicons name="close" size={22} color={colors.text} />
@@ -196,14 +223,64 @@ const NoteExportModal = ({
               {
                 format: 'pdf',
                 icon: 'document-text-outline',
-                label: Platform.OS === 'web' ? 'Print / save PDF' : 'Export PDF',
+                label: Platform.OS === 'web' ? 'Print / save PDF' : 'Save PDF',
               },
-              { format: 'image', icon: 'image-outline', label: 'Export image' },
+              {
+                format: 'image',
+                icon: 'image-outline',
+                label: Platform.OS === 'web' ? 'Download image' : 'Save image',
+              },
             ].map((item) => (
-              <Pressable key={item.format} disabled={!!exporting} style={({ pressed }) => [styles.action, pressed && styles.pressed, exporting && styles.disabled]} onPress={() => runExport(item.format)} accessibilityRole="button" accessibilityLabel={item.label} accessibilityState={{ disabled: !!exporting, busy: exporting === item.format }}>
-                {exporting === item.format ? <ActivityIndicator color={colors.card} /> : <Ionicons name={item.icon} size={21} color={colors.card} />}
-                <Text style={styles.actionText}>{exporting === item.format ? 'Preparing...' : item.label}</Text>
-              </Pressable>
+              <View key={item.format} style={styles.actionRow}>
+                <Pressable
+                  disabled={!!exporting}
+                  style={({ pressed }) => [
+                    styles.action,
+                    pressed && styles.pressed,
+                    exporting && styles.disabled,
+                  ]}
+                  onPress={() => runExport(item.format)}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  accessibilityState={{
+                    disabled: !!exporting,
+                    busy: exporting === `save:${item.format}`,
+                  }}
+                >
+                  {exporting === `save:${item.format}` ? (
+                    <ActivityIndicator color={colors.card} />
+                  ) : (
+                    <Ionicons name={item.icon} size={21} color={colors.card} />
+                  )}
+                  <Text style={styles.actionText}>
+                    {exporting === `save:${item.format}` ? 'Preparing...' : item.label}
+                  </Text>
+                </Pressable>
+                {Platform.OS !== 'web' && (
+                  <Pressable
+                    disabled={!!exporting}
+                    style={({ pressed }) => [
+                      styles.shareAction,
+                      pressed && styles.pressed,
+                      exporting && styles.disabled,
+                    ]}
+                    onPress={() => runExport(item.format, 'share')}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Share ${item.format === 'pdf' ? 'PDF' : 'image'}`}
+                    accessibilityHint="Opens the system share menu"
+                    accessibilityState={{
+                      disabled: !!exporting,
+                      busy: exporting === `share:${item.format}`,
+                    }}
+                  >
+                    {exporting === `share:${item.format}` ? (
+                      <ActivityIndicator color={colors.primary} />
+                    ) : (
+                      <Ionicons name="share-outline" size={21} color={colors.primary} />
+                    )}
+                  </Pressable>
+                )}
+              </View>
             ))}
           </View>
         </View>
@@ -220,7 +297,7 @@ const makeStyles = (colors) => StyleSheet.create({
   title: { color: colors.text, fontSize: 21, fontWeight: '800', marginTop: 2 },
   closeButton: { width: 48, height: 48, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.inputBg },
   pressed: { opacity: 0.72 },
-  previewScroll: { maxHeight: 430, borderRadius: radius.md, backgroundColor: colors.background },
+  previewScroll: { maxHeight: 430, flexShrink: 1, borderRadius: radius.md, backgroundColor: colors.background },
   previewScrollContent: { padding: 12 },
   preview: { width: '100%', minHeight: 260, padding: 24, backgroundColor: '#ffffff', borderRadius: radius.md },
   previewTitle: { color: '#172033', fontSize: 24, lineHeight: 30, fontWeight: '800' },
@@ -257,9 +334,11 @@ const makeStyles = (colors) => StyleSheet.create({
   summaryNoteLabel: { color: '#30384c', fontSize: 11, fontWeight: '800', marginBottom: 5 },
   summaryNoteText: { color: '#30384c', fontSize: 12, lineHeight: 18 },
   brand: { color: '#8a91a3', fontSize: 10, marginTop: 28 },
-  actions: { flexDirection: 'row', gap: 12 },
+  actions: { gap: 10 },
+  actionRow: { flexDirection: 'row', gap: 10 },
   action: { flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.md, backgroundColor: colors.primary },
   actionText: { color: colors.card, fontSize: 14, fontWeight: '800' },
+  shareAction: { width: 52, minHeight: 52, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, backgroundColor: colors.card },
   disabled: { opacity: 0.55 },
 });
 
