@@ -19,6 +19,7 @@ import {
   getExportTitle,
 } from '../utils/note-export.mjs';
 import { radius, shadow, useTheme } from '../theme';
+import { formatReminderSchedule, normalizeReminder } from '../utils/reminder-note.mjs';
 
 const NoteExportModal = ({
   visible,
@@ -32,6 +33,7 @@ const NoteExportModal = ({
   monthlyCommitments = [],
   checklistItems,
   type = 'note',
+  reminder,
 }) => {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
@@ -48,6 +50,7 @@ const NoteExportModal = ({
     monthlyCommitments,
     checklistItems,
     type,
+    reminder,
   };
   const visibleRows = getExpenseExportRows(rows);
   const visibleCategories = getExpenseExportCategories(categories);
@@ -56,6 +59,7 @@ const NoteExportModal = ({
   const checklistCompleted = visibleChecklistItems.filter((item) => item.completed).length;
   const visibleSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
   const hasMonthlySummary = visibleCategories.length > 0 || visibleSummaryNote.length > 0;
+  const visibleReminder = normalizeReminder(reminder);
 
   const runExport = async (format, destination = 'save') => {
     const actionKey = `${destination}:${format}`;
@@ -112,7 +116,20 @@ const NoteExportModal = ({
             <View ref={previewRef} collapsable={false} style={styles.preview}>
               <Text style={styles.previewTitle}>{getExportTitle(title, type)}</Text>
               <View style={styles.accent} />
-              {type === 'checklist' ? (
+              {type === 'reminder' ? (
+                <>
+                  <View style={styles.reminderPreview}>
+                    <View style={styles.reminderPreviewIcon}>
+                      <Ionicons name={visibleReminder.enabled ? 'notifications' : 'notifications-off-outline'} size={20} color="#4854dc" />
+                    </View>
+                    <View style={styles.reminderPreviewText}>
+                      <Text style={styles.reminderPreviewTitle}>{visibleReminder.enabled ? 'Reminder scheduled' : 'Reminder is off'}</Text>
+                      <Text style={styles.reminderPreviewSchedule}>{visibleReminder.enabled ? formatReminderSchedule(visibleReminder) : 'No notification scheduled'}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.previewBody}>{content || 'This reminder note is empty.'}</Text>
+                </>
+              ) : type === 'checklist' ? (
                 <View style={styles.checklistPreview}>
                   <Text style={styles.checklistSummary}>
                     {checklistCompleted} of {visibleChecklistItems.length} completed
@@ -303,6 +320,9 @@ const makeStyles = (colors) => StyleSheet.create({
   previewTitle: { color: '#172033', fontSize: 24, lineHeight: 30, fontWeight: '800' },
   accent: { height: 3, backgroundColor: '#5b67f1', borderRadius: radius.full, marginTop: 14, marginBottom: 20 },
   previewBody: { color: '#30384c', fontSize: 15, lineHeight: 23 },
+  reminderPreview: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, marginBottom: 18, borderWidth: 1, borderColor: '#c7cdfd', borderRadius: 12, backgroundColor: '#f1f2ff' },
+  reminderPreviewIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff' },
+  reminderPreviewText: { flex: 1 }, reminderPreviewTitle: { color: '#30384c', fontSize: 14, fontWeight: '800' }, reminderPreviewSchedule: { color: '#687086', fontSize: 12, lineHeight: 17, marginTop: 2 },
   checklistPreview: { gap: 9 },
   checklistSummary: { color: '#4854dc', fontSize: 14, fontWeight: '800', marginBottom: 4 },
   checklistRow: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 11, paddingVertical: 8, borderWidth: 1, borderColor: '#dfe3ee', borderRadius: 10 },

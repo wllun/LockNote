@@ -40,7 +40,7 @@ const NOTE_TYPES = [
     title: 'Reminder',
     description: 'Add notification settings to a note',
     icon: 'alarm-outline',
-    available: false,
+    available: true,
   },
 ];
 
@@ -151,9 +151,6 @@ const CreateNoteTypeModal = ({ visible, onClose, onSelect }) => {
             ))}
           </ScrollView>
 
-          {isDesktopWeb && (
-            <Text style={styles.footerNote}>More note types are on the way.</Text>
-          )}
         </View>
       </View>
     </Modal>

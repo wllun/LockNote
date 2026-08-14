@@ -10,6 +10,7 @@ import {
   getExportFileName,
   getExportTitle,
 } from './note-export.mjs';
+import { formatReminderSchedule, normalizeReminder } from './reminder-note.mjs';
 
 const callBrowserMethod = (target, method, errorMessage, ...args) => {
   if (!target || typeof target[method] !== 'function') {
@@ -135,6 +136,7 @@ export const exportNoteImage = async (_viewRef, data) => {
   const categories = getExpenseExportCategories(data.categories);
   const commitments = getExpenseExportMonthlyCommitments(data.monthlyCommitments);
   const isChecklist = data.type === 'checklist' || Array.isArray(data.checklistItems);
+  const isReminder = data.type === 'reminder';
   const checklistItems = getChecklistExportItems(data.checklistItems);
   const summaryNote = typeof data.summaryNote === 'string' ? data.summaryNote.trim() : '';
   const hasMonthlySummary = categories.length > 0 || summaryNote.length > 0;
@@ -162,7 +164,7 @@ export const exportNoteImage = async (_viewRef, data) => {
       ? expenseHeight + commitmentHeight + summaryHeight + 120
       : isChecklist
         ? 250 + checklistLines.reduce((sum, item) => sum + Math.max(58, item.lines.length * 38 + 20), 0)
-        : 210 + contentLines.length * 46
+        : 210 + contentLines.length * 46 + (isReminder ? 110 : 0)
   );
   const preferredScale = 2;
   const maxScaleForMemory = Math.sqrt(24000000 / (width * height));
@@ -261,7 +263,17 @@ export const exportNoteImage = async (_viewRef, data) => {
       y += rowHeight;
     });
   } else {
-    let y = 190; contentLines.forEach((line) => { context.fillText(line, padding, y); y += 46; });
+    let y = 190;
+    if (isReminder) {
+      const exportedReminder = normalizeReminder(data.reminder);
+      context.fillStyle = '#f1f2ff'; context.fillRect(padding, y - 24, width - padding * 2, 82);
+      context.fillStyle = '#4854dc'; context.font = 'bold 25px sans-serif';
+      context.fillText(exportedReminder.enabled ? 'Reminder scheduled' : 'Reminder is off', padding + 22, y + 8);
+      context.fillStyle = '#687086'; context.font = '20px sans-serif';
+      context.fillText(exportedReminder.enabled ? formatReminderSchedule(exportedReminder) : 'No notification scheduled', padding + 22, y + 40, width - padding * 2 - 44);
+      y += 110; context.fillStyle = '#172033'; context.font = '32px sans-serif';
+    }
+    contentLines.forEach((line) => { context.fillText(line, padding, y); y += 46; });
   }
   const download = await getCanvasDownload(canvas);
   const link = document.createElement('a');

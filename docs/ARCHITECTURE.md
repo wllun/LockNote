@@ -30,7 +30,7 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 
 `AppNavigator` = bottom tab navigator with three tabs:
 
-- **Home** (native stack): `HomeScreen` → `FolderScreen` → `NoteEditorScreen`
+- **Home** (native stack): `HomeScreen` → `FolderScreen` → the note-type editor (`NoteEditorScreen`, `ChecklistEditorScreen`, `ExpenseRecordEditorScreen`, or `ReminderEditorScreen`)
 - **Settings** (native stack): `SettingsScreen`
 - **Profile** (native stack): `ProfileTabScreen` → `AuthScreen` (logged out) or `ProfileScreen` (logged in), switched via `useAuth()`
 
@@ -63,6 +63,15 @@ daily-expense rows; saving a normalized category name again updates it
 instead of creating a duplicate. The note's `title` remains in the normal title
 column. Expense grand totals add daily-expense rows and checked monthly
 commitments; unchecked commitments are excluded.
+
+Reminder notes use `reminder` and store a plaintext body plus notification
+settings as versioned JSON in `content`. `ReminderEditorScreen` supports one-time,
+daily, weekly, and monthly schedules through `expo-notifications`. Notification
+identifiers are saved with the note so turning a reminder off, deleting its note,
+or deleting its containing folder cancels the pending notification. Locked
+reminders schedule privacy-safe text, but their locally stored content remains
+plaintext like every other locked note. Web preserves and exports reminder
+settings but cannot schedule a device notification.
 
 Checklist notes use `checklist` and store ordered `{id, text, completed}` items
 as versioned JSON in `content`. `ChecklistEditorScreen` supports inline editing,
@@ -99,14 +108,15 @@ This is **gating, not encryption** — note `content` is stored in cleartext. Se
 
 ## Editor auto-save
 
-`NoteEditorScreen`, `ChecklistEditorScreen`, and `ExpenseRecordEditorScreen`
+`NoteEditorScreen`, `ChecklistEditorScreen`, `ExpenseRecordEditorScreen`, and
+`ReminderEditorScreen`
 create the note row first (empty), then navigate into it by `noteId`. Field
 changes trigger a debounced (800ms) `noteRepo.update`. The debounce timer is
 cleared on unmount and before delete. Normal note bodies are limited to 100,000
 characters; checklist items are limited to 500 characters and 500 items; see
 [Note Character Limits](NOTE_LIMITS.md).
 
-All three editors also keep a bounded, in-memory undo history for the current
+All four editors also keep a bounded, in-memory undo history for the current
 editing session. Consecutive typing is grouped into short bursts, while add,
 delete, checkbox, monthly-commitment, and reorder operations create individual
 undo steps. Restoring a snapshot goes back through the same debounced auto-save

@@ -9,6 +9,7 @@ import FolderScreen from '../screens/FolderScreen';
 import NoteEditorScreen from '../screens/NoteEditorScreen';
 import ChecklistEditorScreen from '../screens/ChecklistEditorScreen';
 import ExpenseRecordEditorScreen from '../screens/ExpenseRecordEditorScreen';
+import ReminderEditorScreen from '../screens/ReminderEditorScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProfileTabScreen from '../screens/ProfileTabScreen';
 import { useTheme, useThemeMode } from '../theme';
@@ -41,6 +42,11 @@ const HomeStack = ({ screenOptions }) => (
     <Stack.Screen
       name="ExpenseRecordEditor"
       component={ExpenseRecordEditorScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name="ReminderEditor"
+      component={ReminderEditorScreen}
       options={{ headerShown: false }}
     />
   </Stack.Navigator>

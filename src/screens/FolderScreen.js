@@ -28,10 +28,13 @@ import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
 import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
 import { confirmDestructiveAction } from '../utils/confirm-action';
+import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
+import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
 
 const editorRouteFor = (note) => {
   if (note.note_type === EXPENSE_NOTE_TYPE) return 'ExpenseRecordEditor';
   if (note.note_type === CHECKLIST_NOTE_TYPE) return 'ChecklistEditor';
+  if (note.note_type === REMINDER_NOTE_TYPE) return 'ReminderEditor';
   return 'NoteEditor';
 };
 
@@ -227,7 +230,7 @@ const FolderScreen = ({ route, navigation }) => {
       message: 'Are you sure you want to delete this note?',
       onConfirm: async () => {
         try {
-          await noteRepo.softDelete(note.id);
+          await softDeleteNoteWithCleanup(noteRepo, note);
           loadNotes();
         } catch (error) {
           Alert.alert('Error', 'Failed to delete note');

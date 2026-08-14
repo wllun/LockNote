@@ -26,6 +26,7 @@ export default {
         backgroundColor: "#ffffff",
       },
       edgeToEdgeEnabled: true,
+      permissions: ["SCHEDULE_EXACT_ALARM"],
     },
     web: {
       favicon: "./assets/favicon.png",
@@ -39,6 +40,14 @@ export default {
     },
     plugins: [
       "expo-sqlite",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          color: "#4F46E5",
+          defaultChannel: "reminders",
+        },
+      ],
       [
         "expo-media-library",
         {

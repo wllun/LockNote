@@ -20,6 +20,11 @@ import {
   getChecklistPreview,
   parseChecklistNote,
 } from '../utils/checklist-note.mjs';
+import {
+  getReminderPreview,
+  parseReminderNote,
+  REMINDER_NOTE_TYPE,
+} from '../utils/reminder-note.mjs';
 
 // ponytail: entering animations are native-only — reanimated web leaves items visibility:hidden
 const entering = (index) =>
@@ -40,16 +45,22 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
   const locked = !!note.password;
   const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
   const isChecklist = note.note_type === CHECKLIST_NOTE_TYPE;
+  const isReminder = note.note_type === REMINDER_NOTE_TYPE;
   const checklistItems = isChecklist ? parseChecklistNote(note.content).items : [];
+  const reminder = isReminder ? parseReminderNote(note.content).reminder : null;
   const displayTitle = isExpense
     ? note.title.trim() || 'Expense Record'
     : isChecklist
       ? note.title.trim() || 'Checklist'
+      : isReminder
+        ? note.title.trim() || 'Reminder'
       : note.title || 'Untitled';
   const preview = isExpense
     ? `RM ${formatExpenseAmount(calculateExpenseNoteGrandTotal(note.content))}`
     : isChecklist
       ? getChecklistPreview(checklistItems)
+      : isReminder
+        ? getReminderPreview(note.content)
       : note.content || 'No content';
 
   const handleActionsPress = (e) => {
@@ -95,6 +106,16 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
               <Text style={styles.typeBadgeText}>Checklist</Text>
             </View>
           )}
+          {isReminder && (
+            <View style={styles.typeBadge}>
+              <Ionicons
+                name={reminder?.enabled ? 'notifications' : 'alarm-outline'}
+                size={12}
+                color={colors.primary}
+              />
+              <Text style={styles.typeBadgeText}>Reminder</Text>
+            </View>
+          )}
           {locked && (
             <View style={styles.lockBadge}>
               <Ionicons name="lock-closed" size={12} color={colors.folder} />
@@ -129,6 +150,8 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
               ? 'Locked expense record'
               : isChecklist
                 ? 'Locked checklist'
+                : isReminder
+                  ? 'Locked reminder'
                 : 'Locked note'
             : preview}
         </Text>
