@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { exportNoteImage, exportNotePdf } from '../utils/note-export-adapter';
 import {
   formatExportAmount,
@@ -28,6 +29,7 @@ const NoteExportModal = ({
   type = 'note',
 }) => {
   const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const previewRef = useRef(null);
   const [exporting, setExporting] = useState(null);
@@ -65,7 +67,10 @@ const NoteExportModal = ({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet} accessibilityViewIsModal>
+        <View
+          style={[styles.sheet, { paddingBottom: Math.max(20, insets.bottom + 12) }]}
+          accessibilityViewIsModal
+        >
           <View style={styles.header}>
             <View>
               <Text style={styles.eyebrow}>EXPORT NOTE</Text>
