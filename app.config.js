@@ -23,7 +23,7 @@ export default {
       package: "com.locknote.app",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#ffffff",
+        backgroundColor: "#4F46E5",
       },
       edgeToEdgeEnabled: true,
       permissions: ["SCHEDULE_EXACT_ALARM"],
