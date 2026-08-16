@@ -1,10 +1,14 @@
 import * as Print from 'expo-print';
-import { Directory, File } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import { PixelRatio } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import { buildNoteExportHtml, getExportFileName } from './note-export.mjs';
+import {
+  addExportFileCollisionSuffix,
+  buildNoteExportHtml,
+  getExportFileName,
+} from './note-export.mjs';
 
 const requireFunction = (value, message) => {
   if (typeof value !== 'function') throw new Error(message);
@@ -54,6 +58,14 @@ const shareFile = async (uri, options) => {
   await shareAsync(uri, options);
 };
 
+const copyToNamedCacheFile = async ({ uri, fileName, mimeType }) => {
+  const source = new File(uri);
+  const destination = new File(Paths.cache, fileName);
+  destination.create({ overwrite: true });
+  destination.write(await source.bytes());
+  return { uri: destination.uri, fileName, mimeType };
+};
+
 const createNotePdf = async (data) => {
   const printToFileAsync = requireFunction(
     Print.printToFileAsync,
@@ -63,11 +75,11 @@ const createNotePdf = async (data) => {
   if (typeof result?.uri !== 'string' || !result.uri.trim()) {
     throw new Error('The PDF file could not be created.');
   }
-  return {
+  return copyToNamedCacheFile({
     uri: result.uri,
     fileName: getExportFileName(data?.title, 'pdf', data?.type),
     mimeType: 'application/pdf',
-  };
+  });
 };
 
 const createNoteImage = async (viewRef, data) => {
@@ -86,11 +98,11 @@ const createNoteImage = async (viewRef, data) => {
   if (typeof uri !== 'string' || !uri.trim()) {
     throw new Error('The image file could not be created.');
   }
-  return {
+  return copyToNamedCacheFile({
     uri,
     fileName: getExportFileName(data?.title, 'png', data?.type),
     mimeType: 'image/png',
-  };
+  });
 };
 
 const isDirectoryPickerCancellation = (error) => {
@@ -98,20 +110,21 @@ const isDirectoryPickerCancellation = (error) => {
   return message.includes('pick') && (message.includes('cancelled') || message.includes('canceled'));
 };
 
-const addTimestampToFileName = (fileName) => {
-  const dotIndex = fileName.lastIndexOf('.');
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  if (dotIndex <= 0) return `${fileName}-${stamp}`;
-  return `${fileName.slice(0, dotIndex)}-${stamp}${fileName.slice(dotIndex)}`;
-};
-
 const createDestinationFile = (directory, fileName, mimeType) => {
-  try {
-    return directory.createFile(fileName, mimeType);
-  } catch (error) {
-    if (!String(error?.message || error || '').toLowerCase().includes('exist')) throw error;
-    return directory.createFile(addTimestampToFileName(fileName), mimeType);
+  for (let collisionIndex = 0; collisionIndex < 10000; collisionIndex += 1) {
+    try {
+      return directory.createFile(
+        addExportFileCollisionSuffix(fileName, collisionIndex),
+        mimeType
+      );
+    } catch (error) {
+      const alreadyExists = String(error?.message || error || '')
+        .toLowerCase()
+        .includes('exist');
+      if (!alreadyExists || collisionIndex === 9999) throw error;
+    }
   }
+  throw new Error('Could not choose an available export filename.');
 };
 
 const saveFileToSelectedDirectory = async ({ uri, fileName, mimeType }) => {
@@ -126,7 +139,7 @@ const saveFileToSelectedDirectory = async ({ uri, fileName, mimeType }) => {
   const source = new File(uri);
   const destination = createDestinationFile(directory, fileName, mimeType);
   destination.write(await source.bytes());
-  return { canceled: false, uri: destination.uri };
+  return { canceled: false, uri: destination.uri, fileName: destination.name };
 };
 
 export const saveNotePdf = async (data) => {
@@ -162,7 +175,7 @@ export const saveNoteImage = async (viewRef, data) => {
 export const shareNotePdf = async (data) => {
   const file = await createNotePdf(data);
   await shareFile(file.uri, {
-    dialogTitle: `Export ${getExportFileName(data?.title, 'pdf', data?.type)}`,
+    dialogTitle: `Export ${file.fileName}`,
     mimeType: 'application/pdf',
     UTI: 'com.adobe.pdf',
   });
@@ -171,7 +184,7 @@ export const shareNotePdf = async (data) => {
 export const shareNoteImage = async (viewRef, data) => {
   const file = await createNoteImage(viewRef, data);
   await shareFile(file.uri, {
-    dialogTitle: `Export ${getExportFileName(data?.title, 'png', data?.type)}`,
+    dialogTitle: `Export ${file.fileName}`,
     mimeType: 'image/png',
     UTI: 'public.png',
   });

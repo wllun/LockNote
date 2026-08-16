@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  addExportFileCollisionSuffix,
   buildNoteExportHtml,
+  formatExportFileTimestamp,
   getExpenseExportCategories,
   getExpenseExportCategoryDescription,
   getExpenseExportMonthlyCommitments,
@@ -12,13 +14,34 @@ import {
 } from '../src/utils/note-export.mjs';
 
 test('uses clear fallback titles and filesystem-safe export names', () => {
+  const exportedAt = new Date(2026, 7, 16, 14, 30);
   assert.equal(getExportTitle('', 'note'), 'Untitled note');
   assert.equal(getExportTitle('  ', 'expense'), 'Untitled expense record');
   assert.equal(getExportTitle('  ', 'checklist'), 'Untitled checklist');
-  assert.equal(getExportFileName('Bills: July / August?', 'pdf'), 'Bills July August.pdf');
+  assert.equal(
+    getExportFileName('Bills: July / August?', 'pdf', 'expense', exportedAt),
+    'Bills July August - Expense - 2026-08-16 1430.pdf'
+  );
   assert.equal(getExportTitle(undefined), 'Untitled note');
   assert.equal(getExportTitle(null, 'expense'), 'Untitled expense record');
-  assert.equal(getExportFileName(undefined, undefined), 'Untitled note.pdf');
+  assert.equal(
+    getExportFileName(undefined, undefined, 'note', exportedAt),
+    'Untitled Note - 2026-08-16 1430.pdf'
+  );
+  assert.equal(formatExportFileTimestamp(exportedAt), '2026-08-16 1430');
+});
+
+test('adds numbered suffixes without changing the export extension', () => {
+  const fileName = 'July Expenses - Expense - 2026-08-16 1430.pdf';
+  assert.equal(addExportFileCollisionSuffix(fileName), fileName);
+  assert.equal(
+    addExportFileCollisionSuffix(fileName, 1),
+    'July Expenses - Expense - 2026-08-16 1430 (1).pdf'
+  );
+  assert.equal(
+    addExportFileCollisionSuffix(fileName, 12),
+    'July Expenses - Expense - 2026-08-16 1430 (12).pdf'
+  );
 });
 
 test('normalizes malformed expense rows without exporting undefined values', () => {

@@ -22,16 +22,51 @@ export const getExportTitle = (title = '', type = 'note') =>
         : 'Untitled note'
   );
 
-export const getExportFileName = (title = '', extension = 'pdf', type = 'note') => {
-  const safeTitle = getExportTitle(title, type)
+const EXPORT_TYPE_LABELS = {
+  note: 'Note',
+  checklist: 'Checklist',
+  expense: 'Expense',
+  reminder: 'Reminder',
+};
+
+const padDatePart = (value) => String(value).padStart(2, '0');
+
+export const formatExportFileTimestamp = (exportedAt = new Date()) => {
+  const parsedDate = exportedAt instanceof Date ? exportedAt : new Date(exportedAt);
+  const date = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())} ${padDatePart(date.getHours())}${padDatePart(date.getMinutes())}`;
+};
+
+export const addExportFileCollisionSuffix = (fileName, collisionIndex = 0) => {
+  const normalizedIndex = Math.max(0, Math.floor(Number(collisionIndex) || 0));
+  if (!normalizedIndex) return fileName;
+  const dotIndex = fileName.lastIndexOf('.');
+  if (dotIndex <= 0) return `${fileName} (${normalizedIndex})`;
+  return `${fileName.slice(0, dotIndex)} (${normalizedIndex})${fileName.slice(dotIndex)}`;
+};
+
+export const getExportFileName = (
+  title = '',
+  extension = 'pdf',
+  type = 'note',
+  exportedAt = new Date()
+) => {
+  const normalizedType = Object.prototype.hasOwnProperty.call(EXPORT_TYPE_LABELS, type)
+    ? type
+    : 'note';
+  const typeLabel = EXPORT_TYPE_LABELS[normalizedType];
+  const safeTitle = asText(title)
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 80) || 'LockNote export';
+    .slice(0, 60);
+  const descriptiveName = safeTitle
+    ? `${safeTitle} - ${typeLabel}`
+    : `Untitled ${typeLabel}`;
   const safeExtension = asText(extension)
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '') || 'pdf';
-  return `${safeTitle}.${safeExtension}`;
+  return `${descriptiveName} - ${formatExportFileTimestamp(exportedAt)}.${safeExtension}`;
 };
 
 export const formatExportAmount = (value) => {
