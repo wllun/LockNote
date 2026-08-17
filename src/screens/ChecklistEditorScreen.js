@@ -23,6 +23,7 @@ import PasswordModal from '../components/PasswordModal';
 import { verifyPassword } from '../utils/crypto';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
+import { useDragAutoScroll } from '../utils/use-drag-auto-scroll';
 import {
   calculateChecklistProgress,
   CHECKLIST_ITEM_MAX_CHARACTERS,
@@ -74,14 +75,14 @@ const ChecklistItemRow = React.memo(({
     onDragCancel,
   };
 
-  const startDrag = useCallback(() => {
-    callbacks.current.onDragStart(item.id);
+  const startDrag = useCallback((absoluteY) => {
+    callbacks.current.onDragStart(item.id, absoluteY);
   }, [item.id]);
-  const updateDrag = useCallback((translationY) => {
-    callbacks.current.onDragUpdate(item.id, translationY);
+  const updateDrag = useCallback((translationY, absoluteY) => {
+    callbacks.current.onDragUpdate(item.id, translationY, absoluteY);
   }, [item.id]);
-  const endDrag = useCallback((translationY) => {
-    callbacks.current.onDragEnd(item.id, translationY);
+  const endDrag = useCallback((translationY, absoluteY) => {
+    callbacks.current.onDragEnd(item.id, translationY, absoluteY);
   }, [item.id]);
   const cancelDrag = useCallback(() => {
     callbacks.current.onDragCancel(item.id);
@@ -93,17 +94,15 @@ const ChecklistItemRow = React.memo(({
         .minDistance(4)
         .shouldCancelWhenOutside(false)
         .runOnJS(true)
-        .onStart(() => {
+        .onStart((event) => {
           dragOffsetY.value = 0;
-          startDrag();
+          startDrag(event.absoluteY);
         })
         .onUpdate((event) => {
-          dragOffsetY.value = event.translationY;
-          updateDrag(event.translationY);
+          updateDrag(event.translationY, event.absoluteY);
         })
         .onEnd((event) => {
-          dragOffsetY.value = event.translationY;
-          endDrag(event.translationY);
+          endDrag(event.translationY, event.absoluteY);
         })
         .onFinalize((_, success) => {
           if (!success) cancelDrag();
@@ -216,8 +215,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
   const saveTimeout = useRef(null);
   const newItemInputRef = useRef(null);
+  const listRef = useRef(null);
   const activeDragRef = useRef(null);
   const itemHeightsRef = useRef({});
+  const dragTranslationYRef = useRef(0);
   const dragOffsetY = useSharedValue(0);
   const latest = useRef({
     title: '',
@@ -364,11 +365,33 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     return remainingItems.length;
   }, []);
 
+  const applyChecklistDragPosition = useCallback((itemId, effectiveTranslationY) => {
+    const currentDrag = activeDragRef.current;
+    if (!currentDrag || currentDrag.itemId !== itemId) return;
+    const targetIndex = getDragTargetIndex(itemId, effectiveTranslationY);
+    if (targetIndex === currentDrag.targetIndex) return;
+    const nextDrag = { ...currentDrag, targetIndex };
+    activeDragRef.current = nextDrag;
+    setActiveDrag(nextDrag);
+  }, [getDragTargetIndex]);
+
+  const dragAutoScroll = useDragAutoScroll({
+    scrollRef: listRef,
+    mode: 'flat-list',
+    onAutoScroll: ({ scrollDelta }) => {
+      const currentDrag = activeDragRef.current;
+      if (!currentDrag) return;
+      const effectiveTranslationY = dragTranslationYRef.current + scrollDelta;
+      dragOffsetY.value = effectiveTranslationY;
+      applyChecklistDragPosition(currentDrag.itemId, effectiveTranslationY);
+    },
+  });
+
   const handleItemLayout = useCallback((itemId, height) => {
     itemHeightsRef.current[itemId] = Math.max(CHECKLIST_ITEM_MIN_HEIGHT, height);
   }, []);
 
-  const handleDragStart = useCallback((itemId) => {
+  const handleDragStart = useCallback((itemId, absoluteY) => {
     Keyboard.dismiss();
     const startIndex = latest.current.items.findIndex((item) => item.id === itemId);
     if (startIndex < 0) return;
@@ -376,30 +399,36 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     const nextDrag = { itemId, startIndex, targetIndex: startIndex };
     activeDragRef.current = nextDrag;
     setActiveDrag(nextDrag);
-  }, []);
+    dragTranslationYRef.current = 0;
+    dragAutoScroll.startAutoScroll();
+    dragAutoScroll.updateAutoScrollPointer(absoluteY);
+  }, [dragAutoScroll]);
 
-  const handleDragUpdate = useCallback((itemId, translationY) => {
+  const handleDragUpdate = useCallback((itemId, translationY, absoluteY) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.itemId !== itemId) return;
-
-    const targetIndex = getDragTargetIndex(itemId, translationY);
-    if (targetIndex === currentDrag.targetIndex) return;
-    const nextDrag = { ...currentDrag, targetIndex };
-    activeDragRef.current = nextDrag;
-    setActiveDrag(nextDrag);
-  }, [getDragTargetIndex]);
+    dragTranslationYRef.current = translationY;
+    dragAutoScroll.updateAutoScrollPointer(absoluteY);
+    const effectiveTranslationY = dragAutoScroll.getEffectiveTranslation(translationY);
+    dragOffsetY.value = effectiveTranslationY;
+    applyChecklistDragPosition(itemId, effectiveTranslationY);
+  }, [applyChecklistDragPosition, dragAutoScroll, dragOffsetY]);
 
   const finishDrag = useCallback(() => {
     activeDragRef.current = null;
+    dragAutoScroll.stopAutoScroll();
     dragOffsetY.value = 0;
     setActiveDrag(null);
-  }, [dragOffsetY]);
+  }, [dragAutoScroll, dragOffsetY]);
 
   const handleDragEnd = useCallback((itemId, translationY) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.itemId !== itemId) return;
 
-    const targetIndex = getDragTargetIndex(itemId, translationY);
+    const targetIndex = getDragTargetIndex(
+      itemId,
+      dragAutoScroll.getEffectiveTranslation(translationY)
+    );
     const nextItems = moveChecklistItemToIndex(
       latest.current.items,
       itemId,
@@ -411,7 +440,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     remember(getUndoSnapshot());
     setItems(nextItems);
     updateDraft(latest.current.title, nextItems);
-  }, [finishDrag, getDragTargetIndex, getUndoSnapshot, remember, updateDraft]);
+  }, [dragAutoScroll, finishDrag, getDragTargetIndex, getUndoSnapshot, remember, updateDraft]);
 
   const handleDragCancel = useCallback((itemId) => {
     if (activeDragRef.current?.itemId !== itemId) return;
@@ -645,6 +674,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       </View>
 
       <FlatList
+        ref={listRef}
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
@@ -653,6 +683,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic"
+        onScroll={dragAutoScroll.handleScroll}
+        scrollEventThrottle={16}
+        onLayout={dragAutoScroll.handleViewportLayout}
+        onContentSizeChange={dragAutoScroll.handleContentSizeChange}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: Math.max(insets.bottom, 16) + 16 },

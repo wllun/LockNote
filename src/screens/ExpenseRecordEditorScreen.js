@@ -34,6 +34,7 @@ import DestructiveConfirmationModal from '../components/DestructiveConfirmationM
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
+import { useDragAutoScroll } from '../utils/use-drag-auto-scroll';
 import { verifyPassword } from '../utils/crypto';
 import { monthlyCommitmentTemplate } from '../utils/monthly-commitment-template';
 import {
@@ -272,6 +273,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   const saveTimeout = useRef(null);
   const inputRefs = useRef({});
+  const scrollRef = useRef(null);
   const dragAreaRef = useRef(null);
   const dragAreaBoundsRef = useRef(dragAreaBounds);
   const rowLayouts = useRef({});
@@ -279,6 +281,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const dragRowLayoutsRef = useRef({});
   const deleteTargetBoundsRef = useRef(null);
   const activeDragRef = useRef(null);
+  const dragTranslationYRef = useRef(0);
+  const dragAbsoluteXRef = useRef(0);
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
   const latest = useRef({
@@ -946,6 +950,46 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     );
   };
 
+  const applyDragPosition = (
+    rowId,
+    effectiveTranslationY,
+    absoluteX,
+    absoluteY
+  ) => {
+    const currentDrag = activeDragRef.current;
+    if (!currentDrag || currentDrag.rowId !== rowId) return;
+
+    const targetIndex = getDragTargetIndex(
+      rowId,
+      effectiveTranslationY,
+      currentDrag.kind
+    );
+    const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
+    if (
+      currentDrag.targetIndex === targetIndex &&
+      currentDrag.overDelete === overDelete
+    ) return;
+
+    const nextDrag = { ...currentDrag, targetIndex, overDelete };
+    activeDragRef.current = nextDrag;
+    setActiveDrag(nextDrag);
+  };
+
+  const dragAutoScroll = useDragAutoScroll({
+    scrollRef,
+    mode: 'scroll-view',
+    onAutoScroll: ({ scrollDelta, pointerY }) => {
+      const currentDrag = activeDragRef.current;
+      if (!currentDrag) return;
+      applyDragPosition(
+        currentDrag.rowId,
+        dragTranslationYRef.current + scrollDelta,
+        dragAbsoluteXRef.current,
+        pointerY
+      );
+    },
+  });
+
   const handleDeleteTargetLayout = ({ nativeEvent }) => {
     const dragBounds = dragAreaBoundsRef.current;
     const { x, y, width, height } = nativeEvent.layout;
@@ -988,6 +1032,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     };
     activeDragRef.current = nextDrag;
     setActiveDrag(nextDrag);
+    dragTranslationYRef.current = 0;
+    dragAutoScroll.startAutoScroll();
   };
 
   const handleDragUpdate = (
@@ -998,23 +1044,16 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   ) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.rowId !== rowId) return;
-
-    const targetIndex = getDragTargetIndex(
-      rowId,
-      translationY,
-      currentDrag.kind
-    );
     const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
-    if (
-      currentDrag.targetIndex === targetIndex &&
-      currentDrag.overDelete === overDelete
-    ) {
-      return;
-    }
-
-    const nextDrag = { ...currentDrag, targetIndex, overDelete };
-    activeDragRef.current = nextDrag;
-    setActiveDrag(nextDrag);
+    dragTranslationYRef.current = translationY;
+    dragAbsoluteXRef.current = absoluteX;
+    dragAutoScroll.updateAutoScrollPointer(absoluteY, { blocked: overDelete });
+    applyDragPosition(
+      rowId,
+      dragAutoScroll.getEffectiveTranslation(translationY),
+      absoluteX,
+      absoluteY
+    );
   };
 
   const handleDragEnd = (
@@ -1028,7 +1067,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
     const targetIndex = getDragTargetIndex(
       rowId,
-      translationY,
+      dragAutoScroll.getEffectiveTranslation(translationY),
       currentDrag.kind
     );
     const shouldDelete =
@@ -1037,6 +1076,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     activeDragRef.current = null;
     dragRowLayoutsRef.current = {};
     deleteTargetBoundsRef.current = null;
+    dragAutoScroll.stopAutoScroll();
     setActiveDrag(null);
 
     if (shouldDelete) {
@@ -1073,6 +1113,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     activeDragRef.current = null;
     dragRowLayoutsRef.current = {};
     deleteTargetBoundsRef.current = null;
+    dragAutoScroll.stopAutoScroll();
     setActiveDrag(null);
   };
 
@@ -1267,6 +1308,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={[
           styles.scrollContent,
@@ -1275,6 +1317,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic"
         scrollEnabled={!activeDrag}
+        onScroll={dragAutoScroll.handleScroll}
+        scrollEventThrottle={16}
+        onLayout={dragAutoScroll.handleViewportLayout}
+        onContentSizeChange={dragAutoScroll.handleContentSizeChange}
       >
         <View style={styles.editorContent}>
           <View style={styles.summaryCard}>
