@@ -225,6 +225,15 @@ const FolderScreen = ({ route, navigation }) => {
     setItemActions((current) => ({ ...current, visible: false }));
   };
 
+  const deleteNote = async (note) => {
+    try {
+      await softDeleteNoteWithCleanup(noteRepo, note);
+      loadNotes();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to delete note');
+    }
+  };
+
   const confirmDeleteNote = (note) => {
     confirmDestructiveAction({
       title: 'Delete this note?',
@@ -241,14 +250,7 @@ const FolderScreen = ({ route, navigation }) => {
         },
       ],
       confirmLabel: 'Delete note',
-      onConfirm: async () => {
-        try {
-          await softDeleteNoteWithCleanup(noteRepo, note);
-          loadNotes();
-        } catch (error) {
-          Alert.alert('Error', 'Failed to delete note');
-        }
-      },
+      onConfirm: () => deleteNote(note),
     });
   };
 
@@ -372,11 +374,11 @@ const FolderScreen = ({ route, navigation }) => {
           const hash = await hashPassword(password);
           return hash === passwordModal.note.password;
         }}
-        onVerified={() => {
+        onVerified={async () => {
           const { note, action } = passwordModal;
           setPasswordModal({ visible: false, note: null, action: 'open' });
           if (action === 'delete') {
-            confirmDeleteNote(note);
+            await deleteNote(note);
           } else {
             navigation.navigate(editorRouteFor(note), { noteId: note.id });
           }
@@ -385,11 +387,23 @@ const FolderScreen = ({ route, navigation }) => {
           await noteRepo.update(passwordModal.note.id, { password: null });
           loadNotes();
         } : undefined}
-        title={passwordModal.action === 'delete' ? 'Password required' : 'Locked'}
+        title={passwordModal.action === 'delete' ? 'Delete this locked note?' : 'Locked'}
         subtitle={passwordModal.action === 'delete'
-          ? "Enter this note's password before deleting it."
+          ? 'Enter its password to confirm deletion. This note will be removed from this folder.'
           : 'Enter the password to continue'}
-        verifyLabel={passwordModal.action === 'delete' ? 'Continue' : 'Unlock'}
+        verifyLabel={passwordModal.action === 'delete' ? 'Delete note' : 'Unlock'}
+        variant={passwordModal.action === 'delete' ? 'danger' : 'default'}
+        details={passwordModal.action === 'delete' && passwordModal.note ? [
+          {
+            label: 'Note',
+            value: passwordModal.note.title?.trim() || 'Untitled note',
+            iconName: 'document-text-outline',
+          },
+          {
+            label: 'Last updated',
+            value: formatNoteUpdatedAt(passwordModal.note.updated_at).replace(/^Updated /, ''),
+          },
+        ] : []}
       />
     </View>
   );

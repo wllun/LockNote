@@ -242,6 +242,22 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     catch { Alert.alert('Error', 'Failed to update pin'); }
   };
 
+  const deleteReminder = async () => {
+    try {
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+      }
+      latest.current.deleted = true;
+      await cancelReminderNotifications(latest.current.reminder.notificationIds);
+      await noteRepo.softDelete(noteId);
+      navigation.goBack();
+    } catch {
+      latest.current.deleted = false;
+      Alert.alert('Error', 'Failed to delete reminder');
+    }
+  };
+
   const confirmDelete = () => confirmDestructiveAction({
     title: 'Delete this reminder?',
     message: 'The reminder note will be removed and its scheduled notification will be cancelled.',
@@ -253,15 +269,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       },
     ],
     confirmLabel: 'Delete reminder',
-    onConfirm: async () => {
-      try {
-        if (saveTimeout.current) clearTimeout(saveTimeout.current);
-        latest.current.deleted = true;
-        await cancelReminderNotifications(latest.current.reminder.notificationIds);
-        await noteRepo.softDelete(noteId);
-        navigation.goBack();
-      } catch { Alert.alert('Error', 'Failed to delete reminder'); }
-    },
+    onConfirm: deleteReminder,
   });
 
   const handleDelete = () => hasPassword ? setShowDeletePassword(true) : confirmDelete();
@@ -314,7 +322,29 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
       <ReminderScheduleModal visible={showSchedule} reminder={reminder} onClose={() => setShowSchedule(false)} onSave={handleScheduleSave} saving={scheduling} />
       <NoteExportModal visible={showExport} onClose={() => setShowExport(false)} title={title} content={body} type="reminder" reminder={reminder} />
-      <PasswordModal visible={showDeletePassword} onClose={() => setShowDeletePassword(false)} onVerify={async (password) => { const note = await noteRepo.getById(noteId); return !!note?.password && verifyPassword(password, note.password); }} onVerified={() => { setShowDeletePassword(false); confirmDelete(); }} title="Password required" subtitle="Enter this reminder's password before deleting it." verifyLabel="Continue" />
+      <PasswordModal
+        visible={showDeletePassword}
+        onClose={() => setShowDeletePassword(false)}
+        onVerify={async (password) => {
+          const note = await noteRepo.getById(noteId);
+          return !!note?.password && verifyPassword(password, note.password);
+        }}
+        onVerified={async () => {
+          setShowDeletePassword(false);
+          await deleteReminder();
+        }}
+        title="Delete this locked reminder?"
+        subtitle="Enter its password to confirm deletion. The reminder note and its scheduled notification will be removed."
+        verifyLabel="Delete reminder"
+        variant="danger"
+        details={[
+          {
+            label: 'Reminder',
+            value: title.trim() || 'Untitled reminder',
+            iconName: 'notifications-outline',
+          },
+        ]}
+      />
 
       <Modal visible={showLock} animationType="fade" transparent onRequestClose={() => setShowLock(false)}>
         <KeyboardAwareModalContent><View style={styles.lockCard}><View style={styles.lockIcon}><Ionicons name={hasPassword ? 'lock-closed' : 'lock-open-outline'} size={26} color={colors.primary} /></View><Text style={styles.lockTitle}>{hasPassword ? 'Password Protection' : 'Set Password'}</Text>{hasPassword ? <Text style={styles.lockDescription}>This reminder is password protected. Notification content is hidden.</Text> : <TextInput style={styles.lockInput} placeholder="Enter password" placeholderTextColor={colors.textTertiary} value={lockPassword} onChangeText={setLockPassword} secureTextEntry autoFocus accessibilityLabel="Reminder password" />}<View style={styles.lockButtons}><TouchableOpacity style={[styles.lockButton, { backgroundColor: colors.inputBg }]} onPress={() => { setShowLock(false); setLockPassword(''); }}><Text style={styles.lockButtonText}>Cancel</Text></TouchableOpacity><TouchableOpacity style={[styles.lockButton, { backgroundColor: hasPassword ? colors.dangerSoft : colors.primary }]} onPress={hasPassword ? handleRemovePassword : handleSetPassword}><Text style={[styles.lockButtonText, { color: hasPassword ? colors.danger : colors.card }]}>{hasPassword ? 'Remove Lock' : 'Set Lock'}</Text></TouchableOpacity></View></View></KeyboardAwareModalContent>

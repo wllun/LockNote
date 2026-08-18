@@ -195,11 +195,11 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const handlePasswordVerified = (item, type, action) => {
+  const handlePasswordVerified = async (item, type, action) => {
     setPasswordModal({ visible: false, item: null, type: '', action: 'open' });
     if (action === 'delete') {
       if (type === 'folder') confirmDeleteFolder(item);
-      else confirmDeleteNote(item);
+      else await deleteNote(item);
       return;
     }
     if (type === 'folder') {
@@ -265,6 +265,15 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  const deleteNote = async (note) => {
+    try {
+      await softDeleteNoteWithCleanup(noteRepo, note);
+      refreshCurrent();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to delete note');
+    }
+  };
+
   const confirmDeleteNote = (note) => {
     const noteTitle = note.title?.trim() || 'Untitled note';
     confirmDestructiveAction({
@@ -278,14 +287,7 @@ const HomeScreen = ({ navigation }) => {
         },
       ],
       confirmLabel: 'Delete note',
-      onConfirm: async () => {
-        try {
-          await softDeleteNoteWithCleanup(noteRepo, note);
-          refreshCurrent();
-        } catch (error) {
-          Alert.alert('Error', 'Failed to delete note');
-        }
-      },
+      onConfirm: () => deleteNote(note),
     });
   };
 
@@ -711,11 +713,37 @@ const HomeScreen = ({ navigation }) => {
           else await noteRepo.update(item.id, { password: null });
           refreshCurrent();
         } : undefined}
-        title={passwordModal.action === 'delete' ? 'Password required' : 'Locked'}
+        title={passwordModal.action === 'delete' && passwordModal.type === 'note'
+          ? 'Delete this locked note?'
+          : passwordModal.action === 'delete'
+            ? 'Password required'
+            : 'Locked'}
         subtitle={passwordModal.action === 'delete'
-          ? `Enter this ${passwordModal.type}'s password before deleting it.`
+          ? passwordModal.type === 'note'
+            ? 'Enter its password to confirm deletion. This note will be removed from your notes.'
+            : `Enter this ${passwordModal.type}'s password before deleting it.`
           : 'Enter the password to continue'}
-        verifyLabel={passwordModal.action === 'delete' ? 'Continue' : 'Unlock'}
+        verifyLabel={passwordModal.action === 'delete' && passwordModal.type === 'note'
+          ? 'Delete note'
+          : passwordModal.action === 'delete'
+            ? 'Continue'
+            : 'Unlock'}
+        variant={passwordModal.action === 'delete' && passwordModal.type === 'note'
+          ? 'danger'
+          : 'default'}
+        details={passwordModal.action === 'delete' &&
+          passwordModal.type === 'note' &&
+          passwordModal.item ? [
+            {
+              label: 'Note',
+              value: passwordModal.item.title?.trim() || 'Untitled note',
+              iconName: 'document-text-outline',
+            },
+            {
+              label: 'Last updated',
+              value: formatNoteUpdatedAt(passwordModal.item.updated_at).replace(/^Updated /, ''),
+            },
+          ] : []}
       />
     </View>
   );

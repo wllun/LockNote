@@ -725,6 +725,21 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const deleteChecklist = async () => {
+    try {
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+      }
+      latest.current.deleted = true;
+      await noteRepo.softDelete(noteId);
+      navigation.goBack();
+    } catch {
+      latest.current.deleted = false;
+      Alert.alert('Error', 'Failed to delete checklist');
+    }
+  };
+
   const confirmDelete = () => {
     confirmDestructiveAction({
       title: 'Delete this checklist?',
@@ -737,19 +752,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         },
       ],
       confirmLabel: 'Delete checklist',
-      onConfirm: async () => {
-        try {
-          if (saveTimeout.current) {
-            clearTimeout(saveTimeout.current);
-            saveTimeout.current = null;
-          }
-          latest.current.deleted = true;
-          await noteRepo.softDelete(noteId);
-          navigation.goBack();
-        } catch {
-          Alert.alert('Error', 'Failed to delete checklist');
-        }
-      },
+      onConfirm: deleteChecklist,
     });
   };
 
@@ -1148,13 +1151,21 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
           const note = await noteRepo.getById(noteId);
           return !!note?.password && verifyPassword(password, note.password);
         }}
-        onVerified={() => {
+        onVerified={async () => {
           setShowDeletePasswordModal(false);
-          confirmDelete();
+          await deleteChecklist();
         }}
-        title="Password required"
-        subtitle="Enter this checklist's password before deleting it."
-        verifyLabel="Continue"
+        title="Delete this locked checklist?"
+        subtitle="Enter its password to confirm deletion. This checklist and all its items will be removed."
+        verifyLabel="Delete checklist"
+        variant="danger"
+        details={[
+          {
+            label: 'Checklist',
+            value: title.trim() || 'Untitled checklist',
+            iconName: 'checkbox-outline',
+          },
+        ]}
       />
 
       <Modal

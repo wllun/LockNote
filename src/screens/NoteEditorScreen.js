@@ -165,6 +165,21 @@ const NoteEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const deleteNote = async () => {
+    try {
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+      }
+      latest.current.deleted = true;
+      await noteRepo.softDelete(noteId);
+      navigation.goBack();
+    } catch (error) {
+      latest.current.deleted = false;
+      Alert.alert('Error', 'Failed to delete note');
+    }
+  };
+
   const confirmDelete = () => {
     confirmDestructiveAction({
       title: 'Delete this note?',
@@ -177,19 +192,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         },
       ],
       confirmLabel: 'Delete note',
-      onConfirm: async () => {
-        try {
-          if (saveTimeout.current) {
-            clearTimeout(saveTimeout.current);
-            saveTimeout.current = null;
-          }
-          latest.current.deleted = true;
-          await noteRepo.softDelete(noteId);
-          navigation.goBack();
-        } catch (error) {
-          Alert.alert('Error', 'Failed to delete note');
-        }
-      },
+      onConfirm: deleteNote,
     });
   };
 
@@ -444,13 +447,21 @@ const NoteEditorScreen = ({ route, navigation }) => {
           const note = await noteRepo.getById(noteId);
           return !!note?.password && verifyPassword(password, note.password);
         }}
-        onVerified={() => {
+        onVerified={async () => {
           setShowDeletePasswordModal(false);
-          confirmDelete();
+          await deleteNote();
         }}
-        title="Password required"
-        subtitle="Enter this note's password before deleting it."
-        verifyLabel="Continue"
+        title="Delete this locked note?"
+        subtitle="Enter its password to confirm deletion. This note and its content will be removed from your notes."
+        verifyLabel="Delete note"
+        variant="danger"
+        details={[
+          {
+            label: 'Note',
+            value: title.trim() || 'Untitled note',
+            iconName: 'document-text-outline',
+          },
+        ]}
       />
 
       <Modal visible={showLockModal} animationType="fade" transparent>

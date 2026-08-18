@@ -1183,6 +1183,21 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const deleteExpenseRecord = async () => {
+    try {
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+      }
+      latest.current.deleted = true;
+      await noteRepo.softDelete(noteId);
+      navigation.goBack();
+    } catch {
+      latest.current.deleted = false;
+      Alert.alert('Error', 'Failed to delete expense record');
+    }
+  };
+
   const confirmDelete = () => {
     confirmDestructiveAction({
       title: 'Delete this expense record?',
@@ -1195,19 +1210,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         },
       ],
       confirmLabel: 'Delete record',
-      onConfirm: async () => {
-        try {
-          if (saveTimeout.current) {
-            clearTimeout(saveTimeout.current);
-            saveTimeout.current = null;
-          }
-          latest.current.deleted = true;
-          await noteRepo.softDelete(noteId);
-          navigation.goBack();
-        } catch {
-          Alert.alert('Error', 'Failed to delete expense record');
-        }
-      },
+      onConfirm: deleteExpenseRecord,
     });
   };
 
@@ -2081,13 +2084,21 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           const note = await noteRepo.getById(noteId);
           return !!note?.password && verifyPassword(password, note.password);
         }}
-        onVerified={() => {
+        onVerified={async () => {
           setShowDeletePasswordModal(false);
-          confirmDelete();
+          await deleteExpenseRecord();
         }}
-        title="Password required"
-        subtitle="Enter this expense record's password before deleting it."
-        verifyLabel="Continue"
+        title="Delete this locked expense record?"
+        subtitle="Enter its password to confirm deletion. Daily expenses, monthly bills, total, and summary will be removed."
+        verifyLabel="Delete record"
+        variant="danger"
+        details={[
+          {
+            label: 'Expense record',
+            value: title.trim() || 'Untitled expense record',
+            iconName: 'receipt-outline',
+          },
+        ]}
       />
 
       <Modal
