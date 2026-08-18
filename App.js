@@ -7,6 +7,7 @@ import { initDB } from './src/db/sqlite';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider, useTheme, useThemeMode } from './src/theme';
 import { AuthProvider } from './src/context/AuthContext';
+import AppDialogHost from './src/components/AppDialogHost';
 
 function AppRoot() {
   const colors = useTheme();
@@ -32,6 +33,7 @@ function AppRoot() {
   return (
     <SafeAreaProvider>
       <AppNavigator />
+      <AppDialogHost />
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
     </SafeAreaProvider>
   );

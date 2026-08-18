@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
+  KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
@@ -242,8 +243,16 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   };
 
   const confirmDelete = () => confirmDestructiveAction({
-    title: 'Delete Reminder',
-    message: `Delete “${title.trim() || 'Untitled reminder'}”? Its scheduled notification will also be cancelled.`,
+    title: 'Delete this reminder?',
+    message: 'The reminder note will be removed and its scheduled notification will be cancelled.',
+    details: [
+      {
+        label: 'Reminder',
+        value: title.trim() || 'Untitled reminder',
+        iconName: 'notifications-outline',
+      },
+    ],
+    confirmLabel: 'Delete reminder',
     onConfirm: async () => {
       try {
         if (saveTimeout.current) clearTimeout(saveTimeout.current);

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -12,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { FlatList, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -526,8 +526,16 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
   const confirmDelete = () => {
     confirmDestructiveAction({
-      title: 'Delete Checklist',
-      message: 'Are you sure you want to delete this checklist?',
+      title: 'Delete this checklist?',
+      message: 'This checklist and all its items will be removed from your notes.',
+      details: [
+        {
+          label: 'Checklist',
+          value: title.trim() || 'Untitled checklist',
+          iconName: 'checkbox-outline',
+        },
+      ],
+      confirmLabel: 'Delete checklist',
       onConfirm: async () => {
         try {
           if (saveTimeout.current) {

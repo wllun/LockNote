@@ -7,8 +7,8 @@ import {
   TextInput,
   Modal,
   ScrollView,
-  Alert,
 } from 'react-native';
+import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { radius, shadow, useTheme, useThemeMode } from '../theme';
 import { recovery } from '../utils/recovery';
@@ -74,7 +74,12 @@ const SettingsScreen = () => {
             refreshRecoveryStatus();
           },
         },
-      ]
+      ],
+      {
+        variant: 'danger',
+        iconName: 'key-outline',
+        details: [{ label: 'Recovery PIN', value: 'Currently enabled' }],
+      }
     );
   };
 

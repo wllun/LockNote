@@ -5,11 +5,11 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   TextInput,
   Modal,
   RefreshControl,
 } from 'react-native';
+import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
@@ -27,6 +27,7 @@ import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
+import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
 
 const editorRouteFor = (note) => {
   if (note.note_type === EXPENSE_NOTE_TYPE) return 'ExpenseRecordEditor';
@@ -265,9 +266,18 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const confirmDeleteNote = (note) => {
+    const noteTitle = note.title?.trim() || 'Untitled note';
     confirmDestructiveAction({
-      title: 'Delete Note',
-      message: 'Are you sure you want to delete this note?',
+      title: 'Delete this note?',
+      message: 'This note will be removed from your notes.',
+      details: [
+        { label: 'Note', value: noteTitle, iconName: 'document-text-outline' },
+        {
+          label: 'Last updated',
+          value: formatNoteUpdatedAt(note.updated_at).replace(/^Updated /, ''),
+        },
+      ],
+      confirmLabel: 'Delete note',
       onConfirm: async () => {
         try {
           await softDeleteNoteWithCleanup(noteRepo, note);
@@ -304,8 +314,16 @@ const HomeScreen = ({ navigation }) => {
             } inside the folder.`;
 
       confirmDestructiveAction({
-        title: 'Delete Folder',
+        title: 'Delete this folder?',
         message: detail,
+        details: [
+          { label: 'Folder', value: folder.name, iconName: 'folder-outline' },
+          {
+            label: 'Contains',
+            value: `${noteCount} ${noteCount === 1 ? 'note' : 'notes'}`,
+          },
+        ],
+        confirmLabel: 'Delete folder',
         onConfirm: async () => {
           try {
             await Promise.all(

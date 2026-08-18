@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   Modal,
   StyleSheet,
-  Alert,
 } from 'react-native';
+import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { radius, shadow, useTheme } from '../theme';
 import { recovery } from '../utils/recovery';

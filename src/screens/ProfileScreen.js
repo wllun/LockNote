@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
@@ -32,7 +33,11 @@ const ProfileScreen = () => {
         style: 'destructive',
         onPress: () => supabase.auth.signOut(),
       },
-    ]);
+    ], {
+      variant: 'danger',
+      iconName: 'log-out-outline',
+      details: [{ label: 'Account', value: user?.email || 'Current account' }],
+    });
   };
 
   return (

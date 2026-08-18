@@ -36,6 +36,13 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 
 Screens reload their data on the navigation `focus` event (listener registered in `useEffect`, cleaned up on unmount) rather than holding shared state — so returning from the editor reflects edits without a store.
 
+App-wide messages and confirmations are presented by `AppDialogHost`, mounted
+beside the navigator in `App.js`. Screens and components call the `AppAlert`
+adapter with the same title/message/button shape as React Native's `Alert`, so
+validation messages and destructive confirmations share one themed, accessible
+dialog on native and web. Destructive flows can also provide item details without
+changing their existing repository or password-gating behavior.
+
 List items expose contextual actions through long-press on native and a visible
 three-dots button on web. Note actions are pin, move, and soft-delete; folder
 actions are rename, pin, and soft-delete. Moving a note updates `folder_id`, with `null`

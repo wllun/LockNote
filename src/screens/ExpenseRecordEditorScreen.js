@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -13,6 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import {
   Gesture,
@@ -645,6 +645,15 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       message:
         'All monthly bills will be marked as unpaid. The bills and amounts will stay unchanged.',
       confirmLabel: 'Reset',
+      variant: 'warning',
+      iconName: 'refresh-outline',
+      details: [
+        {
+          label: 'Monthly bills',
+          value: `${latest.current.monthlyCommitments.length} saved`,
+          iconName: 'calendar-outline',
+        },
+      ],
       onConfirm: () =>
         updateMonthlyCommitments(
           latest.current.monthlyCommitments.map((item) => ({
@@ -1176,8 +1185,16 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   const confirmDelete = () => {
     confirmDestructiveAction({
-      title: 'Delete Expense Record',
-      message: 'Are you sure you want to delete this expense record?',
+      title: 'Delete this expense record?',
+      message: 'The daily expenses, monthly bills, total, and summary will be removed.',
+      details: [
+        {
+          label: 'Expense record',
+          value: title.trim() || 'Untitled expense record',
+          iconName: 'receipt-outline',
+        },
+      ],
+      confirmLabel: 'Delete record',
       onConfirm: async () => {
         try {
           if (saveTimeout.current) {

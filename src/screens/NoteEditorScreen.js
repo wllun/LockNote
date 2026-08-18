@@ -3,7 +3,6 @@ import {
   View,
   TextInput,
   StyleSheet,
-  Alert,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +10,7 @@ import {
   Text,
   Pressable,
 } from 'react-native';
+import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
@@ -167,8 +167,16 @@ const NoteEditorScreen = ({ route, navigation }) => {
 
   const confirmDelete = () => {
     confirmDestructiveAction({
-      title: 'Delete Note',
-      message: 'Are you sure you want to delete this note?',
+      title: 'Delete this note?',
+      message: 'This note and its content will be removed from your notes.',
+      details: [
+        {
+          label: 'Note',
+          value: title.trim() || 'Untitled note',
+          iconName: 'document-text-outline',
+        },
+      ],
+      confirmLabel: 'Delete note',
       onConfirm: async () => {
         try {
           if (saveTimeout.current) {

@@ -1,19 +1,21 @@
-import { Alert, Platform } from 'react-native';
-import { requestConfirmation } from './confirmation.mjs';
+import { AppAlert } from './app-alert';
 
 export const confirmDestructiveAction = ({
   title,
   message,
   confirmLabel = 'Delete',
+  details = [],
+  variant = 'danger',
+  iconName = 'trash-outline',
   onConfirm,
 }) => {
-  requestConfirmation({
-    isWeb: Platform.OS === 'web',
-    webConfirm: (prompt) => globalThis.confirm?.(prompt),
-    nativeAlert: (...args) => Alert.alert(...args),
+  AppAlert.alert(
     title,
     message,
-    confirmLabel,
-    onConfirm,
-  });
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: confirmLabel, style: 'destructive', onPress: onConfirm },
+    ],
+    { details, variant, iconName }
+  );
 };
