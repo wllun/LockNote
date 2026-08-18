@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,6 +41,7 @@ const NoteExportModal = ({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const previewRef = useRef(null);
   const [exporting, setExporting] = useState(null);
+  const [showShareOptions, setShowShareOptions] = useState(false);
   const exportData = {
     title,
     content,
@@ -61,6 +62,28 @@ const NoteExportModal = ({
   const visibleSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
   const hasMonthlySummary = visibleCategories.length > 0 || visibleSummaryNote.length > 0;
   const visibleReminder = normalizeReminder(reminder);
+  const exportFormats = [
+    {
+      format: 'pdf',
+      icon: 'document-text-outline',
+      label: Platform.OS === 'web' ? 'Print / save PDF' : 'Save as PDF',
+      description: Platform.OS === 'web'
+        ? 'Open the print or PDF save dialog'
+        : 'Choose a folder in Documents',
+    },
+    {
+      format: 'image',
+      icon: 'image-outline',
+      label: Platform.OS === 'web' ? 'Download image' : 'Save as image',
+      description: Platform.OS === 'web'
+        ? 'Download a clear PNG file'
+        : 'Add a clear PNG to Gallery',
+    },
+  ];
+
+  useEffect(() => {
+    if (!visible) setShowShareOptions(false);
+  }, [visible]);
 
   const runExport = async (format, destination = 'save') => {
     const actionKey = `${destination}:${format}`;
@@ -105,7 +128,7 @@ const NoteExportModal = ({
             <View>
               <Text style={styles.eyebrow}>EXPORT NOTE</Text>
               <Text style={styles.title}>
-                {Platform.OS === 'web' ? 'Choose a format' : 'Save or share'}
+                {Platform.OS === 'web' ? 'Choose a format' : 'Save a copy'}
               </Text>
             </View>
             <Pressable style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close export">
@@ -237,69 +260,106 @@ const NoteExportModal = ({
           </ScrollView>
 
           <View style={styles.actions}>
-            {[
-              {
-                format: 'pdf',
-                icon: 'document-text-outline',
-                label: Platform.OS === 'web' ? 'Print / save PDF' : 'Save PDF',
-              },
-              {
-                format: 'image',
-                icon: 'image-outline',
-                label: Platform.OS === 'web' ? 'Download image' : 'Save image',
-              },
-            ].map((item) => (
-              <View key={item.format} style={styles.actionRow}>
+            {exportFormats.map((item) => (
+              <Pressable
+                key={item.format}
+                disabled={!!exporting}
+                style={({ pressed }) => [
+                  styles.saveAction,
+                  pressed && styles.pressed,
+                  exporting && styles.disabled,
+                ]}
+                onPress={() => runExport(item.format)}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+                accessibilityHint={item.description}
+                accessibilityState={{
+                  disabled: !!exporting,
+                  busy: exporting === `save:${item.format}`,
+                }}
+              >
+                <View style={styles.saveIcon}>
+                  {exporting === `save:${item.format}` ? (
+                    <ActivityIndicator color={colors.primary} />
+                  ) : (
+                    <Ionicons name={item.icon} size={22} color={colors.primary} />
+                  )}
+                </View>
+                <View style={styles.saveCopy}>
+                  <Text style={styles.saveTitle}>
+                    {exporting === `save:${item.format}` ? 'Preparing...' : item.label}
+                  </Text>
+                  <Text style={styles.saveDescription}>{item.description}</Text>
+                </View>
+                {exporting !== `save:${item.format}` && (
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                )}
+              </Pressable>
+            ))}
+
+            {Platform.OS !== 'web' && (
+              <>
                 <Pressable
                   disabled={!!exporting}
                   style={({ pressed }) => [
-                    styles.action,
+                    styles.shareToggle,
                     pressed && styles.pressed,
                     exporting && styles.disabled,
                   ]}
-                  onPress={() => runExport(item.format)}
+                  onPress={() => setShowShareOptions((current) => !current)}
                   accessibilityRole="button"
-                  accessibilityLabel={item.label}
+                  accessibilityLabel="Share instead"
+                  accessibilityHint={showShareOptions ? 'Hides sharing options' : 'Shows PDF and image sharing options'}
                   accessibilityState={{
                     disabled: !!exporting,
-                    busy: exporting === `save:${item.format}`,
+                    expanded: showShareOptions,
                   }}
                 >
-                  {exporting === `save:${item.format}` ? (
-                    <ActivityIndicator color={colors.card} />
-                  ) : (
-                    <Ionicons name={item.icon} size={21} color={colors.card} />
-                  )}
-                  <Text style={styles.actionText}>
-                    {exporting === `save:${item.format}` ? 'Preparing...' : item.label}
-                  </Text>
+                  <Ionicons name="share-outline" size={20} color={colors.primary} />
+                  <Text style={styles.shareToggleText}>Share instead</Text>
+                  <Ionicons
+                    name={showShareOptions ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={colors.primary}
+                  />
                 </Pressable>
-                {Platform.OS !== 'web' && (
-                  <Pressable
-                    disabled={!!exporting}
-                    style={({ pressed }) => [
-                      styles.shareAction,
-                      pressed && styles.pressed,
-                      exporting && styles.disabled,
-                    ]}
-                    onPress={() => runExport(item.format, 'share')}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Share ${item.format === 'pdf' ? 'PDF' : 'image'}`}
-                    accessibilityHint="Opens the system share menu"
-                    accessibilityState={{
-                      disabled: !!exporting,
-                      busy: exporting === `share:${item.format}`,
-                    }}
-                  >
-                    {exporting === `share:${item.format}` ? (
-                      <ActivityIndicator color={colors.primary} />
-                    ) : (
-                      <Ionicons name="share-outline" size={21} color={colors.primary} />
-                    )}
-                  </Pressable>
+
+                {showShareOptions && (
+                  <View style={styles.shareOptions}>
+                    {exportFormats.map((item) => (
+                      <Pressable
+                        key={`share:${item.format}`}
+                        disabled={!!exporting}
+                        style={({ pressed }) => [
+                          styles.shareOption,
+                          pressed && styles.pressed,
+                          exporting && styles.disabled,
+                        ]}
+                        onPress={() => runExport(item.format, 'share')}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Share ${item.format === 'pdf' ? 'PDF' : 'image'}`}
+                        accessibilityHint="Opens the system share menu"
+                        accessibilityState={{
+                          disabled: !!exporting,
+                          busy: exporting === `share:${item.format}`,
+                        }}
+                      >
+                        {exporting === `share:${item.format}` ? (
+                          <ActivityIndicator color={colors.primary} />
+                        ) : (
+                          <Ionicons name={item.icon} size={20} color={colors.primary} />
+                        )}
+                        <Text style={styles.shareOptionText}>
+                          {exporting === `share:${item.format}`
+                            ? 'Preparing...'
+                            : `Share ${item.format === 'pdf' ? 'PDF' : 'image'}`}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
                 )}
-              </View>
-            ))}
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -356,10 +416,16 @@ const makeStyles = (colors) => StyleSheet.create({
   summaryNoteText: { color: '#30384c', fontSize: 12, lineHeight: 18 },
   brand: { color: '#8a91a3', fontSize: 10, marginTop: 28 },
   actions: { gap: 10 },
-  actionRow: { flexDirection: 'row', gap: 10 },
-  action: { flex: 1, minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.md, backgroundColor: colors.primary },
-  actionText: { color: colors.card, fontSize: 14, fontWeight: '800' },
-  shareAction: { width: 52, minHeight: 52, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, backgroundColor: colors.card },
+  saveAction: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg },
+  saveIcon: { width: 44, height: 44, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.primarySoft },
+  saveCopy: { flex: 1, minWidth: 0 },
+  saveTitle: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '800' },
+  saveDescription: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  shareToggle: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.md },
+  shareToggleText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
+  shareOptions: { flexDirection: 'row', gap: 10 },
+  shareOption: { flex: 1, minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 12, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.card },
+  shareOptionText: { flexShrink: 1, color: colors.text, fontSize: 13, lineHeight: 18, fontWeight: '800', textAlign: 'center' },
   disabled: { opacity: 0.55 },
 });
 
