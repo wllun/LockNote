@@ -25,6 +25,7 @@ import {
   parseReminderNote,
   REMINDER_NOTE_TYPE,
 } from '../utils/reminder-note.mjs';
+import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
 
 // ponytail: entering animations are native-only — reanimated web leaves items visibility:hidden
 const entering = (index) =>
@@ -33,14 +34,6 @@ const entering = (index) =>
 const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-  };
 
   const locked = !!note.password;
   const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
@@ -155,7 +148,18 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
                 : 'Locked note'
             : preview}
         </Text>
-        <Text style={styles.date}>{formatDate(note.updated_at)}</Text>
+        <View style={styles.updatedAtRow}>
+          <Ionicons
+            name="time-outline"
+            size={13}
+            color={colors.textTertiary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+          <Text style={styles.updatedAt}>
+            {formatNoteUpdatedAt(note.updated_at)}
+          </Text>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -230,9 +234,16 @@ const makeStyles = (colors) =>
       marginBottom: 8,
       lineHeight: 20,
     },
-    date: {
+    updatedAtRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    updatedAt: {
       fontSize: 12,
+      lineHeight: 16,
       color: colors.textTertiary,
+      flex: 1,
     },
   });
 
