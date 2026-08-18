@@ -48,7 +48,9 @@ three-dots button on web. Note actions are pin, move, and soft-delete; folder
 actions are rename, pin, and soft-delete. Moving a note updates `folder_id`, with `null`
 representing Home. Deleting a folder soft-deletes its contained notes first so
 normal reads do not leave inaccessible active notes behind. Deleting a locked
-note or locked folder requires its item password before the normal destructive
+note uses one combined destructive confirmation that shows the note details,
+verifies its password, and deletes immediately after successful confirmation.
+Locked folders still require their password before the normal destructive
 confirmation is shown; unlocked-item deletion is unchanged.
 
 ## Data model
