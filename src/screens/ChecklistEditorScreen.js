@@ -9,12 +9,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { FlatList, Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import EditorUndoButton from '../components/editor-undo-button';
@@ -40,6 +41,11 @@ import { radius, shadow, useTheme } from '../theme';
 
 const CHECKLIST_ITEM_MIN_HEIGHT = 60;
 const CHECKLIST_ITEM_GAP = 10;
+const DELETE_TARGET_SIZE = 56;
+const DELETE_TARGET_TOLERANCE = 28;
+const DRAG_PREVIEW_MAX_WIDTH = 280;
+const DRAG_PREVIEW_POINTER_OFFSET = 50;
+const DRAG_ACTIVATION_DELAY_MS = 1000;
 
 const ChecklistItemRow = React.memo(({
   item,
@@ -55,13 +61,18 @@ const ChecklistItemRow = React.memo(({
   onDragEnd,
   onDragCancel,
   onLayout,
-  dragOffsetY,
+  dragX,
+  dragY,
+  dragAreaX,
+  dragAreaY,
   isDragging,
   isDropTarget,
   itemCount,
 }) => {
+  const [isHolding, setIsHolding] = useState(false);
   const callbacks = useRef({
     onMove,
+    onDelete,
     onDragStart,
     onDragUpdate,
     onDragEnd,
@@ -69,76 +80,98 @@ const ChecklistItemRow = React.memo(({
   });
   callbacks.current = {
     onMove,
+    onDelete,
     onDragStart,
     onDragUpdate,
     onDragEnd,
     onDragCancel,
   };
 
-  const startDrag = useCallback((absoluteY) => {
-    callbacks.current.onDragStart(item.id, absoluteY);
+  const startDrag = useCallback(() => {
+    callbacks.current.onDragStart(item.id);
   }, [item.id]);
-  const updateDrag = useCallback((translationY, absoluteY) => {
-    callbacks.current.onDragUpdate(item.id, translationY, absoluteY);
+  const updateDrag = useCallback((translationY, absoluteX, absoluteY) => {
+    callbacks.current.onDragUpdate(item.id, translationY, absoluteX, absoluteY);
   }, [item.id]);
-  const endDrag = useCallback((translationY, absoluteY) => {
-    callbacks.current.onDragEnd(item.id, translationY, absoluteY);
+  const endDrag = useCallback((translationY, absoluteX, absoluteY) => {
+    callbacks.current.onDragEnd(item.id, translationY, absoluteX, absoluteY);
   }, [item.id]);
   const cancelDrag = useCallback(() => {
     callbacks.current.onDragCancel(item.id);
   }, [item.id]);
+  const beginHold = useCallback(() => setIsHolding(true), []);
+  const endHold = useCallback(() => setIsHolding(false), []);
 
   const dragGesture = useMemo(
     () =>
       Gesture.Pan()
-        .minDistance(4)
+        .activateAfterLongPress(DRAG_ACTIVATION_DELAY_MS)
         .shouldCancelWhenOutside(false)
-        .runOnJS(true)
+        .onBegin(() => {
+          runOnJS(beginHold)();
+        })
         .onStart((event) => {
-          dragOffsetY.value = 0;
-          startDrag(event.absoluteY);
+          dragX.value = event.absoluteX - dragAreaX;
+          dragY.value = event.absoluteY - dragAreaY;
+          runOnJS(startDrag)();
         })
         .onUpdate((event) => {
-          updateDrag(event.translationY, event.absoluteY);
+          dragX.value = event.absoluteX - dragAreaX;
+          dragY.value = event.absoluteY - dragAreaY;
+          runOnJS(updateDrag)(event.translationY, event.absoluteX, event.absoluteY);
         })
         .onEnd((event) => {
-          endDrag(event.translationY, event.absoluteY);
+          dragX.value = event.absoluteX - dragAreaX;
+          dragY.value = event.absoluteY - dragAreaY;
+          runOnJS(endDrag)(event.translationY, event.absoluteX, event.absoluteY);
         })
         .onFinalize((_, success) => {
-          if (!success) cancelDrag();
+          runOnJS(endHold)();
+          if (!success) runOnJS(cancelDrag)();
         }),
-    [cancelDrag, dragOffsetY, endDrag, startDrag, updateDrag]
-  );
-
-  const draggedRowStyle = useAnimatedStyle(
-    () => ({
-      transform: [{ translateY: isDragging ? dragOffsetY.value : 0 }],
-    }),
-    [isDragging]
+    [
+      beginHold,
+      cancelDrag,
+      dragAreaX,
+      dragAreaY,
+      dragX,
+      dragY,
+      endDrag,
+      endHold,
+      startDrag,
+      updateDrag,
+    ]
   );
 
   return (
-    <View style={styles.itemShell} onLayout={onLayout}>
-      {isDropTarget && <View style={styles.dropIndicator} />}
-      <Animated.View
-        style={[
-          styles.itemRow,
-          isDragging && styles.itemRowDragging,
-          draggedRowStyle,
-        ]}
+    <View style={styles.itemShell}>
+      {isDropTarget && (
+        <View style={styles.rowInsertionGap}>
+          <View style={styles.rowInsertionDot} />
+          <View style={styles.rowInsertionLine} />
+          <Text style={styles.rowInsertionText}>Item moves here</Text>
+        </View>
+      )}
+      <View
+        onLayout={onLayout}
+        style={[styles.itemRow, isDragging && styles.itemRowDragging]}
       >
         <GestureDetector gesture={dragGesture}>
           <View
             collapsable={false}
-            style={styles.dragHandle}
+            style={[
+              styles.dragHandle,
+              isHolding && styles.dragHandleHolding,
+            ]}
             accessible
             accessibilityRole="adjustable"
             accessibilityLabel={`Move checklist item ${index + 1}`}
-            accessibilityHint="Drag this handle up or down to move the item"
+            accessibilityHint="Hold still for one second, then drag to move or delete"
             accessibilityValue={{ text: `Position ${index + 1} of ${itemCount}` }}
             accessibilityActions={[
               { name: 'increment', label: 'Move item down' },
               { name: 'decrement', label: 'Move item up' },
+              { name: 'activate', label: 'Delete item' },
             ]}
             onAccessibilityAction={({ nativeEvent }) => {
               if (nativeEvent.actionName === 'increment') {
@@ -147,9 +180,17 @@ const ChecklistItemRow = React.memo(({
               if (nativeEvent.actionName === 'decrement') {
                 callbacks.current.onMove(item.id, 'up');
               }
+              if (nativeEvent.actionName === 'activate') {
+                callbacks.current.onDelete(item.id);
+              }
             }}
           >
-            <Ionicons name="reorder-three-outline" size={24} color={colors.textSecondary} />
+            <MaterialIcons
+              name="drag-indicator"
+              size={25}
+              color={isHolding ? colors.primary : colors.textSecondary}
+              style={styles.dragIndicatorIcon}
+            />
           </View>
         </GestureDetector>
         <Pressable
@@ -180,15 +221,7 @@ const ChecklistItemRow = React.memo(({
           blurOnSubmit
           accessibilityLabel={`Checklist item ${index + 1}`}
         />
-        <Pressable
-          style={({ pressed }) => [styles.deleteItemButton, pressed && styles.pressed]}
-          onPress={() => onDelete(item.id)}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete checklist item ${index + 1}`}
-        >
-          <Ionicons name="trash-outline" size={19} color={colors.danger} />
-        </Pressable>
-      </Animated.View>
+      </View>
     </View>
   );
 });
@@ -197,6 +230,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const { noteId } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [title, setTitle] = useState('');
@@ -212,14 +246,25 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
   const [activeDrag, setActiveDrag] = useState(null);
+  const [dragAreaBounds, setDragAreaBounds] = useState({
+    x: 0,
+    y: 0,
+    width: windowWidth,
+    height: 0,
+  });
 
   const saveTimeout = useRef(null);
   const newItemInputRef = useRef(null);
   const listRef = useRef(null);
+  const dragAreaRef = useRef(null);
+  const dragAreaBoundsRef = useRef(dragAreaBounds);
   const activeDragRef = useRef(null);
   const itemHeightsRef = useRef({});
+  const deleteTargetBoundsRef = useRef(null);
   const dragTranslationYRef = useRef(0);
-  const dragOffsetY = useSharedValue(0);
+  const dragAbsoluteXRef = useRef(0);
+  const dragX = useSharedValue(0);
+  const dragY = useSharedValue(0);
   const latest = useRef({
     title: '',
     items: [],
@@ -245,6 +290,28 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const showEndDropIndicator = !!activeDrag &&
     activeDrag.targetIndex >= itemsWithoutDraggedItem.length &&
     activeDrag.targetIndex !== activeDrag.startIndex;
+  const deleteTargetBottom = Math.max(16, insets.bottom + 8);
+  const dragPreviewWidth = Math.min(
+    DRAG_PREVIEW_MAX_WIDTH,
+    Math.max(0, windowWidth - 64)
+  );
+  const dragPreviewStyle = useAnimatedStyle(() => {
+    const availableWidth = dragAreaBounds.width || windowWidth;
+    const left = Math.max(
+      16,
+      Math.min(
+        dragX.value - dragPreviewWidth / 2,
+        availableWidth - dragPreviewWidth - 16
+      )
+    );
+    const top = Math.max(
+      insets.top + 8,
+      dragY.value - DRAG_PREVIEW_POINTER_OFFSET
+    );
+    return {
+      transform: [{ translateX: left }, { translateY: top }],
+    };
+  });
 
   const loadChecklist = useCallback(async () => {
     try {
@@ -330,6 +397,25 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     updateDraft(latest.current.title, nextItems);
   }, [getUndoSnapshot, remember, updateDraft]);
 
+  const confirmRemoveItem = useCallback((itemId) => {
+    const item = latest.current.items.find((entry) => entry.id === itemId);
+    if (!item) return;
+
+    confirmDestructiveAction({
+      title: 'Delete this checklist item?',
+      message: 'This item will be removed from the checklist.',
+      details: [
+        {
+          label: 'Item',
+          value: item.text.trim() || 'Empty checklist item',
+          iconName: 'checkbox-outline',
+        },
+      ],
+      confirmLabel: 'Delete item',
+      onConfirm: () => removeItem(itemId),
+    });
+  }, [removeItem]);
+
   const moveItem = useCallback((itemId, direction) => {
     const nextItems = moveChecklistItem(latest.current.items, itemId, direction);
     if (nextItems === latest.current.items) return;
@@ -338,6 +424,45 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     setItems(nextItems);
     updateDraft(latest.current.title, nextItems);
   }, [getUndoSnapshot, remember, updateDraft]);
+
+  const storeDragAreaBounds = useCallback((x, y, width, height) => {
+    const nextBounds = { x, y, width, height };
+    dragAreaBoundsRef.current = nextBounds;
+    setDragAreaBounds((currentBounds) =>
+      currentBounds.x === x &&
+      currentBounds.y === y &&
+      currentBounds.width === width &&
+      currentBounds.height === height
+        ? currentBounds
+        : nextBounds
+    );
+  }, []);
+
+  const measureDragArea = useCallback((event) => {
+    const fallbackLayout = event?.nativeEvent?.layout;
+    requestAnimationFrame(() => {
+      const dragArea = dragAreaRef.current;
+      if (typeof dragArea?.measureInWindow === 'function') {
+        dragArea.measureInWindow(storeDragAreaBounds);
+        return;
+      }
+
+      if (typeof dragArea?.getBoundingClientRect === 'function') {
+        const bounds = dragArea.getBoundingClientRect();
+        storeDragAreaBounds(bounds.left, bounds.top, bounds.width, bounds.height);
+        return;
+      }
+
+      if (fallbackLayout) {
+        storeDragAreaBounds(
+          fallbackLayout.x ?? 0,
+          fallbackLayout.y ?? 0,
+          fallbackLayout.width,
+          fallbackLayout.height
+        );
+      }
+    });
+  }, [storeDragAreaBounds]);
 
   const getDragTargetIndex = useCallback((itemId, translationY) => {
     const currentItems = latest.current.items;
@@ -365,25 +490,64 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     return remainingItems.length;
   }, []);
 
-  const applyChecklistDragPosition = useCallback((itemId, effectiveTranslationY) => {
+  const isPointOverDeleteTarget = useCallback((absoluteX, absoluteY) => {
+    if (!Number.isFinite(absoluteX) || !Number.isFinite(absoluteY)) return false;
+
+    const dragBounds = dragAreaBoundsRef.current;
+    const target = deleteTargetBoundsRef.current ?? {
+      left:
+        dragBounds.x +
+        Math.max(0, (dragBounds.width - DELETE_TARGET_SIZE) / 2),
+      top:
+        dragBounds.y +
+        dragBounds.height -
+        deleteTargetBottom -
+        DELETE_TARGET_SIZE,
+      width: DELETE_TARGET_SIZE,
+      height: DELETE_TARGET_SIZE,
+    };
+    if (!target.width || !target.height) return false;
+
+    return (
+      absoluteX >= target.left - DELETE_TARGET_TOLERANCE &&
+      absoluteX <= target.left + target.width + DELETE_TARGET_TOLERANCE &&
+      absoluteY >= target.top - DELETE_TARGET_TOLERANCE &&
+      absoluteY <= target.top + target.height + DELETE_TARGET_TOLERANCE
+    );
+  }, [deleteTargetBottom]);
+
+  const applyChecklistDragPosition = useCallback((
+    itemId,
+    effectiveTranslationY,
+    absoluteX,
+    absoluteY
+  ) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.itemId !== itemId) return;
     const targetIndex = getDragTargetIndex(itemId, effectiveTranslationY);
-    if (targetIndex === currentDrag.targetIndex) return;
-    const nextDrag = { ...currentDrag, targetIndex };
+    const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
+    if (
+      targetIndex === currentDrag.targetIndex &&
+      overDelete === currentDrag.overDelete
+    ) return;
+    const nextDrag = { ...currentDrag, targetIndex, overDelete };
     activeDragRef.current = nextDrag;
     setActiveDrag(nextDrag);
-  }, [getDragTargetIndex]);
+  }, [getDragTargetIndex, isPointOverDeleteTarget]);
 
   const dragAutoScroll = useDragAutoScroll({
     scrollRef: listRef,
     mode: 'flat-list',
-    onAutoScroll: ({ scrollDelta }) => {
+    onAutoScroll: ({ scrollDelta, pointerY }) => {
       const currentDrag = activeDragRef.current;
       if (!currentDrag) return;
       const effectiveTranslationY = dragTranslationYRef.current + scrollDelta;
-      dragOffsetY.value = effectiveTranslationY;
-      applyChecklistDragPosition(currentDrag.itemId, effectiveTranslationY);
+      applyChecklistDragPosition(
+        currentDrag.itemId,
+        effectiveTranslationY,
+        dragAbsoluteXRef.current,
+        pointerY
+      );
     },
   });
 
@@ -391,37 +555,66 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     itemHeightsRef.current[itemId] = Math.max(CHECKLIST_ITEM_MIN_HEIGHT, height);
   }, []);
 
-  const handleDragStart = useCallback((itemId, absoluteY) => {
+  const handleDeleteTargetLayout = useCallback(({ nativeEvent }) => {
+    const dragBounds = dragAreaBoundsRef.current;
+    const { x, y, width, height } = nativeEvent.layout;
+    deleteTargetBoundsRef.current = {
+      left: dragBounds.x + x,
+      top: dragBounds.y + y,
+      width,
+      height,
+    };
+  }, []);
+
+  const handleDragStart = useCallback((itemId) => {
     Keyboard.dismiss();
+    measureDragArea();
     const startIndex = latest.current.items.findIndex((item) => item.id === itemId);
     if (startIndex < 0) return;
 
-    const nextDrag = { itemId, startIndex, targetIndex: startIndex };
+    deleteTargetBoundsRef.current = null;
+    const nextDrag = {
+      itemId,
+      item: latest.current.items[startIndex],
+      startIndex,
+      targetIndex: startIndex,
+      overDelete: false,
+    };
     activeDragRef.current = nextDrag;
     setActiveDrag(nextDrag);
     dragTranslationYRef.current = 0;
     dragAutoScroll.startAutoScroll();
-    dragAutoScroll.updateAutoScrollPointer(absoluteY);
-  }, [dragAutoScroll]);
+  }, [dragAutoScroll, measureDragArea]);
 
-  const handleDragUpdate = useCallback((itemId, translationY, absoluteY) => {
+  const handleDragUpdate = useCallback((itemId, translationY, absoluteX, absoluteY) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.itemId !== itemId) return;
+    const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
     dragTranslationYRef.current = translationY;
-    dragAutoScroll.updateAutoScrollPointer(absoluteY);
+    dragAbsoluteXRef.current = absoluteX;
+    dragAutoScroll.updateAutoScrollPointer(absoluteY, { blocked: overDelete });
     const effectiveTranslationY = dragAutoScroll.getEffectiveTranslation(translationY);
-    dragOffsetY.value = effectiveTranslationY;
-    applyChecklistDragPosition(itemId, effectiveTranslationY);
-  }, [applyChecklistDragPosition, dragAutoScroll, dragOffsetY]);
+    applyChecklistDragPosition(
+      itemId,
+      effectiveTranslationY,
+      absoluteX,
+      absoluteY
+    );
+  }, [applyChecklistDragPosition, dragAutoScroll, isPointOverDeleteTarget]);
 
   const finishDrag = useCallback(() => {
     activeDragRef.current = null;
+    deleteTargetBoundsRef.current = null;
     dragAutoScroll.stopAutoScroll();
-    dragOffsetY.value = 0;
     setActiveDrag(null);
-  }, [dragAutoScroll, dragOffsetY]);
+  }, [dragAutoScroll]);
 
-  const handleDragEnd = useCallback((itemId, translationY) => {
+  const handleDragEnd = useCallback((
+    itemId,
+    translationY,
+    absoluteX,
+    absoluteY
+  ) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.itemId !== itemId) return;
 
@@ -429,18 +622,26 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       itemId,
       dragAutoScroll.getEffectiveTranslation(translationY)
     );
+    const shouldDelete =
+      currentDrag.overDelete ||
+      isPointOverDeleteTarget(absoluteX, absoluteY);
+    finishDrag();
+    if (shouldDelete) {
+      confirmRemoveItem(itemId);
+      return;
+    }
+
     const nextItems = moveChecklistItemToIndex(
       latest.current.items,
       itemId,
       targetIndex
     );
-    finishDrag();
     if (nextItems === latest.current.items) return;
 
     remember(getUndoSnapshot());
     setItems(nextItems);
     updateDraft(latest.current.title, nextItems);
-  }, [dragAutoScroll, finishDrag, getDragTargetIndex, getUndoSnapshot, remember, updateDraft]);
+  }, [confirmRemoveItem, dragAutoScroll, finishDrag, getDragTargetIndex, getUndoSnapshot, isPointOverDeleteTarget, remember, updateDraft]);
 
   const handleDragCancel = useCallback((itemId) => {
     if (activeDragRef.current?.itemId !== itemId) return;
@@ -593,14 +794,17 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       styles={styles}
       onTextChange={handleItemTextChange}
       onToggle={toggleItem}
-      onDelete={removeItem}
+      onDelete={confirmRemoveItem}
       onMove={moveItem}
       onDragStart={handleDragStart}
       onDragUpdate={handleDragUpdate}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
       onLayout={({ nativeEvent }) => handleItemLayout(item.id, nativeEvent.layout.height)}
-      dragOffsetY={dragOffsetY}
+      dragX={dragX}
+      dragY={dragY}
+      dragAreaX={dragAreaBounds.x}
+      dragAreaY={dragAreaBounds.y}
       isDragging={activeDrag?.itemId === item.id}
       isDropTarget={insertionBeforeItemId === item.id && activeDrag?.itemId !== item.id}
       itemCount={items.length}
@@ -608,7 +812,11 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   ), [
     activeDrag,
     colors,
-    dragOffsetY,
+    confirmRemoveItem,
+    dragAreaBounds.x,
+    dragAreaBounds.y,
+    dragX,
+    dragY,
     handleDragCancel,
     handleDragEnd,
     handleDragStart,
@@ -618,15 +826,16 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     insertionBeforeItemId,
     items.length,
     moveItem,
-    removeItem,
     styles,
     toggleItem,
   ]);
 
   return (
     <KeyboardAvoidingView
+      ref={dragAreaRef}
       style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      onLayout={measureDragArea}
     >
       <View style={styles.header}>
         <TouchableOpacity
@@ -726,6 +935,11 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
             >
               {saveStatus || 'Changes save automatically'}
             </Text>
+            {!!items.length && (
+              <Text style={styles.dragHint}>
+                Hold a grip for 1 second to reorder or delete
+              </Text>
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -740,9 +954,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         ListFooterComponent={
           <>
             {showEndDropIndicator && (
-              <View style={styles.endDropIndicator}>
-                <View style={styles.dropIndicatorLine} />
-                <Text style={styles.dropIndicatorText}>Item moves here</Text>
+              <View style={styles.rowInsertionGap}>
+                <View style={styles.rowInsertionDot} />
+                <View style={styles.rowInsertionLine} />
+                <Text style={styles.rowInsertionText}>Item moves here</Text>
               </View>
             )}
             <View style={styles.addCard}>
@@ -782,6 +997,61 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
           </>
         }
       />
+
+      {activeDrag && (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <Animated.View
+            style={[
+              styles.dragPreview,
+              activeDrag.overDelete && styles.dragPreviewDeleting,
+              { width: dragPreviewWidth },
+              dragPreviewStyle,
+            ]}
+          >
+            <MaterialIcons
+              name="drag-indicator"
+              size={25}
+              color={activeDrag.overDelete ? colors.danger : colors.primary}
+              style={styles.dragIndicatorIcon}
+            />
+            <View style={styles.dragPreviewContent}>
+              <Text style={styles.dragPreviewText} numberOfLines={1}>
+                {activeDrag.item.text.trim() || 'Empty checklist item'}
+              </Text>
+              <Text
+                style={[
+                  styles.dragPreviewDestination,
+                  activeDrag.overDelete && styles.dragPreviewDestinationDeleting,
+                ]}
+              >
+                {activeDrag.overDelete
+                  ? 'Release to delete'
+                  : `Move to item ${activeDrag.targetIndex + 1}`}
+              </Text>
+            </View>
+            <Ionicons
+              name={activeDrag.item.completed ? 'checkmark-circle' : 'ellipse-outline'}
+              size={20}
+              color={activeDrag.item.completed ? colors.primary : colors.textSecondary}
+            />
+          </Animated.View>
+
+          <View
+            onLayout={handleDeleteTargetLayout}
+            style={[
+              styles.dragDeleteTarget,
+              activeDrag.overDelete && styles.dragDeleteTargetActive,
+              { bottom: deleteTargetBottom },
+            ]}
+          >
+            <Ionicons
+              name={activeDrag.overDelete ? 'trash' : 'trash-outline'}
+              size={24}
+              color={activeDrag.overDelete ? colors.card : colors.danger}
+            />
+          </View>
+        </View>
+      )}
 
       <Modal
         visible={showActionsMenu}
@@ -1021,6 +1291,7 @@ const makeStyles = (colors) =>
     progressFill: { height: '100%', borderRadius: radius.full, backgroundColor: colors.primary },
     saveStatus: { color: colors.textTertiary, fontSize: 12 },
     saveStatusError: { color: colors.danger, fontWeight: '600' },
+    dragHint: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
     itemShell: {
       position: 'relative',
       zIndex: 1,
@@ -1038,27 +1309,48 @@ const makeStyles = (colors) =>
       borderColor: colors.border,
     },
     itemRowDragging: {
-      zIndex: 20,
-      opacity: 0.65,
-      borderColor: colors.primary,
-      ...shadow.card,
+      backgroundColor: colors.primarySoft,
+      opacity: 0.35,
     },
     dragHandle: {
       width: 44,
       minHeight: 48,
+      alignSelf: 'stretch',
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    dragHandleHolding: {
+      backgroundColor: colors.primarySoft,
+    },
+    dragIndicatorIcon: {
       opacity: 0.65,
     },
-    dropIndicator: {
-      position: 'absolute',
-      top: -7,
-      left: 10,
-      right: 10,
-      zIndex: 30,
-      height: 3,
+    rowInsertionGap: {
+      height: 28,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      paddingHorizontal: 10,
+      backgroundColor: colors.primarySoft,
+    },
+    rowInsertionDot: {
+      width: 10,
+      height: 10,
+      borderWidth: 2,
+      borderColor: colors.primary,
       borderRadius: radius.full,
+      backgroundColor: colors.card,
+    },
+    rowInsertionLine: {
+      flex: 1,
+      height: 3,
       backgroundColor: colors.primary,
+      borderRadius: radius.full,
+    },
+    rowInsertionText: {
+      color: colors.primary,
+      fontSize: 11,
+      fontWeight: '700',
     },
     checkboxButton: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
     checkbox: {
@@ -1083,31 +1375,67 @@ const makeStyles = (colors) =>
       outlineStyle: 'none',
     },
     itemInputCompleted: { color: colors.textTertiary, textDecorationLine: 'line-through' },
-    deleteItemButton: { width: 44, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full },
     pressed: { opacity: 0.68 },
     emptyState: { alignItems: 'center', gap: 6, paddingHorizontal: 24, paddingVertical: 32 },
     emptyIcon: { width: 56, height: 56, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft },
     emptyTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
     emptyHint: { color: colors.textSecondary, fontSize: 14 },
-    endDropIndicator: {
-      minHeight: 28,
+    dragPreview: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      opacity: 0.65,
+      minHeight: 50,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 7,
       paddingHorizontal: 10,
-      borderRadius: radius.sm,
-      backgroundColor: colors.primarySoft,
+      paddingVertical: 6,
+      backgroundColor: colors.card,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      borderRadius: radius.md,
+      ...shadow.card,
     },
-    dropIndicatorLine: {
+    dragPreviewDeleting: {
+      backgroundColor: colors.dangerSoft,
+      borderColor: colors.danger,
+    },
+    dragPreviewContent: {
       flex: 1,
-      height: 3,
-      borderRadius: radius.full,
-      backgroundColor: colors.primary,
+      minWidth: 0,
+      gap: 2,
     },
-    dropIndicatorText: {
-      color: colors.primary,
-      fontSize: 11,
+    dragPreviewText: {
+      color: colors.text,
+      fontSize: 13,
       fontWeight: '700',
+    },
+    dragPreviewDestination: {
+      color: colors.primary,
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    dragPreviewDestinationDeleting: {
+      color: colors.danger,
+    },
+    dragDeleteTarget: {
+      position: 'absolute',
+      left: '50%',
+      width: DELETE_TARGET_SIZE,
+      height: DELETE_TARGET_SIZE,
+      marginLeft: -DELETE_TARGET_SIZE / 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.dangerSoft,
+      borderWidth: 2,
+      borderColor: colors.danger,
+      borderRadius: radius.full,
+      ...shadow.card,
+    },
+    dragDeleteTargetActive: {
+      backgroundColor: colors.danger,
+      borderColor: colors.card,
     },
     addCard: {
       gap: 9,
