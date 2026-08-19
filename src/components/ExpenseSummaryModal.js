@@ -358,9 +358,6 @@ const ExpenseSummaryModal = ({
                     ? `${(EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS - summaryNoteCharacterCount).toLocaleString()} characters remaining`
                     : `Maximum ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters`}
               </Text>
-              <Text style={styles.footerHint}>
-                Category amounts update automatically when daily expenses change.
-              </Text>
             </ScrollView>
           ) : (
             <ScrollView

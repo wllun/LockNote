@@ -93,7 +93,6 @@ const CreateNoteTypeModal = ({ visible, onClose, onSelect }) => {
               </View>
               <View style={styles.headingText}>
                 <Text style={styles.title}>Create new</Text>
-                <Text style={styles.subtitle}>Choose what you want to capture</Text>
               </View>
             </View>
             <TouchableOpacity
@@ -137,11 +136,10 @@ const CreateNoteTypeModal = ({ visible, onClose, onSelect }) => {
                 </View>
                 <View style={styles.optionText}>
                   <Text style={styles.optionTitle}>{type.title}</Text>
-                  <Text style={styles.optionDescription}>{type.description}</Text>
+                  {/* <Text style={styles.optionDescription}>{type.description}</Text> */}
                 </View>
                 {type.available ? (
                   <View style={styles.readyBadge}>
-                    <Text style={styles.readyText}>Ready</Text>
                     <Ionicons name="arrow-forward" size={14} color={colors.primary} />
                   </View>
                 ) : (

@@ -938,11 +938,6 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
             >
               {saveStatus || 'Changes save automatically'}
             </Text>
-            {!!items.length && (
-              <Text style={styles.dragHint}>
-                Hold a grip for 1 second to reorder or delete
-              </Text>
-            )}
           </View>
         }
         ListEmptyComponent={
@@ -1302,7 +1297,6 @@ const makeStyles = (colors) =>
     progressFill: { height: '100%', borderRadius: radius.full, backgroundColor: colors.primary },
     saveStatus: { color: colors.textTertiary, fontSize: 12 },
     saveStatusError: { color: colors.danger, fontWeight: '600' },
-    dragHint: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
     itemShell: {
       position: 'relative',
       zIndex: 1,
