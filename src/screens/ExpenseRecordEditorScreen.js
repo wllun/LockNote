@@ -1711,6 +1711,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       multiline
                       numberOfLines={1}
                       scrollEnabled={false}
+                      underlineColorAndroid="transparent"
                       submitBehavior="submit"
                       returnKeyType="next"
                       onFocus={() => setFocusedCell(`${row.id}:date`)}
@@ -1741,6 +1742,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       placeholderTextColor={colors.textTertiary}
                       multiline
                       scrollEnabled={false}
+                      underlineColorAndroid="transparent"
                       onContentSizeChange={({ nativeEvent }) =>
                         handleRemarkContentSizeChange(
                           row.id,
@@ -1789,6 +1791,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       multiline
                       numberOfLines={1}
                       scrollEnabled={false}
+                      underlineColorAndroid="transparent"
                       submitBehavior="submit"
                       returnKeyType="next"
                       onFocus={() => setFocusedCell(`${row.id}:amount`)}
@@ -2853,6 +2856,7 @@ const makeStyles = (colors) =>
       color: colors.text,
       fontSize: 15,
       lineHeight: 20,
+      includeFontPadding: false,
       textAlignVertical: 'top',
       paddingHorizontal: 10,
       paddingVertical: 11,
