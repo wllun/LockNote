@@ -55,11 +55,6 @@ const HomeScreen = ({ navigation }) => {
   const [showNoteTypeModal, setShowNoteTypeModal] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [folderPassword, setFolderPassword] = useState('');
-  const [renameFolderModal, setRenameFolderModal] = useState({
-    visible: false,
-    folder: null,
-    name: '',
-  });
   const [passwordModal, setPasswordModal] = useState({
     visible: false,
     item: null,
@@ -233,36 +228,6 @@ const HomeScreen = ({ navigation }) => {
 
   const closeItemActions = () => {
     setItemActions((current) => ({ ...current, visible: false }));
-  };
-
-  const openRenameFolder = (folder) => {
-    setRenameFolderModal({ visible: true, folder, name: folder.name });
-  };
-
-  const closeRenameFolder = () => {
-    setRenameFolderModal({ visible: false, folder: null, name: '' });
-  };
-
-  const handleRenameFolder = async () => {
-    const nextName = renameFolderModal.name.trim();
-    const folder = renameFolderModal.folder;
-    if (!folder) return;
-    if (!nextName) {
-      Alert.alert('Error', 'Please enter a folder name');
-      return;
-    }
-    if (nextName === folder.name) {
-      closeRenameFolder();
-      return;
-    }
-
-    try {
-      await folderRepo.update(folder.id, { name: nextName });
-      closeRenameFolder();
-      refreshCurrent();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to rename folder');
-    }
   };
 
   const deleteNote = async (note) => {
@@ -568,11 +533,6 @@ const HomeScreen = ({ navigation }) => {
             handleToggleNotePin(itemActions.item);
           }
         }}
-        onRename={
-          itemActions.type === 'folder'
-            ? () => openRenameFolder(itemActions.item)
-            : undefined
-        }
         onMove={
           itemActions.type === 'note'
             ? () => openMoveNote(itemActions.item)
@@ -594,57 +554,6 @@ const HomeScreen = ({ navigation }) => {
         onClose={closeMoveNote}
         onSelect={handleMoveNote}
       />
-
-      <Modal
-        visible={renameFolderModal.visible}
-        animationType="fade"
-        transparent
-        onRequestClose={closeRenameFolder}
-      >
-        <KeyboardAwareModalContent>
-          <View style={styles.modalContent} accessibilityViewIsModal>
-            <View style={styles.modalIconCircle}>
-              <Ionicons name="create-outline" size={26} color={colors.folder} />
-            </View>
-            <Text style={styles.modalTitle}>Rename Folder</Text>
-            <Text style={styles.modalFieldLabel}>Folder name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Folder name"
-              placeholderTextColor={colors.textTertiary}
-              value={renameFolderModal.name}
-              onChangeText={(name) =>
-                setRenameFolderModal((current) => ({ ...current, name }))
-              }
-              autoFocus
-              selectTextOnFocus
-              returnKeyType="done"
-              accessibilityLabel="Folder name"
-              onSubmitEditing={handleRenameFolder}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                activeOpacity={0.7}
-                onPress={closeRenameFolder}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel renaming folder"
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.createButton]}
-                activeOpacity={0.7}
-                onPress={handleRenameFolder}
-                accessibilityRole="button"
-                accessibilityLabel="Rename folder"
-              >
-                <Text style={[styles.buttonText, styles.createButtonText]}>Rename</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAwareModalContent>
-      </Modal>
 
       <Modal visible={showFolderModal} animationType="fade" transparent>
         <KeyboardAwareModalContent>

@@ -17,7 +17,6 @@ const ItemActionsModal = ({
   isPinned,
   onClose,
   onTogglePin,
-  onRename,
   onMove,
   onDelete,
 }) => {
@@ -92,7 +91,7 @@ const ItemActionsModal = ({
               />
             </View>
             <Text style={styles.actionText}>
-              {isPinned ? `Unpin ${itemType}` : `Pin ${itemType}`}
+              {isPinned ? 'Unpin' : 'Pin'}
             </Text>
           </Pressable>
 
@@ -117,27 +116,6 @@ const ItemActionsModal = ({
             </Pressable>
           )}
 
-          {!isNote && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.action,
-                pressed && styles.pressed,
-              ]}
-              onPress={() => runAction(onRename)}
-              accessibilityRole="button"
-              accessibilityLabel="Rename folder"
-            >
-              <View style={styles.actionIcon}>
-                <Ionicons
-                  name="create-outline"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-              <Text style={styles.actionText}>Rename folder</Text>
-            </Pressable>
-          )}
-
           <Pressable
             style={({ pressed }) => [
               styles.action,
@@ -152,7 +130,7 @@ const ItemActionsModal = ({
               <Ionicons name="trash-outline" size={20} color={colors.danger} />
             </View>
             <Text style={[styles.actionText, styles.deleteText]}>
-              Delete {itemType}
+              Delete
             </Text>
           </Pressable>
         </View>

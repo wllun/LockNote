@@ -642,15 +642,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const resetCommitmentPaidStatus = () => {
     confirmDestructiveAction({
       title: 'Reset paid status?',
-      message:
-        'All monthly bills will be marked as unpaid. The bills and amounts will stay unchanged.',
       confirmLabel: 'Reset',
       variant: 'warning',
       iconName: 'refresh-outline',
       details: [
         {
           label: 'Monthly bills',
-          value: `${latest.current.monthlyCommitments.length} saved`,
+          value: `${latest.current.monthlyCommitments.filter((item) => item.isPaid).length} of ${latest.current.monthlyCommitments.length} paid`,
           iconName: 'calendar-outline',
         },
       ],
@@ -1563,10 +1561,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 onPress={openNewCommitment}
                 activeOpacity={0.7}
                 accessibilityRole="button"
-                accessibilityLabel="Add bill"
+                accessibilityLabel="Add"
               >
                 <Ionicons name="add-circle" size={23} color={colors.primary} />
-                <Text style={styles.addCommitmentText}>Add bill</Text>
+                <Text style={styles.addCommitmentText}>Add</Text>
               </TouchableOpacity>
               {!!monthlyCommitments.length && (
                 <Pressable
@@ -1625,7 +1623,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           <View style={styles.expenseTableHeading}>
             <View>
               <Text style={styles.sectionTitle}>Daily Expense</Text>
-              <Text style={styles.sectionHint}>Drag a grip to reorder or delete</Text>
             </View>
           </View>
 
