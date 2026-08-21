@@ -91,6 +91,15 @@ export const noteRepo = {
     return await this.getById(id);
   },
 
+  async move(id, folderId = null) {
+    const db = getDB();
+    await db.runAsync(
+      `UPDATE notes SET folder_id = ?, updated_at = ? WHERE id = ? AND is_deleted = 0`,
+      [folderId, now(), id]
+    );
+    return await this.getById(id);
+  },
+
   async softDelete(id) {
     const db = getDB();
     await db.runAsync(

@@ -342,7 +342,8 @@ const HomeScreen = ({ navigation }) => {
     const note = moveNoteModal.note;
     if (!note) return;
     try {
-      await noteRepo.update(note.id, { folder_id: folderId });
+      const movedNote = await noteRepo.move(note.id, folderId);
+      if (!movedNote) throw new Error('Note no longer exists');
       refreshCurrent();
     } catch (error) {
       Alert.alert('Error', 'Failed to move note');

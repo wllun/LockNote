@@ -283,8 +283,9 @@ const FolderScreen = ({ route, navigation }) => {
     const note = moveNoteModal.note;
     if (!note) return;
     try {
-      await noteRepo.update(note.id, { folder_id: targetFolderId });
-      loadNotes();
+      const movedNote = await noteRepo.move(note.id, targetFolderId);
+      if (!movedNote) throw new Error('Note no longer exists');
+      await loadNotes();
     } catch (error) {
       Alert.alert('Error', 'Failed to move note');
     }

@@ -18,6 +18,21 @@ const saveStorage = async (notes) => {
   await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(notes));
 };
 
+// Keep read-modify-write operations in order. Without this queue, an editor's
+// final auto-save can race a move and write an older folder_id back to storage.
+let mutationQueue = Promise.resolve();
+
+const mutateStorage = (mutation) => {
+  const operation = mutationQueue.then(async () => {
+    const notes = await getStorage();
+    const result = await mutation(notes);
+    await saveStorage(notes);
+    return result;
+  });
+  mutationQueue = operation.catch(() => {});
+  return operation;
+};
+
 const normalizeNote = (note) => ({
   ...note,
   note_type: note.note_type || 'note',
@@ -47,7 +62,6 @@ export const noteRepo = {
   },
 
   async create(folderId = null, title = '', content = '', password = null, noteType = 'note') {
-    const notes = await getStorage();
     const id = generateId();
     const timestamp = now();
     const passwordHash = password ? await hashPassword(password) : null;
@@ -65,47 +79,61 @@ export const noteRepo = {
       updated_at: timestamp,
     };
 
-    notes.push(newNote);
-    await saveStorage(notes);
-    return newNote;
+    return await mutateStorage((notes) => {
+      notes.push(newNote);
+      return normalizeNote(newNote);
+    });
   },
 
   async update(id, updates) {
-    const notes = await getStorage();
-    const index = notes.findIndex((n) => n.id === id);
-    if (index === -1) return null;
+    const passwordHash = updates.password !== undefined
+      ? updates.password
+        ? await hashPassword(updates.password)
+        : null
+      : undefined;
 
-    if (updates.title !== undefined) notes[index].title = updates.title;
-    if (updates.content !== undefined) notes[index].content = updates.content;
-    if (updates.folder_id !== undefined) notes[index].folder_id = updates.folder_id;
-    if (updates.note_type !== undefined) notes[index].note_type = updates.note_type;
-    if (updates.password !== undefined) {
-      const passwordHash = updates.password ? await hashPassword(updates.password) : null;
-      notes[index].password = passwordHash;
-    }
-    if (updates.is_pinned !== undefined) {
-      notes[index].is_pinned = updates.is_pinned ? 1 : 0;
-    }
-    notes[index].updated_at = now();
+    return await mutateStorage((notes) => {
+      const index = notes.findIndex((n) => n.id === id);
+      if (index === -1) return null;
 
-    await saveStorage(notes);
-    return normalizeNote(notes[index]);
+      if (updates.title !== undefined) notes[index].title = updates.title;
+      if (updates.content !== undefined) notes[index].content = updates.content;
+      if (updates.folder_id !== undefined) notes[index].folder_id = updates.folder_id;
+      if (updates.note_type !== undefined) notes[index].note_type = updates.note_type;
+      if (updates.password !== undefined) notes[index].password = passwordHash;
+      if (updates.is_pinned !== undefined) {
+        notes[index].is_pinned = updates.is_pinned ? 1 : 0;
+      }
+      notes[index].updated_at = now();
+      return normalizeNote(notes[index]);
+    });
+  },
+
+  async move(id, folderId = null) {
+    return await mutateStorage((notes) => {
+      const note = notes.find((item) => item.id === id && !item.is_deleted);
+      if (!note) return null;
+      note.folder_id = folderId;
+      note.updated_at = now();
+      return normalizeNote(note);
+    });
   },
 
   async softDelete(id) {
-    const notes = await getStorage();
-    const index = notes.findIndex((n) => n.id === id);
-    if (index !== -1) {
-      notes[index].is_deleted = 1;
-      notes[index].updated_at = now();
-      await saveStorage(notes);
-    }
+    await mutateStorage((notes) => {
+      const index = notes.findIndex((n) => n.id === id);
+      if (index !== -1) {
+        notes[index].is_deleted = 1;
+        notes[index].updated_at = now();
+      }
+    });
   },
 
   async hardDelete(id) {
-    let notes = await getStorage();
-    notes = notes.filter((n) => n.id !== id);
-    await saveStorage(notes);
+    await mutateStorage((notes) => {
+      const index = notes.findIndex((n) => n.id === id);
+      if (index !== -1) notes.splice(index, 1);
+    });
   },
 
   async search(query) {
