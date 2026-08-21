@@ -23,7 +23,7 @@ import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
 import { radius, shadow, useTheme } from '../theme';
 import {
-  getNormalNoteCharacterCount,
+  constrainNormalNoteContent,
   NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
 } from '../utils/note-limits.mjs';
 
@@ -44,17 +44,11 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const saveTimeout = useRef(null);
   const contentRef = useRef(null);
+  const contentLimitDialogShown = useRef(false);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
   const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, deleted: false });
   const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
   const insets = useSafeAreaInsets();
-  const contentCharacterCount = getNormalNoteCharacterCount(content);
-  const isNearContentLimit =
-    contentCharacterCount >= NORMAL_NOTE_CONTENT_MAX_CHARACTERS * 0.9;
-  const remainingContentCharacters = Math.max(
-    0,
-    NORMAL_NOTE_CONTENT_MAX_CHARACTERS - contentCharacterCount
-  );
 
   const loadNote = async () => {
     try {
@@ -106,13 +100,25 @@ const NoteEditorScreen = ({ route, navigation }) => {
   };
 
   const handleContentChange = (text) => {
+    const limited = constrainNormalNoteContent(text);
+    if (limited.limitReached && !contentLimitDialogShown.current) {
+      contentLimitDialogShown.current = true;
+      Alert.alert(
+        'Character limit reached',
+        'This note can contain up to 100,000 characters. Additional typed or pasted text cannot be added.'
+      );
+    } else if (!limited.limitReached) {
+      contentLimitDialogShown.current = false;
+    }
+    if (limited.value === latest.current.content) return;
+
     remember(
       { title: latest.current.title, content: latest.current.content },
       'content'
     );
-    setContent(text);
-    latest.current.content = text;
-    autoSave(title, text);
+    setContent(limited.value);
+    latest.current.content = limited.value;
+    autoSave(title, limited.value);
   };
 
   const handleUndo = () => {
@@ -290,7 +296,10 @@ const NoteEditorScreen = ({ route, navigation }) => {
       <View style={styles.contentArea}>
         <TextInput
           ref={contentRef}
-          style={styles.contentInput}
+          style={[
+            styles.contentInput,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
           placeholder="Start writing..."
           placeholderTextColor={colors.textTertiary}
           value={content}
@@ -301,36 +310,6 @@ const NoteEditorScreen = ({ route, navigation }) => {
           accessibilityLabel="Note content"
           accessibilityHint={`Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
         />
-        <View
-          style={[
-            styles.characterLimitFooter,
-            { paddingBottom: Math.max(insets.bottom, 8) },
-          ]}
-        >
-          <Text
-            style={[
-              styles.characterLimitMessage,
-              isNearContentLimit && styles.characterCounterNearLimit,
-            ]}
-            accessibilityLiveRegion="polite"
-          >
-            {remainingContentCharacters === 0
-              ? 'Character limit reached'
-              : isNearContentLimit
-                ? `${remainingContentCharacters.toLocaleString()} characters remaining`
-                : `Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
-          </Text>
-          <Text
-            style={[
-              styles.characterCounter,
-              isNearContentLimit && styles.characterCounterNearLimit,
-            ]}
-            accessibilityLabel={`${contentCharacterCount.toLocaleString()} of ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} note characters used`}
-          >
-            {contentCharacterCount.toLocaleString()} /{' '}
-            {NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()}
-          </Text>
-        </View>
       </View>
 
       <Modal
@@ -594,29 +573,6 @@ const makeStyles = (colors) =>
       paddingTop: 16,
       color: colors.text,
       lineHeight: 25,
-    },
-    characterLimitFooter: {
-      minHeight: 36,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      paddingHorizontal: 20,
-      paddingTop: 6,
-    },
-    characterLimitMessage: {
-      flex: 1,
-      color: colors.textTertiary,
-      fontSize: 12,
-    },
-    characterCounter: {
-      fontSize: 13,
-      color: colors.textTertiary,
-      fontVariant: ['tabular-nums'],
-    },
-    characterCounterNearLimit: {
-      color: colors.danger,
-      fontWeight: '600',
     },
     actionsMenuOverlay: {
       flex: 1,

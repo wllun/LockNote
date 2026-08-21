@@ -15,7 +15,10 @@ import ReminderScheduleModal from '../components/reminder-schedule-modal';
 import { verifyPassword } from '../utils/crypto';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
-import { NORMAL_NOTE_CONTENT_MAX_CHARACTERS } from '../utils/note-limits.mjs';
+import {
+  constrainNormalNoteContent,
+  NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
+} from '../utils/note-limits.mjs';
 import {
   formatReminderSchedule, isReminderNoteEmpty, normalizeReminder,
   parseReminderNote, serializeReminderNote,
@@ -45,6 +48,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const [scheduling, setScheduling] = useState(false);
   const saveTimeout = useRef(null);
   const bodyRef = useRef(null);
+  const bodyLimitDialogShown = useRef(false);
   const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, deleted: false });
   const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
 
@@ -110,8 +114,20 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   };
 
   const handleBodyChange = (text) => {
+    const limited = constrainNormalNoteContent(text);
+    if (limited.limitReached && !bodyLimitDialogShown.current) {
+      bodyLimitDialogShown.current = true;
+      Alert.alert(
+        'Character limit reached',
+        'This reminder note can contain up to 100,000 characters. Additional typed or pasted text cannot be added.'
+      );
+    } else if (!limited.limitReached) {
+      bodyLimitDialogShown.current = false;
+    }
+    if (limited.value === latest.current.body) return;
+
     remember(snapshot(), 'body');
-    latest.current.body = text; setBody(text); autoSave();
+    latest.current.body = limited.value; setBody(limited.value); autoSave();
   };
 
   const scheduleAndSave = async (nextReminder, { recordUndo = true } = {}) => {
@@ -273,8 +289,6 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   });
 
   const handleDelete = () => hasPassword ? setShowDeletePassword(true) : confirmDelete();
-  const remaining = NORMAL_NOTE_CONTENT_MAX_CHARACTERS - body.length;
-
   return (
     <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
@@ -305,8 +319,6 @@ const ReminderEditorScreen = ({ route, navigation }) => {
             <Ionicons name="chevron-forward" size={18} color={colors.primary} />
           </Pressable>
         </View>
-
-        <View style={styles.footer}><Text style={styles.limitText}>{remaining < 10000 ? `${remaining.toLocaleString()} characters remaining` : `Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}</Text><Text style={styles.count}>{body.length.toLocaleString()} / {NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()}</Text></View>
       </ScrollView>
 
       <Modal visible={showActions} animationType="fade" transparent onRequestClose={() => setShowActions(false)}>
@@ -369,7 +381,6 @@ const makeStyles = (colors) => StyleSheet.create({
   reminderIconEnabled: { backgroundColor: colors.card }, reminderInfo: { flex: 1, minWidth: 0 },
   reminderLabel: { color: colors.text, fontSize: 16, fontWeight: '800' }, reminderSchedule: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 3 },
   editReminder: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 15, borderTopWidth: 1, borderTopColor: colors.border }, editReminderText: { flex: 1, color: colors.primary, fontSize: 14, fontWeight: '700' }, pressed: { opacity: 0.7 },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 }, limitText: { flex: 1, color: colors.textTertiary, fontSize: 12 }, count: { color: colors.textTertiary, fontSize: 12, fontVariant: ['tabular-nums'] },
   actionOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.12)' }, actionMenu: { position: 'absolute', right: 12, width: 250, overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, ...shadow.card },
   actionItem: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16 }, actionDelete: { borderTopWidth: 1, borderTopColor: colors.border }, actionText: { flex: 1, color: colors.text, fontSize: 16 },
   lockCard: { width: '100%', maxWidth: 400, padding: 24, alignItems: 'center', borderRadius: radius.lg, backgroundColor: colors.card, ...shadow.card }, lockIcon: { width: 56, height: 56, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primarySoft, marginBottom: 14 }, lockTitle: { color: colors.text, fontSize: 19, fontWeight: '700', marginBottom: 8 }, lockDescription: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 14 }, lockInput: { alignSelf: 'stretch', padding: 14, borderRadius: radius.md, backgroundColor: colors.inputBg, color: colors.text, fontSize: 16 }, lockButtons: { alignSelf: 'stretch', flexDirection: 'row', gap: 12, marginTop: 16 }, lockButton: { flex: 1, minHeight: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }, lockButtonText: { color: colors.text, fontSize: 15, fontWeight: '700' },
