@@ -167,6 +167,7 @@ const makeStyles = (colors) =>
       width: 44,
       height: 44,
       marginVertical: -8,
+      marginRight: -8,
       borderRadius: radius.full,
       justifyContent: 'center',
       alignItems: 'center',
