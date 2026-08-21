@@ -100,6 +100,11 @@ export const getChecklistPreview = (items) => {
   return nextItem ? `${progress} · Next: ${nextItem}` : `${progress} · All done`;
 };
 
+export const getChecklistProgressPreview = (items) => {
+  const { completed, total } = calculateChecklistProgress(items);
+  return total ? `${completed} of ${total} completed` : 'No checklist items';
+};
+
 export const isChecklistNoteEmpty = (title, items) =>
   !String(title ?? '').trim() && !getVisibleChecklistItems(items).length;
 

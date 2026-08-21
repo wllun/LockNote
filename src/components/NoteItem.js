@@ -17,11 +17,13 @@ import {
 } from '../utils/expense-record.mjs';
 import {
   CHECKLIST_NOTE_TYPE,
+  getChecklistProgressPreview,
   getChecklistPreview,
   parseChecklistNote,
 } from '../utils/checklist-note.mjs';
 import {
   getReminderPreview,
+  getReminderSchedulePreview,
   parseReminderNote,
   REMINDER_NOTE_TYPE,
 } from '../utils/reminder-note.mjs';
@@ -31,7 +33,14 @@ import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
 const entering = (index) =>
   Platform.OS === 'web' ? undefined : FadeInDown.duration(220).delay(Math.min(index * 40, 240));
 
-const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
+const NoteItem = ({
+  note,
+  onPress,
+  onOpenActions,
+  index = 0,
+  checklistProgressOnly = false,
+  reminderScheduleOnly = false,
+}) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -51,9 +60,13 @@ const NoteItem = ({ note, onPress, onOpenActions, index = 0 }) => {
   const preview = isExpense
     ? `RM ${formatExpenseAmount(calculateExpenseNoteGrandTotal(note.content))}`
     : isChecklist
-      ? getChecklistPreview(checklistItems)
+      ? checklistProgressOnly
+        ? getChecklistProgressPreview(checklistItems)
+        : getChecklistPreview(checklistItems)
       : isReminder
-        ? getReminderPreview(note.content)
+        ? reminderScheduleOnly
+          ? getReminderSchedulePreview(note.content)
+          : getReminderPreview(note.content)
       : note.content || 'No content';
 
   const handleActionsPress = (e) => {

@@ -4,6 +4,7 @@ import {
   calculateChecklistProgress,
   CHECKLIST_ITEM_MAX_CHARACTERS,
   createChecklistItem,
+  getChecklistProgressPreview,
   getChecklistPreview,
   isChecklistNoteEmpty,
   moveChecklistItem,
@@ -63,6 +64,8 @@ test('calculates checklist progress from visible items', () => {
     percent: 50,
   });
   assert.equal(getChecklistPreview(items), '1 of 2 completed · Next: Next');
+  assert.equal(getChecklistProgressPreview(items), '1 of 2 completed');
+  assert.equal(getChecklistProgressPreview([]), 'No checklist items');
 });
 
 test('detects empty checklist notes and limits item text', () => {

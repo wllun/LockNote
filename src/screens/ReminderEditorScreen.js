@@ -288,7 +288,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(20, insets.bottom + 12) }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-        <TextInput ref={bodyRef} style={styles.bodyInput} placeholder="What do you want to remember?" placeholderTextColor={colors.textTertiary} value={body} onChangeText={handleBodyChange} maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS} multiline textAlignVertical="top" accessibilityLabel="Reminder note content" />
+        <TextInput ref={bodyRef} style={styles.bodyInput} placeholder="... ..." placeholderTextColor={colors.textTertiary} value={body} onChangeText={handleBodyChange} maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS} multiline textAlignVertical="top" accessibilityLabel="Reminder note content" />
 
         <View style={[styles.reminderCard, reminder.enabled && styles.reminderCardEnabled]}>
           <View style={styles.reminderTop}>

@@ -80,6 +80,11 @@ export const getReminderPreview = (content) => {
   return body ? `${body}\n${schedule}` : schedule;
 };
 
+export const getReminderSchedulePreview = (content) => {
+  const { reminder } = parseReminderNote(content);
+  return reminder.enabled ? formatReminderSchedule(reminder) : 'Reminder is off';
+};
+
 export const isReminderNoteEmpty = ({ title = '', body = '', reminder, hasPassword, isPinned } = {}) =>
   !String(title).trim() &&
   !String(body).trim() &&

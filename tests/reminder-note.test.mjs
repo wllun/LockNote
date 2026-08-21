@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatReminderSchedule,
   getReminderPreview,
+  getReminderSchedulePreview,
   isReminderNoteEmpty,
   parseReminderNote,
   serializeReminderNote,
@@ -30,7 +31,10 @@ test('preserves legacy plaintext reminder content', () => {
 test('formats recurring schedules and previews their state', () => {
   const reminder = { enabled: true, scheduledAt, repeat: 'daily' };
   assert.match(formatReminderSchedule(reminder), /^Every day at /);
-  assert.match(getReminderPreview(serializeReminderNote({ body: 'Medicine', reminder })), /Medicine\nEvery day/);
+  const content = serializeReminderNote({ body: 'Medicine', reminder });
+  assert.match(getReminderPreview(content), /Medicine\nEvery day/);
+  assert.match(getReminderSchedulePreview(content), /^Every day at /);
+  assert.doesNotMatch(getReminderSchedulePreview(content), /Medicine/);
 });
 
 test('only treats a reminder as empty when it has no meaningful state', () => {

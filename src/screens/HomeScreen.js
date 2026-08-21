@@ -415,6 +415,8 @@ const HomeScreen = ({ navigation }) => {
                 key={note.id}
                 note={note}
                 index={index}
+                checklistProgressOnly
+                reminderScheduleOnly
                 onPress={() => handleNotePress(note)}
                 onOpenActions={() => openItemActions(note, 'note')}
               />
@@ -473,6 +475,8 @@ const HomeScreen = ({ navigation }) => {
               key={note.id}
               note={note}
               index={index}
+              checklistProgressOnly
+              reminderScheduleOnly
               onPress={() => handleNotePress(note)}
               onOpenActions={() => openItemActions(note, 'note')}
             />

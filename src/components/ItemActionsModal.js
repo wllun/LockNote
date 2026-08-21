@@ -112,7 +112,7 @@ const ItemActionsModal = ({
                   color={colors.textSecondary}
                 />
               </View>
-              <Text style={styles.actionText}>Move to folder</Text>
+              <Text style={styles.actionText}>Move</Text>
             </Pressable>
           )}
 
