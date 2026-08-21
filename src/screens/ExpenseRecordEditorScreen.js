@@ -1991,7 +1991,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 color={isPinned ? colors.primary : colors.textSecondary}
               />
               <Text style={styles.actionsMenuText}>
-                {isPinned ? 'Unpin note' : 'Pin note'}
+                {isPinned ? 'Unpin' : 'Pin'}
               </Text>
             </Pressable>
 
@@ -2017,7 +2017,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 color={hasPassword ? colors.folder : colors.textSecondary}
               />
               <Text style={styles.actionsMenuText}>
-                {hasPassword ? 'Password protection' : 'Lock note'}
+                {hasPassword ? 'Password protection' : 'Lock'}
               </Text>
             </Pressable>
 
@@ -2036,7 +2036,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             >
               <Ionicons name="trash-outline" size={20} color={colors.danger} />
               <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>
-                Delete note
+                Delete
               </Text>
             </Pressable>
           </View>

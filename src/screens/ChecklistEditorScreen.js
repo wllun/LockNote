@@ -1093,7 +1093,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                 size={20}
                 color={isPinned ? colors.primary : colors.textSecondary}
               />
-              <Text style={styles.actionsMenuText}>{isPinned ? 'Unpin checklist' : 'Pin checklist'}</Text>
+              <Text style={styles.actionsMenuText}>{isPinned ? 'Unpin' : 'Pin'}</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
@@ -1109,7 +1109,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                 size={20}
                 color={hasPassword ? colors.folder : colors.textSecondary}
               />
-              <Text style={styles.actionsMenuText}>{hasPassword ? 'Password protection' : 'Lock checklist'}</Text>
+              <Text style={styles.actionsMenuText}>{hasPassword ? 'Password protection' : 'Lock'}</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [
@@ -1125,7 +1125,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
               accessibilityLabel="Delete checklist"
             >
               <Ionicons name="trash-outline" size={20} color={colors.danger} />
-              <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>Delete checklist</Text>
+              <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>Delete</Text>
             </Pressable>
           </View>
         </View>

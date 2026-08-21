@@ -313,9 +313,9 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         <View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setShowActions(false)} accessible={false} /><View style={[styles.actionMenu, { top: insets.top + 60 }]}>
           {[
             { icon: 'share-outline', text: 'Export PDF or image', action: () => setShowExport(true) },
-            { icon: isPinned ? 'pin' : 'pin-outline', text: isPinned ? 'Unpin reminder' : 'Pin reminder', action: handleTogglePin },
-            { icon: hasPassword ? 'lock-closed' : 'lock-open-outline', text: hasPassword ? 'Password protection' : 'Lock reminder', action: () => setShowLock(true) },
-            { icon: 'trash-outline', text: 'Delete reminder', danger: true, action: handleDelete },
+            { icon: isPinned ? 'pin' : 'pin-outline', text: isPinned ? 'Unpin' : 'Pin', action: handleTogglePin },
+            { icon: hasPassword ? 'lock-closed' : 'lock-open-outline', text: hasPassword ? 'Password protection' : 'Lock', action: () => setShowLock(true) },
+            { icon: 'trash-outline', text: 'Delete', danger: true, action: handleDelete },
           ].map((item) => <Pressable key={item.text} style={({ pressed }) => [styles.actionItem, item.danger && styles.actionDelete, pressed && styles.pressed]} onPress={() => { setShowActions(false); item.action(); }} accessibilityRole="button"><Ionicons name={item.icon} size={20} color={item.danger ? colors.danger : colors.textSecondary} /><Text style={[styles.actionText, item.danger && { color: colors.danger }]}>{item.text}</Text></Pressable>)}
         </View></View>
       </Modal>
