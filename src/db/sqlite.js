@@ -30,6 +30,17 @@ export const initDB = async () => {
       password TEXT,
       is_deleted INTEGER DEFAULT 0,
       is_pinned INTEGER DEFAULT 0,
+      cloud_id TEXT,
+      cloud_owner_id TEXT,
+      share_origin TEXT NOT NULL DEFAULT 'private',
+      share_role TEXT,
+      collaborator_count INTEGER NOT NULL DEFAULT 0,
+      server_revision INTEGER NOT NULL DEFAULT 0,
+      last_edited_by_id TEXT,
+      last_edited_by_email TEXT,
+      last_edited_at TEXT,
+      sync_status TEXT,
+      last_synced_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -67,6 +78,27 @@ export const initDB = async () => {
   if (!noteColumns.some((column) => column.name === 'note_type')) {
     await db.execAsync(`ALTER TABLE notes ADD COLUMN note_type TEXT NOT NULL DEFAULT 'note'`);
   }
+
+  const collaborationColumns = [
+    ['cloud_id', 'TEXT'],
+    ['cloud_owner_id', 'TEXT'],
+    ['share_origin', "TEXT NOT NULL DEFAULT 'private'"],
+    ['share_role', 'TEXT'],
+    ['collaborator_count', 'INTEGER NOT NULL DEFAULT 0'],
+    ['server_revision', 'INTEGER NOT NULL DEFAULT 0'],
+    ['last_edited_by_id', 'TEXT'],
+    ['last_edited_by_email', 'TEXT'],
+    ['last_edited_at', 'TEXT'],
+    ['sync_status', 'TEXT'],
+    ['last_synced_at', 'TEXT'],
+  ];
+  const migratedColumns = await db.getAllAsync('PRAGMA table_info(notes)');
+  for (const [name, definition] of collaborationColumns) {
+    if (!migratedColumns.some((column) => column.name === name)) {
+      await db.execAsync(`ALTER TABLE notes ADD COLUMN ${name} ${definition}`);
+    }
+  }
+  await db.execAsync('CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_cloud_id ON notes(cloud_id) WHERE cloud_id IS NOT NULL');
 
   return db;
 };

@@ -28,6 +28,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import EditorUndoButton from '../components/editor-undo-button';
 import NoteExportModal from '../components/NoteExportModal';
+import NoteShareModal from '../components/NoteShareModal';
+import CollaborationFooter from '../components/CollaborationFooter';
+import { collaborationService } from '../services/collaborationService';
 import PasswordModal from '../components/PasswordModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
 import DestructiveConfirmationModal from '../components/DestructiveConfirmationModal';
@@ -256,6 +259,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
@@ -293,6 +297,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     monthlyCommitments: [],
     hasPassword: false,
     isPinned: false,
+    cloudId: null,
     deleted: false,
   });
   const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
@@ -403,6 +408,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         monthlyCommitments: parsed.monthlyCommitments,
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
+        cloudId: note.cloud_id,
       };
       clearUndo();
     } catch {
@@ -432,7 +438,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       saveTimeout.current = setTimeout(async () => {
         saveTimeout.current = null;
         try {
-          await noteRepo.update(noteId, {
+          await collaborationService.save(noteId, {
             title: nextTitle.trim(),
             content: serializeExpenseNote(
               nextRows,
@@ -502,7 +508,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     setCategories(nextCategories);
     setSaveStatus('Saving...');
     try {
-      await noteRepo.update(noteId, {
+      await collaborationService.save(noteId, {
         title: latest.current.title.trim(),
         content: serializeExpenseNote(
           latest.current.rows,
@@ -1188,7 +1194,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         saveTimeout.current = null;
       }
       latest.current.deleted = true;
-      await noteRepo.softDelete(noteId);
+      await collaborationService.delete(noteId);
       navigation.goBack();
     } catch {
       latest.current.deleted = false;
@@ -1245,12 +1251,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           draft.monthlyCommitments
         ) &&
         !draft.hasPassword &&
-        !draft.isPinned
+        !draft.isPinned &&
+        !draft.cloudId
       ) {
         noteRepo.hardDelete(noteId).catch(() => {});
       } else if (pending) {
-        noteRepo
-          .update(noteId, {
+        collaborationService
+          .save(noteId, {
             title: draft.title.trim(),
             content: serializeExpenseNote(
               draft.rows,
@@ -1883,6 +1890,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
+      <CollaborationFooter noteId={noteId} onRemoteNote={loadRecord} />
+
       {activeDrag && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <Animated.View
@@ -1957,6 +1966,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             style={[styles.actionsMenu, { top: insets.top + 60 }]}
             accessibilityViewIsModal
           >
+            <Pressable
+              style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
+              onPress={() => { setShowActionsMenu(false); setShowShareModal(true); }}
+              accessibilityRole="button"
+            >
+              <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Share with people</Text>
+            </Pressable>
             <Pressable
               style={({ pressed }) => [
                 styles.actionsMenuItem,
@@ -2076,6 +2093,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         monthlyCommitments={monthlyCommitments}
         type="expense"
       />
+      <NoteShareModal visible={showShareModal} noteId={noteId} onClose={() => setShowShareModal(false)} onChanged={loadRecord} onLeft={() => navigation.goBack()} />
 
       <PasswordModal
         visible={showDeletePasswordModal}

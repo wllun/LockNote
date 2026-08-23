@@ -20,6 +20,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import EditorUndoButton from '../components/editor-undo-button';
 import NoteExportModal from '../components/NoteExportModal';
+import NoteShareModal from '../components/NoteShareModal';
+import CollaborationFooter from '../components/CollaborationFooter';
+import { collaborationService } from '../services/collaborationService';
 import PasswordModal from '../components/PasswordModal';
 import { verifyPassword } from '../utils/crypto';
 import { confirmDestructiveAction } from '../utils/confirm-action';
@@ -241,6 +244,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
@@ -271,6 +275,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     newItemText: '',
     hasPassword: false,
     isPinned: false,
+    cloudId: null,
     deleted: false,
   });
   const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
@@ -330,6 +335,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         newItemText: '',
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
+        cloudId: note.cloud_id,
       };
       clearUndo();
     } catch {
@@ -344,7 +350,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       saveTimeout.current = setTimeout(async () => {
         saveTimeout.current = null;
         try {
-          await noteRepo.update(noteId, {
+          await collaborationService.save(noteId, {
             title: nextTitle,
             content: serializeChecklistNote(nextItems),
           });
@@ -732,7 +738,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         saveTimeout.current = null;
       }
       latest.current.deleted = true;
-      await noteRepo.softDelete(noteId);
+      await collaborationService.delete(noteId);
       navigation.goBack();
     } catch {
       latest.current.deleted = false;
@@ -778,10 +784,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
       const { title: latestTitle, items: latestItems, hasPassword: password, isPinned: pinned, deleted } = latest.current;
       if (deleted) return;
-      if (isChecklistNoteEmpty(latestTitle, latestItems) && !password && !pinned) {
+      if (!latest.current.cloudId && isChecklistNoteEmpty(latestTitle, latestItems) && !password && !pinned) {
         noteRepo.hardDelete(noteId).catch(() => {});
       } else if (pending) {
-        noteRepo.update(noteId, {
+        collaborationService.save(noteId, {
           title: latestTitle,
           content: serializeChecklistNote(latestItems),
         }).catch(() => {});
@@ -996,6 +1002,8 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         }
       />
 
+      <CollaborationFooter noteId={noteId} onRemoteNote={loadChecklist} />
+
       {activeDrag && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <Animated.View
@@ -1069,6 +1077,14 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
           >
             <Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
+              onPress={() => { setShowActionsMenu(false); setShowShareModal(true); }}
+              accessibilityRole="button"
+            >
+              <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Share with people</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => {
                 setShowActionsMenu(false);
                 setShowExportModal(true);
@@ -1138,6 +1154,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         checklistItems={items}
         type="checklist"
       />
+      <NoteShareModal visible={showShareModal} noteId={noteId} onClose={() => setShowShareModal(false)} onChanged={loadChecklist} onLeft={() => navigation.goBack()} />
 
       <PasswordModal
         visible={showDeletePasswordModal}

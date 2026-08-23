@@ -10,14 +10,14 @@ export const noteRepo = {
   async getRootNotes() {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE folder_id IS NULL AND is_deleted = 0 ORDER BY is_pinned DESC, updated_at DESC`
+      `SELECT * FROM notes WHERE folder_id IS NULL AND is_deleted = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, updated_at DESC`
     );
   },
 
   async getByFolderId(folderId) {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 ORDER BY is_pinned DESC, updated_at DESC`,
+      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, updated_at DESC`,
       [folderId]
     );
   },
@@ -76,6 +76,16 @@ export const noteRepo = {
       fields.push('is_pinned = ?');
       values.push(updates.is_pinned ? 1 : 0);
     }
+    for (const field of [
+      'cloud_id', 'cloud_owner_id', 'share_origin', 'share_role',
+      'collaborator_count', 'server_revision', 'last_edited_by_id',
+      'last_edited_by_email', 'last_edited_at', 'sync_status', 'last_synced_at',
+    ]) {
+      if (updates[field] !== undefined) {
+        fields.push(`${field} = ?`);
+        values.push(updates[field]);
+      }
+    }
 
     if (fields.length === 0) return await this.getById(id);
 
@@ -116,8 +126,30 @@ export const noteRepo = {
   async search(query) {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY is_pinned DESC, updated_at DESC`,
+      `SELECT * FROM notes WHERE is_deleted = 0 AND share_origin != 'incoming' AND (title LIKE ? OR content LIKE ?) ORDER BY is_pinned DESC, updated_at DESC`,
       [`%${query}%`, `%${query}%`]
     );
+  },
+
+  async getSharedWithMe() {
+    const db = getDB();
+    return await db.getAllAsync(
+      `SELECT * FROM notes WHERE is_deleted = 0 AND share_origin = 'incoming' ORDER BY last_edited_at DESC, updated_at DESC`
+    );
+  },
+
+  async getByCloudId(cloudId) {
+    const db = getDB();
+    return await db.getFirstAsync(
+      `SELECT * FROM notes WHERE cloud_id = ? AND is_deleted = 0`,
+      [cloudId]
+    );
+  },
+
+  async upsertSharedCache(remote) {
+    const existing = await this.getByCloudId(remote.cloud_id);
+    if (existing) return await this.update(existing.id, remote);
+    const created = await this.create(null, remote.title, remote.content, null, remote.note_type);
+    return await this.update(created.id, remote);
   },
 };

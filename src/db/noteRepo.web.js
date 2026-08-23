@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hashPassword } from '../utils/crypto';
+import { COLLABORATION_DEFAULTS, normalizeCollaborationNote } from '../utils/collaboration-note.mjs';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
@@ -33,16 +34,13 @@ const mutateStorage = (mutation) => {
   return operation;
 };
 
-const normalizeNote = (note) => ({
-  ...note,
-  note_type: note.note_type || 'note',
-});
+const normalizeNote = normalizeCollaborationNote;
 
 export const noteRepo = {
   async getRootNotes() {
     const notes = await getStorage();
     return notes
-      .filter((n) => n.folder_id === null && !n.is_deleted)
+      .filter((n) => n.folder_id === null && !n.is_deleted && n.share_origin !== 'incoming')
       .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at))
       .map(normalizeNote);
   },
@@ -50,7 +48,7 @@ export const noteRepo = {
   async getByFolderId(folderId) {
     const notes = await getStorage();
     return notes
-      .filter((n) => n.folder_id === folderId && !n.is_deleted)
+      .filter((n) => n.folder_id === folderId && !n.is_deleted && n.share_origin !== 'incoming')
       .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at))
       .map(normalizeNote);
   },
@@ -77,6 +75,7 @@ export const noteRepo = {
       is_pinned: 0,
       created_at: timestamp,
       updated_at: timestamp,
+      ...COLLABORATION_DEFAULTS,
     };
 
     return await mutateStorage((notes) => {
@@ -103,6 +102,13 @@ export const noteRepo = {
       if (updates.password !== undefined) notes[index].password = passwordHash;
       if (updates.is_pinned !== undefined) {
         notes[index].is_pinned = updates.is_pinned ? 1 : 0;
+      }
+      for (const field of [
+        'cloud_id', 'cloud_owner_id', 'share_origin', 'share_role',
+        'collaborator_count', 'server_revision', 'last_edited_by_id',
+        'last_edited_by_email', 'last_edited_at', 'sync_status', 'last_synced_at',
+      ]) {
+        if (updates[field] !== undefined) notes[index][field] = updates[field];
       }
       notes[index].updated_at = now();
       return normalizeNote(notes[index]);
@@ -142,10 +148,32 @@ export const noteRepo = {
       .filter(
         (n) =>
           !n.is_deleted &&
+          n.share_origin !== 'incoming' &&
           (n.title.toLowerCase().includes(query.toLowerCase()) ||
             n.content.toLowerCase().includes(query.toLowerCase()))
       )
       .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at))
       .map(normalizeNote);
+  },
+
+  async getSharedWithMe() {
+    const notes = await getStorage();
+    return notes
+      .filter((note) => !note.is_deleted && note.share_origin === 'incoming')
+      .sort((a, b) => new Date(b.last_edited_at || b.updated_at) - new Date(a.last_edited_at || a.updated_at))
+      .map(normalizeNote);
+  },
+
+  async getByCloudId(cloudId) {
+    const notes = await getStorage();
+    const note = notes.find((item) => item.cloud_id === cloudId && !item.is_deleted);
+    return note ? normalizeNote(note) : null;
+  },
+
+  async upsertSharedCache(remote) {
+    const existing = await this.getByCloudId(remote.cloud_id);
+    if (existing) return await this.update(existing.id, remote);
+    const created = await this.create(null, remote.title, remote.content, null, remote.note_type);
+    return await this.update(created.id, remote);
   },
 };

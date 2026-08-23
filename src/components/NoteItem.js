@@ -132,6 +132,20 @@ const NoteItem = ({
               <Ionicons name="pin" size={13} color={colors.primary} />
             </View>
           )}
+          {note.collaborator_count > 0 && (
+            <View
+              style={styles.shareBadge}
+              accessibilityLabel={`Shared with ${note.collaborator_count} ${note.collaborator_count === 1 ? 'person' : 'people'}`}
+            >
+              <Ionicons name="people" size={13} color={colors.primary} />
+              <Text style={styles.shareBadgeText}>{note.collaborator_count}</Text>
+            </View>
+          )}
+          {note.share_origin === 'incoming' && (
+            <View style={styles.shareBadge} accessibilityLabel="Shared with you">
+              <Ionicons name="people" size={13} color={colors.primary} />
+            </View>
+          )}
           {Platform.OS === 'web' && (
             <Pressable
               style={({ pressed }) => [
@@ -229,6 +243,18 @@ const makeStyles = (colors) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    shareBadge: {
+      minWidth: 24,
+      height: 24,
+      paddingHorizontal: 6,
+      borderRadius: radius.full,
+      backgroundColor: colors.primarySoft,
+      flexDirection: 'row',
+      gap: 3,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    shareBadgeText: { color: colors.primary, fontSize: 11, fontWeight: '800' },
     webMenuButton: {
       width: 44,
       height: 44,

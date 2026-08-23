@@ -12,6 +12,7 @@ import ExpenseRecordEditorScreen from '../screens/ExpenseRecordEditorScreen';
 import ReminderEditorScreen from '../screens/ReminderEditorScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProfileTabScreen from '../screens/ProfileTabScreen';
+import SharedScreen from '../screens/SharedScreen';
 import { useTheme, useThemeMode } from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -62,6 +63,16 @@ const SettingsStack = ({ screenOptions }) => (
   </Stack.Navigator>
 );
 
+const SharedStack = ({ screenOptions }) => (
+  <Stack.Navigator screenOptions={screenOptions}>
+    <Stack.Screen name="SharedMain" component={SharedScreen} options={{ title: 'Shared with me' }} />
+    <Stack.Screen name="NoteEditor" component={NoteEditorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ChecklistEditor" component={ChecklistEditorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ExpenseRecordEditor" component={ExpenseRecordEditorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ headerShown: false }} />
+  </Stack.Navigator>
+);
+
 const ProfileStack = ({ screenOptions }) => (
   <Stack.Navigator screenOptions={screenOptions}>
     <Stack.Screen
@@ -108,6 +119,8 @@ const AppNavigator = () => {
               iconName = focused ? 'home' : 'home-outline';
             } else if (route.name === 'Settings') {
               iconName = focused ? 'settings' : 'settings-outline';
+            } else if (route.name === 'Shared') {
+              iconName = focused ? 'people' : 'people-outline';
             } else if (route.name === 'Profile') {
               iconName = focused ? 'person-circle' : 'person-circle-outline';
             }
@@ -128,6 +141,9 @@ const AppNavigator = () => {
         </Tab.Screen>
         <Tab.Screen name="Settings">
           {() => <SettingsStack screenOptions={stackScreenOptions} />}
+        </Tab.Screen>
+        <Tab.Screen name="Shared">
+          {() => <SharedStack screenOptions={stackScreenOptions} />}
         </Tab.Screen>
         <Tab.Screen name="Profile">
           {() => <ProfileStack screenOptions={stackScreenOptions} />}

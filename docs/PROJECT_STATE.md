@@ -35,7 +35,8 @@ _Snapshot: 2026-07-30. Check off items as they land._
 - [ ] Verify registration, email confirmation, login persistence, password reset, and sign-out end-to-end on Android, iOS, and web. Android and iOS simulator binaries compile successfully on EAS; web production export and local HTTP runtime pass. Interactive cloud-device verification is blocked until EAS Simulator is enabled for the Expo account.
 - [X] Email confirmation returns to `locknote://auth-confirm` on native and the corresponding app URL on web.
 - [ ] Sync Notes is a stub (`Alert` only) — no premium gating, no actual note/folder sync to Supabase yet.
-- Note content itself still never leaves the device — only auth (email/password) talks to the network.
+- [X] Collaboration Release 1 — explicit per-note sharing by registered account email, Shared tab/local cache, owner share indicators, collaborator management, realtime refresh, last-editor footer, RLS, and revision-protected saves. Backend migration/function deployment and live two-account verification still require configured Supabase credentials.
+- Private note content remains local. Content leaves the device only after the owner explicitly shares that note.
 
 ### Possible features
 - [X] Dark mode — palette centralized in `src/theme.js` (`useTheme()` + `makeStyles(colors)`). Theme mode (`system` / `light` / `dark`) is set in Settings, persisted in AsyncStorage (`@locknote_theme`), shared via `ThemeProvider` context; `system` follows the OS via `useColorScheme`. `userInterfaceStyle` is `automatic`.

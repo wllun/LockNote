@@ -10,6 +10,9 @@ import { noteRepo } from '../db/noteRepo';
 import EditorUndoButton from '../components/editor-undo-button';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import NoteExportModal from '../components/NoteExportModal';
+import NoteShareModal from '../components/NoteShareModal';
+import CollaborationFooter from '../components/CollaborationFooter';
+import { collaborationService } from '../services/collaborationService';
 import PasswordModal from '../components/PasswordModal';
 import ReminderScheduleModal from '../components/reminder-schedule-modal';
 import { verifyPassword } from '../utils/crypto';
@@ -41,6 +44,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const [showSchedule, setShowSchedule] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [showLock, setShowLock] = useState(false);
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
@@ -49,7 +53,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const saveTimeout = useRef(null);
   const bodyRef = useRef(null);
   const bodyLimitDialogShown = useRef(false);
-  const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, deleted: false });
+  const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, cloudId: null, deleted: false });
   const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
 
   const contentFor = (nextBody, nextReminder) => serializeReminderNote({ body: nextBody, reminder: nextReminder });
@@ -59,7 +63,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       clearTimeout(saveTimeout.current);
       saveTimeout.current = null;
     }
-    await noteRepo.update(noteId, {
+    await collaborationService.save(noteId, {
       title: next.title,
       content: contentFor(next.body, next.reminder),
     });
@@ -70,13 +74,12 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     saveTimeout.current = setTimeout(() => {
       saveTimeout.current = null;
       const next = latest.current;
-      noteRepo.update(noteId, { title: next.title, content: contentFor(next.body, next.reminder) })
+      collaborationService.save(noteId, { title: next.title, content: contentFor(next.body, next.reminder) })
         .catch((error) => console.error('Reminder auto-save failed:', error));
     }, 800);
   }, [noteId]);
 
-  useEffect(() => {
-    noteRepo.getById(noteId).then((note) => {
+  const applyLoadedNote = useCallback((note) => {
       if (!note) return;
       const parsed = parseReminderNote(note.content);
       const next = {
@@ -86,23 +89,28 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         reminder: parsed.reminder,
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
+        cloudId: note.cloud_id,
       };
       latest.current = next;
       setTitle(next.title); setBody(next.body); setReminder(next.reminder);
       setHasPassword(next.hasPassword); setIsPinned(next.isPinned); clearUndo();
-    }).catch(() => Alert.alert('Error', 'Failed to load reminder'));
-  }, [noteId, clearUndo]);
+  }, [clearUndo]);
+
+  useEffect(() => {
+    noteRepo.getById(noteId).then(applyLoadedNote)
+      .catch(() => Alert.alert('Error', 'Failed to load reminder'));
+  }, [noteId, applyLoadedNote]);
 
   useEffect(() => () => {
     const pending = saveTimeout.current;
     if (pending) clearTimeout(pending);
     const next = latest.current;
     if (next.deleted) return;
-    if (isReminderNoteEmpty(next)) {
+    if (!next.cloudId && isReminderNoteEmpty(next)) {
       cancelReminderNotifications(next.reminder.notificationIds).catch(() => {});
       noteRepo.hardDelete(noteId).catch(() => {});
     } else if (pending) {
-      noteRepo.update(noteId, { title: next.title, content: contentFor(next.body, next.reminder) }).catch(() => {});
+      collaborationService.save(noteId, { title: next.title, content: contentFor(next.body, next.reminder) }).catch(() => {});
     }
   }, [noteId]);
 
@@ -266,7 +274,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       }
       latest.current.deleted = true;
       await cancelReminderNotifications(latest.current.reminder.notificationIds);
-      await noteRepo.softDelete(noteId);
+      await collaborationService.delete(noteId);
       navigation.goBack();
     } catch {
       latest.current.deleted = false;
@@ -321,9 +329,12 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
+      <CollaborationFooter noteId={noteId} onRemoteNote={applyLoadedNote} />
+
       <Modal visible={showActions} animationType="fade" transparent onRequestClose={() => setShowActions(false)}>
         <View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setShowActions(false)} accessible={false} /><View style={[styles.actionMenu, { top: insets.top + 60 }]}>
           {[
+            { icon: 'people-outline', text: 'Share with people', action: () => setShowShare(true) },
             { icon: 'share-outline', text: 'Export PDF or image', action: () => setShowExport(true) },
             { icon: isPinned ? 'pin' : 'pin-outline', text: isPinned ? 'Unpin' : 'Pin', action: handleTogglePin },
             { icon: hasPassword ? 'lock-closed' : 'lock-open-outline', text: hasPassword ? 'Password protection' : 'Lock', action: () => setShowLock(true) },
@@ -334,6 +345,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
       <ReminderScheduleModal visible={showSchedule} reminder={reminder} onClose={() => setShowSchedule(false)} onSave={handleScheduleSave} saving={scheduling} />
       <NoteExportModal visible={showExport} onClose={() => setShowExport(false)} title={title} content={body} type="reminder" reminder={reminder} />
+      <NoteShareModal visible={showShare} noteId={noteId} onClose={() => setShowShare(false)} onLeft={() => navigation.goBack()} />
       <PasswordModal
         visible={showDeletePassword}
         onClose={() => setShowDeletePassword(false)}

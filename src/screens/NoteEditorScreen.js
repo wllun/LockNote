@@ -16,6 +16,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import EditorUndoButton from '../components/editor-undo-button';
 import NoteExportModal from '../components/NoteExportModal';
+import NoteShareModal from '../components/NoteShareModal';
+import CollaborationFooter from '../components/CollaborationFooter';
+import { collaborationService } from '../services/collaborationService';
 import PasswordModal from '../components/PasswordModal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { verifyPassword } from '../utils/crypto';
@@ -39,6 +42,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
@@ -46,7 +50,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const contentRef = useRef(null);
   const contentLimitDialogShown = useRef(false);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
-  const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, deleted: false });
+  const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, cloudId: null, deleted: false });
   const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
   const insets = useSafeAreaInsets();
 
@@ -64,6 +68,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           content: note.content,
           hasPassword: !!note.password,
           isPinned: !!note.is_pinned,
+          cloudId: note.cloud_id,
         };
         clearUndo();
       }
@@ -80,7 +85,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
       saveTimeout.current = setTimeout(async () => {
         saveTimeout.current = null;
         try {
-          await noteRepo.update(noteId, { title: newTitle, content: newContent });
+          await collaborationService.save(noteId, { title: newTitle, content: newContent });
         } catch (error) {
           console.error('Auto-save failed:', error);
         }
@@ -178,7 +183,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         saveTimeout.current = null;
       }
       latest.current.deleted = true;
-      await noteRepo.softDelete(noteId);
+      await collaborationService.delete(noteId);
       navigation.goBack();
     } catch (error) {
       latest.current.deleted = false;
@@ -223,12 +228,12 @@ const NoteEditorScreen = ({ route, navigation }) => {
         clearTimeout(pending);
         saveTimeout.current = null;
       }
-      const { title, content, hasPassword, isPinned, deleted } = latest.current;
+      const { title, content, hasPassword, isPinned, cloudId, deleted } = latest.current;
       if (deleted) return;
-      if (!title.trim() && !content.trim() && !hasPassword && !isPinned) {
+      if (!cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned) {
         noteRepo.hardDelete(noteId).catch(() => {});
       } else if (pending) {
-        noteRepo.update(noteId, { title, content }).catch(() => {});
+        collaborationService.save(noteId, { title, content }).catch(() => {});
       }
     };
   }, [noteId]);
@@ -312,6 +317,8 @@ const NoteEditorScreen = ({ route, navigation }) => {
         />
       </View>
 
+      <CollaborationFooter noteId={noteId} onRemoteNote={loadNote} />
+
       <Modal
         visible={showActionsMenu}
         animationType="fade"
@@ -328,6 +335,14 @@ const NoteEditorScreen = ({ route, navigation }) => {
             style={[styles.actionsMenu, { top: insets.top + 60 }]}
             accessibilityViewIsModal
           >
+            <Pressable
+              style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
+              onPress={() => { setShowActionsMenu(false); setShowShareModal(true); }}
+              accessibilityRole="button"
+            >
+              <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Share with people</Text>
+            </Pressable>
             <Pressable
               style={({ pressed }) => [
                 styles.actionsMenuItem,
@@ -418,6 +433,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         title={title}
         content={content}
       />
+      <NoteShareModal visible={showShareModal} noteId={noteId} onClose={() => setShowShareModal(false)} onChanged={loadNote} onLeft={() => navigation.goBack()} />
 
       <PasswordModal
         visible={showDeletePasswordModal}

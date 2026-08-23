@@ -1,5 +1,5 @@
-// Supabase client for account auth only — notes/folders stay in local
-// SQLite/AsyncStorage (see docs/ARCHITECTURE.md). Session persists via
+// Supabase client for account auth and explicitly shared notes. Private
+// notes/folders stay in local SQLite/AsyncStorage (see docs/ARCHITECTURE.md). Session persists via
 // AsyncStorage so a logged-in user stays logged in across app restarts.
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';

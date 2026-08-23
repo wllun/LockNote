@@ -1,6 +1,6 @@
 # Architecture
 
-LockNote is a single-user, local-first Expo / React Native app. Note/folder data has no backend and never leaves the device — UI talks to a thin repository layer that abstracts over two platform-specific storage backends. Account auth is the one piece that talks to the network (see [Auth](#auth) below); it does not touch note/folder data.
+LockNote is a local-first Expo / React Native app. Private note/folder data stays on the device. A note leaves the device only after its owner explicitly shares it with another LockNote account; shared-note copies use Supabase with a local cache for offline reading.
 
 ## Layers
 
@@ -28,10 +28,11 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 
 ## Navigation
 
-`AppNavigator` = bottom tab navigator with three tabs:
+`AppNavigator` = bottom tab navigator with four tabs:
 
 - **Home** (native stack): `HomeScreen` → `FolderScreen` → the note-type editor (`NoteEditorScreen`, `ChecklistEditorScreen`, `ExpenseRecordEditorScreen`, or `ReminderEditorScreen`)
 - **Settings** (native stack): `SettingsScreen`
+- **Shared** (native stack): `SharedScreen` → a shared note-type editor
 - **Profile** (native stack): `ProfileTabScreen` → `AuthScreen` (logged out) or `ProfileScreen` (logged in), switched via `useAuth()`
 
 Screens reload their data on the navigation `focus` event (listener registered in `useEffect`, cleaned up on unmount) rather than holding shared state — so returning from the editor reflects edits without a store.
@@ -134,7 +135,7 @@ leaving the editor.
 
 ## Auth
 
-Supabase is used for account auth only (Phase 2 of [ROADMAP.md](ROADMAP.md)) — it is not a data store, and note/folder content never leaves the device.
+Supabase provides account auth and the backend for notes a user explicitly shares. Private notes and all folders remain local-only.
 
 - `src/services/supabaseClient.js` — the client, configured with AsyncStorage as the session storage adapter so a login survives app restarts. Reads `supabaseUrl`/`supabaseAnonKey` from `Constants.expoConfig.extra` (populated from `.env` via `app.config.js`), not `process.env` directly. Missing or invalid configuration no longer crashes startup; auth actions show a support-oriented configuration message.
 - `src/services/authService.mjs` and `src/utils/auth.mjs` — testable Supabase request wrappers, callback parsing, field validation, email normalization, and user-friendly error mapping for network, credentials, rate-limit, expired-link, and configuration failures. Emails are trimmed and lowercased before requests; registration and reset passwords require at least 8 characters.
@@ -142,6 +143,12 @@ Supabase is used for account auth only (Phase 2 of [ROADMAP.md](ROADMAP.md)) —
 - `AuthScreen` handles sign-up, sign-in, forgotten-password email requests, and choosing a new password. Invalid email, short-password, and confirmation errors appear beneath their relevant fields before Supabase is called. Supabase must allow `locknote://reset-password` and `locknote://auth-confirm` in **Authentication → URL Configuration → Redirect URLs** (plus the corresponding deployed web URLs). On sign-up, if Supabase's "confirm email" setting is on, no session comes back immediately — the screen shows a "check your email" message and flips to sign-in mode; if it's off, a session comes back right away and `onAuthStateChange` flips the Profile tab over on its own.
 - `tests/auth.test.mjs` exercises error mapping, callback parsing, redirects, request payloads, and configuration/error propagation. It runs as part of `npm test`.
 - `react-native-url-polyfill/auto` is imported first in `index.js` — required because Hermes' native `URL` implementation is incomplete and `@supabase/supabase-js` depends on it.
+
+## Shared-note collaboration
+
+Release 1 shares individual notes by registered account email. Private notes remain local. Once sharing begins, the local row stores a cloud ID, ownership/origin, collaborator count, server revision, sync state, and last-editor metadata. Incoming notes are excluded from Home, folder, and search reads and appear only in the Shared tab.
+
+Supabase stores `profiles`, `shared_notes`, and `note_members`. Row-level security limits reads to the owner and current members. Email lookup is performed by the authenticated `share-note` Edge Function so the client cannot enumerate account emails and never receives a service-role key. Content saves use an expected server revision; stale saves fail instead of silently replacing newer content. Realtime table events refresh the local cache and an open editor. Release 1 synchronizes complete saved note snapshots and does not provide character-level CRDT cursor merging.
 
 ## Notable state
 
