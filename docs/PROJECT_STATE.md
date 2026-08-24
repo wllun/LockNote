@@ -20,7 +20,8 @@ _Snapshot: 2026-08-24. Check off items as they land._
 
 ### Incomplete / stubbed
 - [X] Wire up search UI — Home has a search bar that queries `folderRepo.search()` + `noteRepo.search()` (added `folderRepo.search()` to both repos); results replace the default lists, password gating preserved
-- [ ] Implement or remove **Settings → Backup Data** (currently labeled "Coming soon", no handler)
+- [ ] Implement **Settings → Backup Data** as a versioned, portable file export for folders, notes, password hashes, pin state, note types, root-note relationships, and soft-delete metadata. It is currently labeled "Coming soon" with no handler.
+- [ ] Implement backup import/restore — select a LockNote backup file, validate its format and schema version before writing, preview folder/note counts, require confirmation, and merge by ID/timestamp without breaking `folder_id = null`, soft deletes, password hashes, or native/web repository parity. Do not silently replace existing data.
 - [X] Decide on `hardDelete()` — now called by the editor's empty-note cleanup on exit; no user-facing "permanently delete" flow (not needed)
 - [X] Clean up empty notes on editor exit (editor hard-deletes the row on unmount if title, content, and password are all empty; also flushes a pending auto-save on exit)
 
@@ -35,6 +36,7 @@ _Snapshot: 2026-08-24. Check off items as they land._
 - [ ] Verify registration, email confirmation, login persistence, password reset, and sign-out end-to-end on Android, iOS, and web. Android and iOS simulator binaries compile successfully on EAS; web production export and local HTTP runtime pass. Interactive cloud-device verification is blocked until EAS Simulator is enabled for the Expo account.
 - [X] Email confirmation returns to `locknote://auth-confirm` on native and the corresponding app URL on web.
 - [X] Sync Notes — manual two-way folder/note sync through the authenticated `sync_private_data` RPC, with RLS, last-write-wins timestamps, soft-delete tombstones, native/web repository parity, and per-account last-sync status. The migration still requires deployment and live multi-device verification; premium gating is not implemented.
+- [ ] Automatic/background sync — serialize with manual sync and the editors' pending 800 ms saves; trigger a foreground sync after session restoration, app launch/resume, and connectivity recovery, then add best-effort OS background execution where supported. Queue retries while offline, avoid duplicate concurrent runs, surface the last successful sync/error, and never let a stale cloud snapshot overwrite a newer local edit.
 - [X] Collaboration Release 1 — explicit per-note sharing by registered account email, Shared tab/local cache, owner share indicators, collaborator management, realtime refresh, last-editor footer, RLS, and revision-protected saves. Backend migration/function deployment and live two-account verification still require configured Supabase credentials.
 - Private note content stays local unless the signed-in owner explicitly runs Sync Notes. LockNote does not end-to-end encrypt content before upload.
 
@@ -61,6 +63,7 @@ _Snapshot: 2026-08-24. Check off items as they land._
 - [X] Login — Profile tab with real Supabase Auth (email/password sign up + sign in, session persisted via AsyncStorage). No premium gating yet — anyone can create an account.
 - [X] Sync DB — Profile screen pushes and pulls private/owned notes and folders through an account-scoped Supabase RPC. Deletions and root-note semantics are preserved.
 - [X] Multi-device login — after signing in, running Sync Notes merges that device with the account snapshot. Automatic background sync is not implemented.
+- [ ] Automatic/background sync — add lifecycle/network-triggered foreground sync first, followed by best-effort platform background execution with safe retry and conflict handling.
 - [X] Searchable — already shipped free in Phase 1 (Home search bar); decide whether to keep it free or gate it behind Phase 2
 
 ### Phase 3 — Attachments — premium pro, RM9.99/month
@@ -70,6 +73,7 @@ _Snapshot: 2026-08-24. Check off items as they land._
 ### Phase 4 — Export
 
 - [X] Export PDF & image - note and expense editors provide a preview, native Gallery/Documents saving, and optional sharing; web prints/saves PDF and downloads PNG locally. Expense exports include saved monthly categories, categorized total, and the shared summary note.
+- [ ] Portable backup export and import/restore for the complete LockNote data model, with a versioned format, validation, preview, and explicit merge/replace confirmation.
 
 ### Phase 5 — Structure (not premium)
 
