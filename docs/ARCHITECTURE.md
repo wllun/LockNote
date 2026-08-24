@@ -172,6 +172,31 @@ stored per account in AsyncStorage.
 LockNote does not end-to-end encrypt note content before upload. Password fields
 remain SHA-256 access-gate hashes; they are never uploaded as plaintext.
 
+## Portable backup and restore
+
+Settings → Export Backup builds a schema-versioned `locknote-backup` JSON file
+from the repositories' active private/owned records and sync tombstones. The
+file includes folders, notes, note types, pin state, ISO timestamps, nullable
+`folder_id` relationships, and existing SHA-256 access-gate hashes. It does not
+include incoming shared-note caches or account/collaboration identifiers.
+
+Settings → Import Backup reads a selected JSON file into memory, enforces a 25
+MB limit, validates its format, version, field types, timestamps, unique IDs,
+password-hash shape, and folder references, then shows folder/note/deletion
+counts before writing. Merge reuses the repositories' last-write-wins snapshot
+methods. Replace uses matching `replaceBackupSnapshot()` methods on native and
+web, clears current private data and tombstones, and keeps Shared-with-me notes.
+Folders are always restored before notes so foreign keys remain valid; a null
+`folder_id` stays a Home/root note.
+
+Reminder bodies and schedule settings are portable, but notification IDs are
+device-local. Export and import clear those IDs and disable the reminder so a
+restore cannot create a schedule the destination device did not register.
+Imported owned collaborative notes become private local notes to avoid retaining
+stale account or cloud identifiers.
+
+Backup JSON contains plaintext note content and is not encrypted.
+
 ## Shared-note collaboration
 
 Release 1 shares individual notes by registered account email. Once sharing begins, the local row stores a cloud ID, ownership/origin, collaborator count, server revision, sync state, and last-editor metadata. Incoming notes are excluded from Home, folder, private-account sync, and search reads and appear only in the Shared tab.

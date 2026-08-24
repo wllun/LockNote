@@ -10,6 +10,7 @@ A local-first note-taking app with folder organization, per-item password protec
 - Full-text search across notes (native)
 - Soft delete (items are flagged, not immediately purged)
 - Manual two-way account sync across iOS, Android, and web
+- Portable JSON backup export and validated merge/replace restore
 - Runs on iOS, Android, and web
 
 ## Requirements
@@ -39,9 +40,15 @@ Signed-in users can run **Profile → Sync Notes** to merge folders and notes wi
 their owner-scoped Supabase snapshot. Sync is manual; normal editing remains
 offline-first.
 
+Every user can use **Settings → Export Backup** without an account, then import
+that versioned JSON file on iOS, Android, or web. Import previews the contents
+and requires choosing Merge or Replace. Replace affects private data only and
+keeps Shared-with-me notes. Reminder registrations remain device-local and are
+disabled on restore.
+
 ## Security
 
-Password protection is **access gating, not encryption**. A folder/note password is stored as a SHA-256 hash and checked before opening the item. Note contents are stored in plaintext in the local database, and LockNote does not end-to-end encrypt them before account sync. Anyone with direct access to local storage or authorized account data can read notes regardless of a lock. Do not treat this as secure storage for sensitive data.
+Password protection is **access gating, not encryption**. A folder/note password is stored as a SHA-256 hash and checked before opening the item. Note contents are stored in plaintext in the local database, account sync, and portable JSON backup files; LockNote does not end-to-end encrypt them. Anyone with direct access to local storage, authorized account data, or a backup file can read notes regardless of a lock. Do not treat this as secure storage for sensitive data.
 
 ## Project layout
 

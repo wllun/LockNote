@@ -217,7 +217,10 @@ export const noteRepo = {
         const index = notes.findIndex((note) => note.id === remote.id);
         if (index === -1) {
           notes.push(normalized);
-        } else if (new Date(remote.updated_at) >= new Date(notes[index].updated_at)) {
+        } else if (
+          notes[index].share_origin !== 'incoming' &&
+          new Date(remote.updated_at) >= new Date(notes[index].updated_at)
+        ) {
           notes[index] = { ...notes[index], ...normalized };
         }
         const tombstoneIndex = localTombstones.findIndex((item) =>
@@ -236,6 +239,23 @@ export const noteRepo = {
           note.updated_at = tombstone.updated_at;
         }
       }
+    });
+  },
+
+  async replaceBackupSnapshot(records = [], tombstones = []) {
+    await mutateStorage((notes, localTombstones) => {
+      const incomingNotes = notes.filter((note) => note.share_origin === 'incoming');
+      const incomingIds = new Set(incomingNotes.map((note) => note.id));
+      const restoredNotes = records
+        .filter((note) => !incomingIds.has(note.id))
+        .map((note) => normalizeNote({
+          ...note,
+          is_deleted: 0,
+          is_pinned: note.is_pinned ? 1 : 0,
+          ...COLLABORATION_DEFAULTS,
+        }));
+      notes.splice(0, notes.length, ...incomingNotes, ...restoredNotes);
+      localTombstones.splice(0, localTombstones.length, ...tombstones);
     });
   },
 };

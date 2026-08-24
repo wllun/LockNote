@@ -7,12 +7,14 @@ import {
   TextInput,
   Modal,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { radius, shadow, useTheme, useThemeMode } from '../theme';
 import { recovery } from '../utils/recovery';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
+import { backupService } from '../services/backupService';
 
 const THEME_OPTIONS = [
   { mode: 'system', label: 'System', icon: 'contrast-outline' },
@@ -30,6 +32,7 @@ const SettingsScreen = () => {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
+  const [backupBusy, setBackupBusy] = useState(null);
 
   const refreshRecoveryStatus = useCallback(() => {
     recovery.hasPin().then(setHasRecovery);
@@ -81,6 +84,103 @@ const SettingsScreen = () => {
         details: [{ label: 'Recovery PIN', value: 'Currently enabled' }],
       }
     );
+  };
+
+  const showBackupError = (error) => {
+    Alert.alert(
+      'Backup failed',
+      error?.message || 'LockNote could not complete the backup operation.',
+      [{ text: 'OK' }],
+      { variant: 'danger', iconName: 'alert-circle-outline' }
+    );
+  };
+
+  const restoreSelectedBackup = async (selection, mode) => {
+    setBackupBusy('restore');
+    try {
+      const result = await backupService.restoreBackup(selection, mode);
+      Alert.alert(
+        'Backup restored',
+        `${result.folderCount} folder${result.folderCount === 1 ? '' : 's'} and ${result.noteCount} note${result.noteCount === 1 ? '' : 's'} were ${mode === 'replace' ? 'restored' : 'merged'}.`,
+        [{ text: 'OK' }],
+        {
+          variant: 'success',
+          iconName: 'checkmark-circle-outline',
+          details: [
+            { label: 'Mode', value: mode === 'replace' ? 'Replace private data' : 'Merge by latest edit' },
+            { label: 'Deleted records', value: String(result.deletedCount) },
+          ],
+        }
+      );
+    } catch (error) {
+      showBackupError(error);
+    } finally {
+      setBackupBusy(null);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    if (backupBusy) return;
+    setBackupBusy('export');
+    try {
+      const result = await backupService.exportBackup();
+      Alert.alert(
+        'Backup ready',
+        'Your portable LockNote JSON backup was created.',
+        [{ text: 'OK' }],
+        {
+          variant: 'success',
+          iconName: 'checkmark-circle-outline',
+          details: [
+            { label: 'Folders', value: String(result.folderCount) },
+            { label: 'Notes', value: String(result.noteCount) },
+            { label: 'File', value: result.filename },
+          ],
+        }
+      );
+    } catch (error) {
+      showBackupError(error);
+    } finally {
+      setBackupBusy(null);
+    }
+  };
+
+  const handleImportBackup = async () => {
+    if (backupBusy) return;
+    setBackupBusy('import');
+    try {
+      const selection = await backupService.pickBackup();
+      setBackupBusy(null);
+      if (!selection) return;
+      const { summary } = selection;
+      Alert.alert(
+        'Import backup?',
+        'Merge keeps current data and applies the newest version of each item. Replace removes current private folders and notes first. Shared-with-me notes stay on this device.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Merge', onPress: () => restoreSelectedBackup(selection, 'merge') },
+          {
+            text: 'Replace',
+            style: 'destructive',
+            onPress: () => restoreSelectedBackup(selection, 'replace'),
+          },
+        ],
+        {
+          variant: 'warning',
+          iconName: 'download-outline',
+          details: [
+            { label: 'File', value: selection.filename },
+            { label: 'Folders', value: String(summary.folderCount) },
+            { label: 'Notes', value: String(summary.noteCount) },
+            { label: 'Deleted records', value: String(summary.deletedCount) },
+            { label: 'Created', value: new Date(summary.exportedAt).toLocaleString() },
+          ],
+        }
+      );
+    } catch (error) {
+      setBackupBusy(null);
+      showBackupError(error);
+    }
   };
 
   return (
@@ -164,17 +264,29 @@ const SettingsScreen = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Data</Text>
         <View style={styles.card}>
-          <TouchableOpacity style={styles.item} activeOpacity={0.7}>
-            <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
-              <Ionicons name="cloud-upload-outline" size={19} color={colors.primary} />
+          <TouchableOpacity
+            style={[styles.item, backupBusy && styles.itemDisabled]}
+            activeOpacity={0.7}
+            onPress={handleImportBackup}
+            disabled={!!backupBusy}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: colors.folderSoft }]}>
+              <Ionicons name="push-outline" size={19} color={colors.folder} />
             </View>
             <View style={styles.itemContent}>
-              <Text style={styles.itemLabel}>Backup Data</Text>
-              <Text style={styles.itemDescription}>Coming soon</Text>
+              <Text style={styles.itemLabel}>Import Backup</Text>
+              <Text style={styles.itemDescription}>Preview, then merge or replace</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            {backupBusy === 'import' || backupBusy === 'restore' ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            )}
           </TouchableOpacity>
         </View>
+        <Text style={styles.dataNotice}>
+          Backup files contain note content and password hashes. They are not encrypted.
+        </Text>
       </View>
 
       <View style={styles.section}>
@@ -294,6 +406,9 @@ const makeStyles = (colors) =>
       alignItems: 'center',
       padding: 14,
     },
+    itemDisabled: {
+      opacity: 0.55,
+    },
     themeRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -363,6 +478,13 @@ const makeStyles = (colors) =>
       fontSize: 13,
       color: colors.textTertiary,
       marginTop: 2,
+    },
+    dataNotice: {
+      color: colors.textTertiary,
+      fontSize: 12,
+      lineHeight: 17,
+      marginHorizontal: 4,
+      marginTop: 8,
     },
     modalContent: {
       backgroundColor: colors.card,

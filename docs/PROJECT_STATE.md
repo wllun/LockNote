@@ -20,8 +20,8 @@ _Snapshot: 2026-08-24. Check off items as they land._
 
 ### Incomplete / stubbed
 - [X] Wire up search UI — Home has a search bar that queries `folderRepo.search()` + `noteRepo.search()` (added `folderRepo.search()` to both repos); results replace the default lists, password gating preserved
-- [ ] Implement **Settings → Backup Data** as a versioned, portable file export for folders, notes, password hashes, pin state, note types, root-note relationships, and soft-delete metadata. It is currently labeled "Coming soon" with no handler.
-- [ ] Implement backup import/restore — select a LockNote backup file, validate its format and schema version before writing, preview folder/note counts, require confirmation, and merge by ID/timestamp without breaking `folder_id = null`, soft deletes, password hashes, or native/web repository parity. Do not silently replace existing data.
+- [X] Settings backup export — creates a versioned, portable JSON file containing private/owned folders and notes, password hashes, pin state, note types, root-note relationships, and deletion tombstones. Incoming shared-note caches and account/collaboration identifiers are excluded.
+- [X] Backup import/restore — selects and validates a LockNote JSON backup (including schema version, references, timestamps, password-hash shape, duplicates, and a 25 MB limit), previews its counts, and requires an explicit Merge or Replace choice. Merge uses ID/timestamp conflict handling; Replace resets private data while preserving Shared-with-me notes. Both paths preserve `folder_id = null`, soft deletes, and native/web repository parity.
 - [X] Decide on `hardDelete()` — now called by the editor's empty-note cleanup on exit; no user-facing "permanently delete" flow (not needed)
 - [X] Clean up empty notes on editor exit (editor hard-deletes the row on unmount if title, content, and password are all empty; also flushes a pending auto-save on exit)
 
@@ -43,7 +43,7 @@ _Snapshot: 2026-08-24. Check off items as they land._
 ### Possible features
 - [X] Dark mode — palette centralized in `src/theme.js` (`useTheme()` + `makeStyles(colors)`). Theme mode (`system` / `light` / `dark`) is set in Settings, persisted in AsyncStorage (`@locknote_theme`), shared via `ThemeProvider` context; `system` follows the OS via `useColorScheme`. `userInterfaceStyle` is `automatic`.
 - [X] Password recovery/reset — an app-wide recovery PIN (Settings → Security), persisted in AsyncStorage via `src/utils/recovery.js`, hashed with the same SHA-256 helper as item passwords. `PasswordModal` gets a "Forgot password?" link that verifies the PIN and clears the item's password. Note: this resets the gate, it does not recover the original password (impossible from a hash) — consistent with the "gating, not encryption" model.
-- [X] Cross-platform account portability — manual Sync Notes merges native SQLite and web AsyncStorage data through Supabase. File-based backup/export remains separate work.
+- [X] Cross-platform data portability — manual Sync Notes merges native SQLite and web AsyncStorage data through Supabase, while Settings can export/import a backend-independent LockNote JSON backup.
 - [X] Pinning — `is_pinned` column added to both SQLite tables (migrated via guarded `ALTER TABLE`) and to the web AsyncStorage records. Pinned folders/notes sort first everywhere (lists + search). List actions open by long-press on native or three dots on web; editor actions use a three-dots menu.
 - [X] Contextual list actions — notes can be pinned, moved between Home/folders, or soft-deleted; folders can be renamed, pinned, or soft-deleted together with their contained notes.
 - [X] PDF/image export — normal, checklist, expense, and reminder notes export normalized content on native and web. Native saves PNG files directly to the device gallery and writes PDFs to a folder selected through the system document picker, with sharing retained as a secondary action. Web downloads PNG images and opens an isolated note document for printing or saving as PDF.
@@ -73,7 +73,7 @@ _Snapshot: 2026-08-24. Check off items as they land._
 ### Phase 4 — Export
 
 - [X] Export PDF & image - note and expense editors provide a preview, native Gallery/Documents saving, and optional sharing; web prints/saves PDF and downloads PNG locally. Expense exports include saved monthly categories, categorized total, and the shared summary note.
-- [ ] Portable backup export and import/restore for the complete LockNote data model, with a versioned format, validation, preview, and explicit merge/replace confirmation.
+- [X] Portable backup export and import/restore for folders, private/owned notes, password hashes, pin state, note types, root-note relationships, and deletion tombstones, with a versioned format, validation, preview, and explicit merge/replace confirmation. Reminder notification registrations are intentionally device-local; imported reminders are disabled.
 
 ### Phase 5 — Structure (not premium)
 
@@ -108,3 +108,4 @@ When the user presses the Add button, let them choose one of these note types:
 
 - **Not secure storage.** Passwords gate access via hash comparison; note content is plaintext in the local DB. Not safe for genuinely sensitive data — see [README.md](../README.md#security).
 - **Sync security.** Local storage remains the offline source used by screens. Manual account sync stores note/folder data in owner-scoped Supabase tables protected by RLS, but LockNote does not end-to-end encrypt note content before upload.
+- **Backup security.** Portable JSON backups contain plaintext note content and SHA-256 access-gate hashes; they are not encrypted. Incoming shared-note caches, collaboration/account identifiers, and device notification IDs are not included.

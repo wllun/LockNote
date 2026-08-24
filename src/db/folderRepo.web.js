@@ -173,4 +173,15 @@ export const folderRepo = {
       }
     });
   },
+
+  async replaceBackupSnapshot(records = [], tombstones = []) {
+    await mutateStorage((folders, localTombstones) => {
+      folders.splice(0, folders.length, ...records.map((folder) => ({
+        ...folder,
+        is_deleted: 0,
+        is_pinned: folder.is_pinned ? 1 : 0,
+      })));
+      localTombstones.splice(0, localTombstones.length, ...tombstones);
+    });
+  },
 };

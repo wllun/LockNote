@@ -221,7 +221,8 @@ export const noteRepo = {
              last_edited_at = excluded.last_edited_at,
              sync_status = excluded.sync_status,
              last_synced_at = excluded.last_synced_at
-           WHERE excluded.updated_at >= notes.updated_at`,
+           WHERE excluded.updated_at >= notes.updated_at
+             AND notes.share_origin != 'incoming'`,
           [
             note.id,
             note.folder_id ?? null,
@@ -265,6 +266,46 @@ export const noteRepo = {
           `UPDATE notes SET is_deleted = 1, updated_at = ?
            WHERE id = ? AND share_origin != 'incoming' AND updated_at <= ?`,
           [tombstone.updated_at, tombstone.id, tombstone.updated_at]
+        );
+      }
+    });
+  },
+
+  async replaceBackupSnapshot(records = [], tombstones = []) {
+    const db = getDB();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync(`DELETE FROM sync_tombstones WHERE entity_type = 'note'`);
+      await txn.runAsync(`DELETE FROM notes WHERE share_origin != 'incoming'`);
+
+      for (const note of records) {
+        await txn.runAsync(
+          `INSERT INTO notes (
+             id, folder_id, title, content, note_type, password, is_deleted,
+             is_pinned, created_at, updated_at, cloud_id, cloud_owner_id,
+             share_origin, share_role, collaborator_count, server_revision,
+             last_edited_by_id, last_edited_by_email, last_edited_at,
+             sync_status, last_synced_at
+           ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, NULL, 'private', NULL, 0, 0,
+             NULL, NULL, NULL, NULL, NULL)
+           ON CONFLICT(id) DO NOTHING`,
+          [
+            note.id,
+            note.folder_id ?? null,
+            note.title || '',
+            note.content || '',
+            note.note_type || 'note',
+            note.password || null,
+            note.is_pinned ? 1 : 0,
+            note.created_at,
+            note.updated_at,
+          ]
+        );
+      }
+      for (const tombstone of tombstones) {
+        await txn.runAsync(
+          `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
+           VALUES ('note', ?, ?)`,
+          [tombstone.id, tombstone.updated_at]
         );
       }
     });

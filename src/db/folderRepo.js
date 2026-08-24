@@ -183,4 +183,35 @@ export const folderRepo = {
       }
     });
   },
+
+  async replaceBackupSnapshot(records = [], tombstones = []) {
+    const db = getDB();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync(`DELETE FROM sync_tombstones WHERE entity_type = 'folder'`);
+      await txn.runAsync(`DELETE FROM folders`);
+
+      for (const folder of records) {
+        await txn.runAsync(
+          `INSERT INTO folders (
+             id, name, password, is_deleted, is_pinned, created_at, updated_at
+           ) VALUES (?, ?, ?, 0, ?, ?, ?)`,
+          [
+            folder.id,
+            folder.name,
+            folder.password || null,
+            folder.is_pinned ? 1 : 0,
+            folder.created_at,
+            folder.updated_at,
+          ]
+        );
+      }
+      for (const tombstone of tombstones) {
+        await txn.runAsync(
+          `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
+           VALUES ('folder', ?, ?)`,
+          [tombstone.id, tombstone.updated_at]
+        );
+      }
+    });
+  },
 };
