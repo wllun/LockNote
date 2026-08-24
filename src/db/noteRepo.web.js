@@ -9,14 +9,16 @@ const generateId = () => {
 const now = () => new Date().toISOString();
 
 const NOTES_KEY = '@locknote_notes';
+const TOMBSTONES_KEY = '@locknote_note_sync_tombstones';
 
 const getStorage = async () => {
   const data = await AsyncStorage.getItem(NOTES_KEY);
   return data ? JSON.parse(data) : [];
 };
 
-const saveStorage = async (notes) => {
-  await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+const getTombstones = async () => {
+  const data = await AsyncStorage.getItem(TOMBSTONES_KEY);
+  return data ? JSON.parse(data) : [];
 };
 
 // Keep read-modify-write operations in order. Without this queue, an editor's
@@ -25,13 +27,22 @@ let mutationQueue = Promise.resolve();
 
 const mutateStorage = (mutation) => {
   const operation = mutationQueue.then(async () => {
-    const notes = await getStorage();
-    const result = await mutation(notes);
-    await saveStorage(notes);
+    const [notes, tombstones] = await Promise.all([getStorage(), getTombstones()]);
+    const result = await mutation(notes, tombstones);
+    await AsyncStorage.multiSet([
+      [NOTES_KEY, JSON.stringify(notes)],
+      [TOMBSTONES_KEY, JSON.stringify(tombstones)],
+    ]);
     return result;
   });
   mutationQueue = operation.catch(() => {});
   return operation;
+};
+
+const upsertTombstone = (tombstones, id, updatedAt) => {
+  const existing = tombstones.find((item) => item.id === id);
+  if (!existing) tombstones.push({ id, updated_at: updatedAt });
+  else if (new Date(updatedAt) >= new Date(existing.updated_at)) existing.updated_at = updatedAt;
 };
 
 const normalizeNote = normalizeCollaborationNote;
@@ -126,19 +137,26 @@ export const noteRepo = {
   },
 
   async softDelete(id) {
-    await mutateStorage((notes) => {
+    await mutateStorage((notes, tombstones) => {
       const index = notes.findIndex((n) => n.id === id);
       if (index !== -1) {
+        const timestamp = now();
         notes[index].is_deleted = 1;
-        notes[index].updated_at = now();
+        notes[index].updated_at = timestamp;
+        if (notes[index].share_origin !== 'incoming') {
+          upsertTombstone(tombstones, id, timestamp);
+        }
       }
     });
   },
 
   async hardDelete(id) {
-    await mutateStorage((notes) => {
+    await mutateStorage((notes, tombstones) => {
       const index = notes.findIndex((n) => n.id === id);
-      if (index !== -1) notes.splice(index, 1);
+      if (index !== -1) {
+        if (notes[index].share_origin !== 'incoming') upsertTombstone(tombstones, id, now());
+        notes.splice(index, 1);
+      }
     });
   },
 
@@ -175,5 +193,49 @@ export const noteRepo = {
     if (existing) return await this.update(existing.id, remote);
     const created = await this.create(null, remote.title, remote.content, null, remote.note_type);
     return await this.update(created.id, remote);
+  },
+
+  async getSyncSnapshot() {
+    await mutationQueue;
+    const [notes, tombstones] = await Promise.all([getStorage(), getTombstones()]);
+    return {
+      records: notes
+        .filter((note) => !note.is_deleted && note.share_origin !== 'incoming')
+        .map(normalizeNote),
+      tombstones,
+    };
+  },
+
+  async applySyncSnapshot(records = [], tombstones = []) {
+    await mutateStorage((notes, localTombstones) => {
+      for (const remote of records) {
+        const normalized = normalizeNote({
+          ...remote,
+          is_deleted: 0,
+          is_pinned: remote.is_pinned ? 1 : 0,
+        });
+        const index = notes.findIndex((note) => note.id === remote.id);
+        if (index === -1) {
+          notes.push(normalized);
+        } else if (new Date(remote.updated_at) >= new Date(notes[index].updated_at)) {
+          notes[index] = { ...notes[index], ...normalized };
+        }
+        const tombstoneIndex = localTombstones.findIndex((item) =>
+          item.id === remote.id && new Date(item.updated_at) <= new Date(remote.updated_at)
+        );
+        if (tombstoneIndex !== -1) localTombstones.splice(tombstoneIndex, 1);
+      }
+
+      for (const tombstone of tombstones) {
+        upsertTombstone(localTombstones, tombstone.id, tombstone.updated_at);
+        const note = notes.find((item) =>
+          item.id === tombstone.id && item.share_origin !== 'incoming'
+        );
+        if (note && new Date(note.updated_at) <= new Date(tombstone.updated_at)) {
+          note.is_deleted = 1;
+          note.updated_at = tombstone.updated_at;
+        }
+      }
+    });
   },
 };

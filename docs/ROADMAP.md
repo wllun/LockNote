@@ -13,7 +13,7 @@ Product plan across phases. For what's implemented right now in detail, see [PRO
 ## Phase 2 — Cloud — premium, RM4.90/month
 
 - [X] Login — Profile tab with real Supabase Auth (email/password sign up + sign in, session persisted via AsyncStorage). No premium gating yet — anyone can create an account.
-- [ ] Sync DB — Profile screen has a "Sync Notes" entry point, currently stubbed ("Coming soon"). Actual push/pull of notes/folders to Supabase not built.
+- [X] Sync DB — Profile screen manually merges private/owned notes and folders with an owner-scoped Supabase snapshot, including soft-delete tombstones and native/web parity. Backend migration deployment and live multi-device verification are still required.
 - [ ] Multi-device login — depends on Sync DB above; logging in on a second device doesn't yet pull your notes.
 - [X] Searchable — already shipped free in Phase 1 (Home search bar); decide whether to keep it free or gate it behind Phase 2
 

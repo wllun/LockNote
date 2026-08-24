@@ -1,6 +1,6 @@
 # LockNote
 
-A local, offline note-taking app with folder organization and per-item password protection. Built with Expo / React Native.
+A local-first note-taking app with folder organization, per-item password protection, optional account sync, and note sharing. Built with Expo / React Native.
 
 ## Features
 
@@ -9,6 +9,7 @@ A local, offline note-taking app with folder organization and per-item password 
 - Auto-save while editing (debounced)
 - Full-text search across notes (native)
 - Soft delete (items are flagged, not immediately purged)
+- Manual two-way account sync across iOS, Android, and web
 - Runs on iOS, Android, and web
 
 ## Requirements
@@ -23,18 +24,24 @@ npm install
 npm start        # then press i / a / w for iOS, Android, web
 ```
 
-No account, backend, or configuration needed — all data is stored locally on the device.
+No account or backend configuration is needed for offline use. Account sync,
+authentication, and collaboration require a configured Supabase project and the
+migrations in `supabase/migrations`.
 
 ## Storage
 
-Data lives entirely on-device. There is no server or sync:
+Local storage is the primary data source:
 
 - **iOS / Android** — SQLite (`expo-sqlite`), database file `locknote.db`
 - **Web** — AsyncStorage (localStorage), via `*.web.js` repo variants
 
+Signed-in users can run **Profile → Sync Notes** to merge folders and notes with
+their owner-scoped Supabase snapshot. Sync is manual; normal editing remains
+offline-first.
+
 ## Security
 
-Password protection is **access gating, not encryption**. A folder/note password is stored as a SHA-256 hash and checked before opening the item. Note contents are stored in plaintext in the local database. Anyone with direct access to the device's storage can read notes regardless of a lock. Do not treat this as secure storage for sensitive data.
+Password protection is **access gating, not encryption**. A folder/note password is stored as a SHA-256 hash and checked before opening the item. Note contents are stored in plaintext in the local database, and LockNote does not end-to-end encrypt them before account sync. Anyone with direct access to local storage or authorized account data can read notes regardless of a lock. Do not treat this as secure storage for sensitive data.
 
 ## Project layout
 

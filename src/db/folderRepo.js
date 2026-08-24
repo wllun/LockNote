@@ -73,15 +73,33 @@ export const folderRepo = {
 
   async softDelete(id) {
     const db = getDB();
-    await db.runAsync(
-      `UPDATE folders SET is_deleted = 1, updated_at = ? WHERE id = ?`,
-      [now(), id]
-    );
+    const timestamp = now();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync(
+        `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
+         VALUES ('folder', ?, ?)
+         ON CONFLICT(entity_type, entity_id) DO UPDATE SET deleted_at = excluded.deleted_at`,
+        [id, timestamp]
+      );
+      await txn.runAsync(
+        `UPDATE folders SET is_deleted = 1, updated_at = ? WHERE id = ?`,
+        [timestamp, id]
+      );
+    });
   },
 
   async hardDelete(id) {
     const db = getDB();
-    await db.runAsync(`DELETE FROM folders WHERE id = ?`, [id]);
+    const timestamp = now();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync(
+        `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
+         VALUES ('folder', ?, ?)
+         ON CONFLICT(entity_type, entity_id) DO UPDATE SET deleted_at = excluded.deleted_at`,
+        [id, timestamp]
+      );
+      await txn.runAsync(`DELETE FROM folders WHERE id = ?`, [id]);
+    });
   },
 
   async getNoteCount(folderId) {
@@ -99,5 +117,70 @@ export const folderRepo = {
       `SELECT * FROM folders WHERE is_deleted = 0 AND name LIKE ? ORDER BY is_pinned DESC, created_at DESC`,
       [`%${query}%`]
     );
+  },
+
+  async getSyncSnapshot() {
+    const db = getDB();
+    const [records, tombstones] = await Promise.all([
+      db.getAllAsync(
+        `SELECT id, name, password, is_pinned, created_at, updated_at
+         FROM folders WHERE is_deleted = 0`
+      ),
+      db.getAllAsync(
+        `SELECT entity_id AS id, deleted_at AS updated_at
+         FROM sync_tombstones WHERE entity_type = 'folder'`
+      ),
+    ]);
+    return { records, tombstones };
+  },
+
+  async applySyncSnapshot(records = [], tombstones = []) {
+    const db = getDB();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      for (const folder of records) {
+        await txn.runAsync(
+          `INSERT INTO folders (
+             id, name, password, is_deleted, is_pinned, created_at, updated_at
+           ) VALUES (?, ?, ?, 0, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             name = excluded.name,
+             password = excluded.password,
+             is_deleted = 0,
+             is_pinned = excluded.is_pinned,
+             created_at = excluded.created_at,
+             updated_at = excluded.updated_at
+           WHERE excluded.updated_at >= folders.updated_at`,
+          [
+            folder.id,
+            folder.name,
+            folder.password || null,
+            folder.is_pinned ? 1 : 0,
+            folder.created_at,
+            folder.updated_at,
+          ]
+        );
+        await txn.runAsync(
+          `DELETE FROM sync_tombstones
+           WHERE entity_type = 'folder' AND entity_id = ? AND deleted_at <= ?`,
+          [folder.id, folder.updated_at]
+        );
+      }
+      for (const tombstone of tombstones) {
+        await txn.runAsync(
+          `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
+           VALUES ('folder', ?, ?)
+           ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+             deleted_at = CASE
+               WHEN excluded.deleted_at >= sync_tombstones.deleted_at
+               THEN excluded.deleted_at ELSE sync_tombstones.deleted_at END`,
+          [tombstone.id, tombstone.updated_at]
+        );
+        await txn.runAsync(
+          `UPDATE folders SET is_deleted = 1, updated_at = ?
+           WHERE id = ? AND updated_at <= ?`,
+          [tombstone.updated_at, tombstone.id, tombstone.updated_at]
+        );
+      }
+    });
   },
 };

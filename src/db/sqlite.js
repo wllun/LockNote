@@ -59,6 +59,13 @@ export const initDB = async () => {
       FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS sync_tombstones (
+      entity_type TEXT NOT NULL CHECK (entity_type IN ('folder', 'note')),
+      entity_id TEXT NOT NULL,
+      deleted_at TEXT NOT NULL,
+      PRIMARY KEY (entity_type, entity_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_notes_folder_id ON notes(folder_id);
     CREATE INDEX IF NOT EXISTS idx_notes_is_deleted ON notes(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_folders_is_deleted ON folders(is_deleted);
@@ -99,6 +106,16 @@ export const initDB = async () => {
     }
   }
   await db.execAsync('CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_cloud_id ON notes(cloud_id) WHERE cloud_id IS NOT NULL');
+
+  // Preserve deletions made before account sync was introduced so an older
+  // copy on another device cannot bring those rows back.
+  await db.execAsync(`
+    INSERT OR IGNORE INTO sync_tombstones (entity_type, entity_id, deleted_at)
+    SELECT 'folder', id, updated_at FROM folders WHERE is_deleted = 1;
+    INSERT OR IGNORE INTO sync_tombstones (entity_type, entity_id, deleted_at)
+    SELECT 'note', id, updated_at FROM notes
+    WHERE is_deleted = 1 AND share_origin != 'incoming';
+  `);
 
   return db;
 };

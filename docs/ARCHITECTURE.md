@@ -1,6 +1,6 @@
 # Architecture
 
-LockNote is a local-first Expo / React Native app. Private note/folder data stays on the device. A note leaves the device only after its owner explicitly shares it with another LockNote account; shared-note copies use Supabase with a local cache for offline reading.
+LockNote is a local-first Expo / React Native app. SQLite/AsyncStorage remains the primary store and all editing works offline. A signed-in user can manually sync private folders and notes to their own Supabase account, and can separately share an individual note with another LockNote account.
 
 ## Layers
 
@@ -15,6 +15,10 @@ Repositories                 folderRepo, noteRepo   ← identical API, platform-
 SQLite      AsyncStorage
 (native)    (web, *.web.js)
 ```
+
+`syncService` takes active local snapshots plus deletion tombstones, sends them
+to the authenticated `sync_private_data` Supabase function, and applies the
+canonical response back through matching native/web repository methods.
 
 Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automatically via the `.web.js` extension. Screens import `'../db/folderRepo'` — unaware of which backend they get. The two implementations expose the **same method signatures and return shapes**, so any change to one must be mirrored in the other.
 
@@ -61,6 +65,11 @@ Two tables / collections. Timestamps are ISO strings; IDs are generated client-s
 **folders**: `id, name, password, is_deleted, created_at, updated_at`
 
 **notes**: `id, folder_id (nullable → root note), title, content, note_type, password, is_deleted, created_at, updated_at`
+
+**sync_tombstones** (native) / per-repository tombstone keys (web): deleted
+folder/note IDs and deletion timestamps. Normal reads still filter deleted rows;
+the sync path uploads tombstones so an older copy on another device cannot
+resurrect a deleted item.
 
 `note_type` defaults to `note` for existing/plaintext notes. Expense notes use
 `expense`; their editable table rows (`date`, `remark`, and `amount`) are stored
@@ -135,7 +144,7 @@ leaving the editor.
 
 ## Auth
 
-Supabase provides account auth and the backend for notes a user explicitly shares. Private notes and all folders remain local-only.
+Supabase provides account auth, private account sync, and the backend for notes a user explicitly shares. Local storage remains authoritative while editing offline.
 
 - `src/services/supabaseClient.js` — the client, configured with AsyncStorage as the session storage adapter so a login survives app restarts. Reads `supabaseUrl`/`supabaseAnonKey` from `Constants.expoConfig.extra` (populated from `.env` via `app.config.js`), not `process.env` directly. Missing or invalid configuration no longer crashes startup; auth actions show a support-oriented configuration message.
 - `src/services/authService.mjs` and `src/utils/auth.mjs` — testable Supabase request wrappers, callback parsing, field validation, email normalization, and user-friendly error mapping for network, credentials, rate-limit, expired-link, and configuration failures. Emails are trimmed and lowercased before requests; registration and reset passwords require at least 8 characters.
@@ -144,9 +153,28 @@ Supabase provides account auth and the backend for notes a user explicitly share
 - `tests/auth.test.mjs` exercises error mapping, callback parsing, redirects, request payloads, and configuration/error propagation. It runs as part of `npm test`.
 - `react-native-url-polyfill/auto` is imported first in `index.js` — required because Hermes' native `URL` implementation is incomplete and `@supabase/supabase-js` depends on it.
 
+## Private account sync
+
+Profile → Sync Notes performs an explicit two-way sync of folders and private or
+owned notes. The server stores typed rows in `private_folders` and
+`private_notes`; row-level security restricts every row to its authenticated
+owner. The `sync_private_data` RPC merges snapshots atomically with
+last-write-wins ordering by each client's ISO `updated_at`, then returns the
+account's canonical snapshot. Sync applies folders before notes to preserve
+foreign keys and keeps `folder_id = null` for Home notes.
+
+Incoming collaboration notes are excluded because their source of truth is the
+shared-note service. Soft-delete and historical tombstones propagate removals.
+Reminder bodies sync, but device notification registrations and enabled state
+remain local to the device that scheduled them. The last successful sync time is
+stored per account in AsyncStorage.
+
+LockNote does not end-to-end encrypt note content before upload. Password fields
+remain SHA-256 access-gate hashes; they are never uploaded as plaintext.
+
 ## Shared-note collaboration
 
-Release 1 shares individual notes by registered account email. Private notes remain local. Once sharing begins, the local row stores a cloud ID, ownership/origin, collaborator count, server revision, sync state, and last-editor metadata. Incoming notes are excluded from Home, folder, and search reads and appear only in the Shared tab.
+Release 1 shares individual notes by registered account email. Once sharing begins, the local row stores a cloud ID, ownership/origin, collaborator count, server revision, sync state, and last-editor metadata. Incoming notes are excluded from Home, folder, private-account sync, and search reads and appear only in the Shared tab.
 
 Supabase stores `profiles`, `shared_notes`, and `note_members`. Row-level security limits reads to the owner and current members. Email lookup is performed by the authenticated `share-note` Edge Function so the client cannot enumerate account emails and never receives a service-role key. Content saves use an expected server revision; stale saves fail instead of silently replacing newer content. Realtime table events refresh the local cache and an open editor. Release 1 synchronizes complete saved note snapshots and does not provide character-level CRDT cursor merging.
 

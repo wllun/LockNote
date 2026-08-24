@@ -1,6 +1,6 @@
 # Project State — TODO
 
-_Snapshot: 2026-07-30. Check off items as they land._
+_Snapshot: 2026-08-24. Check off items as they land._
 
 ## Done
 
@@ -26,7 +26,7 @@ _Snapshot: 2026-07-30. Check off items as they land._
 
 ### Supabase (now active — not vestigial)
 - [X] Revived for account auth (Phase 2 of ROADMAP.md). `src/services/supabaseClient.js` creates the client (AsyncStorage-backed session persistence); `src/context/AuthContext.js` exposes `useAuth()` app-wide.
-- [X] Profile tab — `AuthScreen` (email/password sign up + sign in, one screen with a mode toggle) shown when logged out; `ProfileScreen` (email, member-since date, Sync Notes stub, Sign Out) shown when logged in.
+- [X] Profile tab — `AuthScreen` (email/password sign up + sign in, one screen with a mode toggle) shown when logged out; `ProfileScreen` (email, member-since date, two-way Sync Notes action, Sign Out) shown when logged in.
 - [X] Account password recovery — sign-in sends a Supabase reset email; `locknote://reset-password` opens an in-app new-password form.
 - [X] Require matching password confirmation during registration and password reset.
 - [X] Add stronger email and password validation — normalized lowercase emails, format checks, 8-character minimum for new passwords, confirmation matching, and field-level messages.
@@ -34,14 +34,14 @@ _Snapshot: 2026-07-30. Check off items as they land._
 - [X] Add automated authentication tests (17 cases covering validation, errors, callbacks, redirects, and Supabase request wrappers).
 - [ ] Verify registration, email confirmation, login persistence, password reset, and sign-out end-to-end on Android, iOS, and web. Android and iOS simulator binaries compile successfully on EAS; web production export and local HTTP runtime pass. Interactive cloud-device verification is blocked until EAS Simulator is enabled for the Expo account.
 - [X] Email confirmation returns to `locknote://auth-confirm` on native and the corresponding app URL on web.
-- [ ] Sync Notes is a stub (`Alert` only) — no premium gating, no actual note/folder sync to Supabase yet.
+- [X] Sync Notes — manual two-way folder/note sync through the authenticated `sync_private_data` RPC, with RLS, last-write-wins timestamps, soft-delete tombstones, native/web repository parity, and per-account last-sync status. The migration still requires deployment and live multi-device verification; premium gating is not implemented.
 - [X] Collaboration Release 1 — explicit per-note sharing by registered account email, Shared tab/local cache, owner share indicators, collaborator management, realtime refresh, last-editor footer, RLS, and revision-protected saves. Backend migration/function deployment and live two-account verification still require configured Supabase credentials.
-- Private note content remains local. Content leaves the device only after the owner explicitly shares that note.
+- Private note content stays local unless the signed-in owner explicitly runs Sync Notes. LockNote does not end-to-end encrypt content before upload.
 
 ### Possible features
 - [X] Dark mode — palette centralized in `src/theme.js` (`useTheme()` + `makeStyles(colors)`). Theme mode (`system` / `light` / `dark`) is set in Settings, persisted in AsyncStorage (`@locknote_theme`), shared via `ThemeProvider` context; `system` follows the OS via `useColorScheme`. `userInterfaceStyle` is `automatic`.
 - [X] Password recovery/reset — an app-wide recovery PIN (Settings → Security), persisted in AsyncStorage via `src/utils/recovery.js`, hashed with the same SHA-256 helper as item passwords. `PasswordModal` gets a "Forgot password?" link that verifies the PIN and clears the item's password. Note: this resets the gate, it does not recover the original password (impossible from a hash) — consistent with the "gating, not encryption" model.
-- [ ] Data export / cross-platform portability (native SQLite and web AsyncStorage are separate, no sync)
+- [X] Cross-platform account portability — manual Sync Notes merges native SQLite and web AsyncStorage data through Supabase. File-based backup/export remains separate work.
 - [X] Pinning — `is_pinned` column added to both SQLite tables (migrated via guarded `ALTER TABLE`) and to the web AsyncStorage records. Pinned folders/notes sort first everywhere (lists + search). List actions open by long-press on native or three dots on web; editor actions use a three-dots menu.
 - [X] Contextual list actions — notes can be pinned, moved between Home/folders, or soft-deleted; folders can be renamed, pinned, or soft-deleted together with their contained notes.
 - [X] PDF/image export — normal, checklist, expense, and reminder notes export normalized content on native and web. Native saves PNG files directly to the device gallery and writes PDFs to a folder selected through the system document picker, with sharing retained as a secondary action. Web downloads PNG images and opens an isolated note document for printing or saving as PDF.
@@ -59,8 +59,8 @@ _Snapshot: 2026-07-30. Check off items as they land._
 ### Phase 2 — Cloud — premium, RM4.90/month
 
 - [X] Login — Profile tab with real Supabase Auth (email/password sign up + sign in, session persisted via AsyncStorage). No premium gating yet — anyone can create an account.
-- [ ] Sync DB — Profile screen has a "Sync Notes" entry point, currently stubbed ("Coming soon"). Actual push/pull of notes/folders to Supabase not built.
-- [ ] Multi-device login — depends on Sync DB above; logging in on a second device doesn't yet pull your notes.
+- [X] Sync DB — Profile screen pushes and pulls private/owned notes and folders through an account-scoped Supabase RPC. Deletions and root-note semantics are preserved.
+- [X] Multi-device login — after signing in, running Sync Notes merges that device with the account snapshot. Automatic background sync is not implemented.
 - [X] Searchable — already shipped free in Phase 1 (Home search bar); decide whether to keep it free or gate it behind Phase 2
 
 ### Phase 3 — Attachments — premium pro, RM9.99/month
@@ -103,4 +103,4 @@ When the user presses the Add button, let them choose one of these note types:
 ## Caveats (not bugs — document, don't "fix" silently)
 
 - **Not secure storage.** Passwords gate access via hash comparison; note content is plaintext in the local DB. Not safe for genuinely sensitive data — see [README.md](../README.md#security).
-- **Migration history.** App was originally built for Supabase (cloud + auth), migrated to local-only, and has now re-adopted Supabase — but only for account auth (Phase 2 of ROADMAP.md), not as a data store. Notes/folders remain local-only (SQLite/AsyncStorage); nothing about them syncs yet.
+- **Sync security.** Local storage remains the offline source used by screens. Manual account sync stores note/folder data in owner-scoped Supabase tables protected by RLS, but LockNote does not end-to-end encrypt note content before upload.

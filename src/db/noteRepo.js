@@ -112,15 +112,35 @@ export const noteRepo = {
 
   async softDelete(id) {
     const db = getDB();
-    await db.runAsync(
-      `UPDATE notes SET is_deleted = 1, updated_at = ? WHERE id = ?`,
-      [now(), id]
-    );
+    const timestamp = now();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync(
+        `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
+         SELECT 'note', id, ? FROM notes
+         WHERE id = ? AND share_origin != 'incoming'
+         ON CONFLICT(entity_type, entity_id) DO UPDATE SET deleted_at = excluded.deleted_at`,
+        [timestamp, id]
+      );
+      await txn.runAsync(
+        `UPDATE notes SET is_deleted = 1, updated_at = ? WHERE id = ?`,
+        [timestamp, id]
+      );
+    });
   },
 
   async hardDelete(id) {
     const db = getDB();
-    await db.runAsync(`DELETE FROM notes WHERE id = ?`, [id]);
+    const timestamp = now();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync(
+        `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
+         SELECT 'note', id, ? FROM notes
+         WHERE id = ? AND share_origin != 'incoming'
+         ON CONFLICT(entity_type, entity_id) DO UPDATE SET deleted_at = excluded.deleted_at`,
+        [timestamp, id]
+      );
+      await txn.runAsync(`DELETE FROM notes WHERE id = ?`, [id]);
+    });
   },
 
   async search(query) {
@@ -151,5 +171,102 @@ export const noteRepo = {
     if (existing) return await this.update(existing.id, remote);
     const created = await this.create(null, remote.title, remote.content, null, remote.note_type);
     return await this.update(created.id, remote);
+  },
+
+  async getSyncSnapshot() {
+    const db = getDB();
+    const [records, tombstones] = await Promise.all([
+      db.getAllAsync(
+        `SELECT * FROM notes
+         WHERE is_deleted = 0 AND share_origin != 'incoming'`
+      ),
+      db.getAllAsync(
+        `SELECT entity_id AS id, deleted_at AS updated_at
+         FROM sync_tombstones WHERE entity_type = 'note'`
+      ),
+    ]);
+    return { records, tombstones };
+  },
+
+  async applySyncSnapshot(records = [], tombstones = []) {
+    const db = getDB();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      for (const note of records) {
+        await txn.runAsync(
+          `INSERT INTO notes (
+             id, folder_id, title, content, note_type, password, is_deleted,
+             is_pinned, created_at, updated_at, cloud_id, cloud_owner_id,
+             share_origin, share_role, collaborator_count, server_revision,
+             last_edited_by_id, last_edited_by_email, last_edited_at,
+             sync_status, last_synced_at
+           ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             folder_id = excluded.folder_id,
+             title = excluded.title,
+             content = excluded.content,
+             note_type = excluded.note_type,
+             password = excluded.password,
+             is_deleted = 0,
+             is_pinned = excluded.is_pinned,
+             created_at = excluded.created_at,
+             updated_at = excluded.updated_at,
+             cloud_id = excluded.cloud_id,
+             cloud_owner_id = excluded.cloud_owner_id,
+             share_origin = excluded.share_origin,
+             share_role = excluded.share_role,
+             collaborator_count = excluded.collaborator_count,
+             server_revision = excluded.server_revision,
+             last_edited_by_id = excluded.last_edited_by_id,
+             last_edited_by_email = excluded.last_edited_by_email,
+             last_edited_at = excluded.last_edited_at,
+             sync_status = excluded.sync_status,
+             last_synced_at = excluded.last_synced_at
+           WHERE excluded.updated_at >= notes.updated_at`,
+          [
+            note.id,
+            note.folder_id ?? null,
+            note.title || '',
+            note.content || '',
+            note.note_type || 'note',
+            note.password || null,
+            note.is_pinned ? 1 : 0,
+            note.created_at,
+            note.updated_at,
+            note.cloud_id || null,
+            note.cloud_owner_id || null,
+            note.share_origin || 'private',
+            note.share_role || null,
+            Number(note.collaborator_count) || 0,
+            Number(note.server_revision) || 0,
+            note.last_edited_by_id || null,
+            note.last_edited_by_email || null,
+            note.last_edited_at || null,
+            note.sync_status || null,
+            note.last_synced_at || null,
+          ]
+        );
+        await txn.runAsync(
+          `DELETE FROM sync_tombstones
+           WHERE entity_type = 'note' AND entity_id = ? AND deleted_at <= ?`,
+          [note.id, note.updated_at]
+        );
+      }
+      for (const tombstone of tombstones) {
+        await txn.runAsync(
+          `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
+           VALUES ('note', ?, ?)
+           ON CONFLICT(entity_type, entity_id) DO UPDATE SET
+             deleted_at = CASE
+               WHEN excluded.deleted_at >= sync_tombstones.deleted_at
+               THEN excluded.deleted_at ELSE sync_tombstones.deleted_at END`,
+          [tombstone.id, tombstone.updated_at]
+        );
+        await txn.runAsync(
+          `UPDATE notes SET is_deleted = 1, updated_at = ?
+           WHERE id = ? AND share_origin != 'incoming' AND updated_at <= ?`,
+          [tombstone.updated_at, tombstone.id, tombstone.updated_at]
+        );
+      }
+    });
   },
 };

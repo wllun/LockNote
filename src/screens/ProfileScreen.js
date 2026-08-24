@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../context/AuthContext';
+import { syncService } from '../services/syncService';
+import { syncErrorMessage } from '../utils/private-sync.mjs';
 import { radius, shadow, useTheme } from '../theme';
 
 const formatDate = (dateString) => {
@@ -15,14 +17,44 @@ const formatDate = (dateString) => {
   });
 };
 
+const formatSyncDate = (dateString) => {
+  if (!dateString) return 'Not synced yet';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return 'Not synced yet';
+  return `Last synced ${date.toLocaleString()}`;
+};
+
 const ProfileScreen = () => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
   const user = session?.user;
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState(null);
 
-  const handleSync = () => {
-    Alert.alert('Sync Notes', 'Coming soon — your notes will sync securely to your account.');
+  useEffect(() => {
+    let active = true;
+    syncService.getLastSyncAt(user?.id)
+      .then((value) => { if (active) setLastSyncAt(value); })
+      .catch(() => { if (active) setLastSyncAt(null); });
+    return () => { active = false; };
+  }, [user?.id]);
+
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const result = await syncService.syncAll();
+      setLastSyncAt(result.syncedAt);
+      Alert.alert(
+        'Sync complete',
+        `${result.notes} ${result.notes === 1 ? 'note' : 'notes'} and ${result.folders} ${result.folders === 1 ? 'folder' : 'folders'} are up to date.`,
+      );
+    } catch (error) {
+      Alert.alert('Sync failed', syncErrorMessage(error));
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleSignOut = () => {
@@ -51,19 +83,42 @@ const ProfileScreen = () => {
       </View>
 
       <View style={styles.card}>
-        <TouchableOpacity style={styles.item} activeOpacity={0.7} onPress={handleSync}>
+        <TouchableOpacity
+          style={[styles.item, syncing && styles.itemDisabled]}
+          activeOpacity={0.7}
+          onPress={handleSync}
+          disabled={syncing}
+          accessibilityRole="button"
+          accessibilityLabel="Sync notes and folders"
+          accessibilityState={{ busy: syncing, disabled: syncing }}
+        >
           <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
             <Ionicons name="cloud-upload-outline" size={19} color={colors.primary} />
           </View>
           <View style={styles.itemContent}>
             <Text style={styles.itemLabel}>Sync Notes</Text>
-            <Text style={styles.itemDescription}>Coming soon</Text>
+            <Text style={styles.itemDescription} numberOfLines={1}>
+              {syncing ? 'Merging local and cloud changes…' : formatSyncDate(lastSyncAt)}
+            </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          {syncing
+            ? <ActivityIndicator size="small" color={colors.primary} />
+            : <Ionicons name="cloud-upload-outline" size={20} color={colors.textTertiary} />}
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.signOutButton} activeOpacity={0.7} onPress={handleSignOut}>
+      <Text style={styles.syncNotice}>
+        Sync stores note and folder data in your LockNote account. LockNote does not
+        end-to-end encrypt note content before upload. Reminder notifications stay on
+        the device where they were scheduled.
+      </Text>
+
+      <TouchableOpacity
+        style={styles.signOutButton}
+        activeOpacity={0.7}
+        onPress={handleSignOut}
+        disabled={syncing}
+      >
         <Ionicons name="log-out-outline" size={18} color={colors.danger} />
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
@@ -113,6 +168,9 @@ const makeStyles = (colors) =>
       alignItems: 'center',
       padding: 14,
     },
+    itemDisabled: {
+      opacity: 0.7,
+    },
     iconCircle: {
       width: 36,
       height: 36,
@@ -133,6 +191,13 @@ const makeStyles = (colors) =>
       fontSize: 13,
       color: colors.textTertiary,
       marginTop: 2,
+    },
+    syncNotice: {
+      color: colors.textTertiary,
+      fontSize: 12,
+      lineHeight: 17,
+      marginHorizontal: 4,
+      marginTop: 12,
     },
     signOutButton: {
       flexDirection: 'row',
