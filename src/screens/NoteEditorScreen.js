@@ -592,7 +592,7 @@ const makeStyles = (colors) =>
     },
     actionsMenuOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(15,23,42,0.12)',
+      backgroundColor: colors.backdropSoft,
     },
     actionsMenu: {
       position: 'absolute',

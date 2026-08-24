@@ -368,7 +368,7 @@ const NoteExportModal = ({
 };
 
 const makeStyles = (colors) => StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.52)' },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.backdropStrong },
   sheet: { maxHeight: '90%', backgroundColor: colors.card, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: 20, gap: 16, ...shadow.card },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   eyebrow: { color: colors.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1 },

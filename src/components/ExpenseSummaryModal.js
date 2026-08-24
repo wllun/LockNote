@@ -647,7 +647,7 @@ const ExpenseSummaryModal = ({
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.52)' },
+    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.backdropStrong },
     sheet: { maxHeight: '90%', backgroundColor: colors.card, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, ...shadow.card },
     handle: { width: 42, height: 4, borderRadius: radius.full, backgroundColor: colors.border, alignSelf: 'center', marginTop: 9 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 13, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -705,7 +705,7 @@ const makeStyles = (colors) =>
     infoText: { flex: 1, color: colors.primary, fontSize: 13, fontWeight: '600' },
     textButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
     textButtonText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
-    categoryActionOverlay: { flex: 1, padding: 16, backgroundColor: 'rgba(15,23,42,0.56)' },
+    categoryActionOverlay: { flex: 1, padding: 16, backgroundColor: colors.backdropStrong },
     categoryActionOverlayPhone: { justifyContent: 'flex-end' },
     categoryActionOverlayWeb: { justifyContent: 'center', alignItems: 'center' },
     categoryActionPanel: { width: '100%', overflow: 'hidden', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, ...shadow.card },

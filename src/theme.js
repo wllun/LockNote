@@ -24,6 +24,9 @@ const lightColors = {
   onDanger: '#FFFFFF',
   folder: '#F59E0B',
   folderSoft: '#FEF4E4',
+  backdropSoft: 'rgba(0,0,0,0.50)',
+  backdrop: 'rgba(0,0,0,0.50)',
+  backdropStrong: 'rgba(0,0,0,0.50)',
 };
 
 const darkColors = {
@@ -42,6 +45,9 @@ const darkColors = {
   onDanger: '#1A1D29',
   folder: '#FFC94A',
   folderSoft: '#453A1D',
+  backdropSoft: 'rgba(0,0,0,0.50)',
+  backdrop: 'rgba(0,0,0,0.50)',
+  backdropStrong: 'rgba(0,0,0,0.50)',
 };
 
 export const radius = {

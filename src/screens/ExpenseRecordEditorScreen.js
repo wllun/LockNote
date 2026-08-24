@@ -2359,7 +2359,7 @@ const makeStyles = (colors) =>
     },
     actionsMenuOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(15,23,42,0.12)',
+      backgroundColor: colors.backdropSoft,
     },
     actionsMenu: {
       position: 'absolute',
@@ -2401,7 +2401,7 @@ const makeStyles = (colors) =>
       alignItems: 'center',
       justifyContent: 'flex-end',
       paddingHorizontal: 12,
-      backgroundColor: 'rgba(15,23,42,0.48)',
+      backgroundColor: colors.backdrop,
     },
     rowActionsSheet: {
       width: '100%',

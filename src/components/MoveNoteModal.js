@@ -156,7 +156,7 @@ const makeStyles = (colors) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: 'rgba(15,23,42,0.35)',
+      backgroundColor: colors.backdrop,
       padding: 16,
     },
     overlayPhone: {

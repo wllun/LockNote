@@ -97,7 +97,7 @@ const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
 };
 
 const makeStyles = (colors) => StyleSheet.create({
-  overlay: { backgroundColor: 'rgba(15,23,42,0.4)' }, modalContent: { width: '100%' },
+  overlay: { backgroundColor: colors.backdrop }, modalContent: { width: '100%' },
   panel: { width: '100%', maxWidth: 520, maxHeight: '85%', backgroundColor: colors.card, borderRadius: radius.lg, padding: 18, borderWidth: 1, borderColor: colors.border, ...shadow.card },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }, title: { color: colors.text, fontSize: 20, fontWeight: '800' }, subtitle: { color: colors.textSecondary, fontSize: 13, marginTop: 3 },
   iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full }, inviteRow: { flexDirection: 'row', gap: 10 },

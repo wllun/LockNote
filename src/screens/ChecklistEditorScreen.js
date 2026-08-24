@@ -1487,7 +1487,7 @@ const makeStyles = (colors) =>
     addButton: { width: 48, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     addButtonDisabled: { opacity: 0.4 },
     itemLimit: { color: colors.textTertiary, fontSize: 11, fontVariant: ['tabular-nums'] },
-    actionsMenuOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.12)' },
+    actionsMenuOverlay: { flex: 1, backgroundColor: colors.backdropSoft },
     actionsMenu: {
       position: 'absolute',
       right: 12,
@@ -1504,7 +1504,7 @@ const makeStyles = (colors) =>
     actionsMenuDeleteItem: { borderTopWidth: 1, borderTopColor: colors.border },
     actionsMenuText: { flex: 1, fontSize: 16, color: colors.text },
     actionsMenuDeleteText: { color: colors.danger, fontWeight: '600' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    modalOverlay: { flex: 1, backgroundColor: colors.backdrop, justifyContent: 'center', alignItems: 'center', padding: 24 },
     modalContent: { backgroundColor: colors.card, borderRadius: radius.lg, padding: 24, width: '100%', maxWidth: 400, alignItems: 'center', ...shadow.card },
     modalIconCircle: { width: 56, height: 56, borderRadius: radius.full, backgroundColor: colors.primarySoft, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
     modalTitle: { fontSize: 19, fontWeight: '700', color: colors.text, marginBottom: 8, textAlign: 'center' },

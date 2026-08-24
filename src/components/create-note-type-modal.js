@@ -159,7 +159,7 @@ const makeStyles = (colors) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: 'rgba(8,12,24,0.58)',
+      backgroundColor: colors.backdropStrong,
       justifyContent: 'flex-end',
     },
     overlayDesktop: {

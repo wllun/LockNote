@@ -6,14 +6,16 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../theme';
 
 const KeyboardAwareModalContent = forwardRef(
   ({ children, overlayStyle, contentContainerStyle }, ref) => {
     const insets = useSafeAreaInsets();
+    const colors = useTheme();
 
     return (
       <KeyboardAvoidingView
-        style={[styles.overlay, overlayStyle]}
+        style={[styles.overlay, { backgroundColor: colors.backdrop }, overlayStyle]}
         behavior={
           Platform.OS === 'ios'
             ? 'padding'
@@ -49,7 +51,6 @@ KeyboardAwareModalContent.displayName = 'KeyboardAwareModalContent';
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15,23,42,0.45)',
   },
   scroll: {
     flex: 1,

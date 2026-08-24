@@ -111,7 +111,7 @@ const ReminderScheduleModal = ({ visible, reminder, onClose, onSave, saving = fa
 };
 
 const makeStyles = (colors) => StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.52)' },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.backdropStrong },
   sheet: { maxHeight: '92%', padding: 20, gap: 16, backgroundColor: colors.card, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, ...shadow.card },
   handle: { width: 42, height: 4, borderRadius: radius.full, backgroundColor: colors.border, alignSelf: 'center', marginTop: -6 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },

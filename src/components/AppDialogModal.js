@@ -170,7 +170,7 @@ const makeStyles = (colors) =>
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 18,
-      backgroundColor: 'rgba(15,23,42,0.56)',
+      backgroundColor: colors.backdropStrong,
     },
     panel: {
       width: '100%',
