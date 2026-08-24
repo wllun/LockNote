@@ -71,6 +71,7 @@ import {
   upsertExpenseCategory,
 } from '../utils/expense-record.mjs';
 import { radius, shadow, useTheme } from '../theme';
+import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
 
 const EXPENSE_ROW_MIN_HEIGHT = 48;
 const EXPENSE_REMARK_MAX_HEIGHT = 82;
@@ -1231,45 +1232,46 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     loadSavedCommitmentTemplate();
   }, [loadRecord, loadSavedCommitmentTemplate]);
 
-  useEffect(() => {
-    return () => {
-      const pending = saveTimeout.current;
-      if (pending) {
-        clearTimeout(pending);
-        saveTimeout.current = null;
-      }
+  const isEmptyDraft = useCallback((draft) =>
+    !draft.cloudId &&
+    !draft.hasPassword &&
+    !draft.isPinned &&
+    isExpenseNoteEmpty(
+      draft.title,
+      draft.rows,
+      draft.categories,
+      draft.summaryNote,
+      draft.monthlyCommitments
+    ), []);
 
-      const draft = latest.current;
-      if (draft.deleted) return;
+  const needsExitCleanup = useCallback(() => {
+    const draft = latest.current;
+    return !draft.deleted && (isEmptyDraft(draft) || !!saveTimeout.current);
+  }, [isEmptyDraft]);
 
-      if (
-        isExpenseNoteEmpty(
-          draft.title,
+  const finalizeExit = useCallback(async () => {
+    const pending = saveTimeout.current;
+    if (pending) clearTimeout(pending);
+    saveTimeout.current = null;
+
+    const draft = latest.current;
+    if (draft.deleted) return;
+    if (isEmptyDraft(draft)) {
+      await noteRepo.hardDelete(noteId);
+    } else if (pending) {
+      await collaborationService.save(noteId, {
+        title: draft.title.trim(),
+        content: serializeExpenseNote(
           draft.rows,
           draft.categories,
           draft.summaryNote,
           draft.monthlyCommitments
-        ) &&
-        !draft.hasPassword &&
-        !draft.isPinned &&
-        !draft.cloudId
-      ) {
-        noteRepo.hardDelete(noteId).catch(() => {});
-      } else if (pending) {
-        collaborationService
-          .save(noteId, {
-            title: draft.title.trim(),
-            content: serializeExpenseNote(
-              draft.rows,
-              draft.categories,
-              draft.summaryNote,
-              draft.monthlyCommitments
-            ),
-          })
-          .catch(() => {});
-      }
-    };
-  }, [noteId]);
+        ),
+      });
+    }
+  }, [isEmptyDraft, noteId]);
+
+  useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 
   return (
     <KeyboardAvoidingView

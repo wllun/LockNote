@@ -41,6 +41,7 @@ import {
   serializeChecklistNote,
 } from '../utils/checklist-note.mjs';
 import { radius, shadow, useTheme } from '../theme';
+import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
 
 const CHECKLIST_ITEM_MIN_HEIGHT = 60;
 const CHECKLIST_ITEM_GAP = 10;
@@ -774,26 +775,38 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     loadChecklist();
   }, [loadChecklist]);
 
-  useEffect(() => {
-    return () => {
-      const pending = saveTimeout.current;
-      if (pending) {
-        clearTimeout(pending);
-        saveTimeout.current = null;
-      }
+  const needsExitCleanup = useCallback(() => {
+    const draft = latest.current;
+    const empty = !draft.cloudId &&
+      isChecklistNoteEmpty(draft.title, draft.items) &&
+      !draft.hasPassword &&
+      !draft.isPinned;
+    return !draft.deleted && (empty || !!saveTimeout.current);
+  }, []);
 
-      const { title: latestTitle, items: latestItems, hasPassword: password, isPinned: pinned, deleted } = latest.current;
-      if (deleted) return;
-      if (!latest.current.cloudId && isChecklistNoteEmpty(latestTitle, latestItems) && !password && !pinned) {
-        noteRepo.hardDelete(noteId).catch(() => {});
-      } else if (pending) {
-        collaborationService.save(noteId, {
-          title: latestTitle,
-          content: serializeChecklistNote(latestItems),
-        }).catch(() => {});
-      }
-    };
+  const finalizeExit = useCallback(async () => {
+    const pending = saveTimeout.current;
+    if (pending) clearTimeout(pending);
+    saveTimeout.current = null;
+
+    const draft = latest.current;
+    if (draft.deleted) return;
+    if (
+      !draft.cloudId &&
+      isChecklistNoteEmpty(draft.title, draft.items) &&
+      !draft.hasPassword &&
+      !draft.isPinned
+    ) {
+      await noteRepo.hardDelete(noteId);
+    } else if (pending) {
+      await collaborationService.save(noteId, {
+        title: draft.title,
+        content: serializeChecklistNote(draft.items),
+      });
+    }
   }, [noteId]);
+
+  useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 
   const renderItem = useCallback(({ item, index }) => (
     <ChecklistItemRow

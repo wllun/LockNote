@@ -25,6 +25,7 @@ import { verifyPassword } from '../utils/crypto';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
 import { radius, shadow, useTheme } from '../theme';
+import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
 import {
   constrainNormalNoteContent,
   NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
@@ -219,24 +220,27 @@ const NoteEditorScreen = ({ route, navigation }) => {
     loadNote();
   }, [noteId]);
 
-  // On exit: flush a pending save, or clean up a never-typed-in note so
-  // backing out doesn't leave an empty "Untitled" row.
-  useEffect(() => {
-    return () => {
-      const pending = saveTimeout.current;
-      if (pending) {
-        clearTimeout(pending);
-        saveTimeout.current = null;
-      }
-      const { title, content, hasPassword, isPinned, cloudId, deleted } = latest.current;
-      if (deleted) return;
-      if (!cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned) {
-        noteRepo.hardDelete(noteId).catch(() => {});
-      } else if (pending) {
-        collaborationService.save(noteId, { title, content }).catch(() => {});
-      }
-    };
+  const needsExitCleanup = useCallback(() => {
+    const { title, content, hasPassword, isPinned, cloudId, deleted } = latest.current;
+    const empty = !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned;
+    return !deleted && (empty || !!saveTimeout.current);
+  }, []);
+
+  const finalizeExit = useCallback(async () => {
+    const pending = saveTimeout.current;
+    if (pending) clearTimeout(pending);
+    saveTimeout.current = null;
+
+    const { title, content, hasPassword, isPinned, cloudId, deleted } = latest.current;
+    if (deleted) return;
+    if (!cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned) {
+      await noteRepo.hardDelete(noteId);
+    } else if (pending) {
+      await collaborationService.save(noteId, { title, content });
+    }
   }, [noteId]);
+
+  useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 
   return (
     <KeyboardAvoidingView

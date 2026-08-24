@@ -30,6 +30,7 @@ import {
   cancelReminderNotifications, scheduleReminderNotification,
 } from '../utils/reminder-notifications';
 import { radius, shadow, useTheme } from '../theme';
+import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
 
 const ReminderEditorScreen = ({ route, navigation }) => {
   const { noteId } = route.params;
@@ -101,18 +102,31 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       .catch(() => Alert.alert('Error', 'Failed to load reminder'));
   }, [noteId, applyLoadedNote]);
 
-  useEffect(() => () => {
+  const needsExitCleanup = useCallback(() => {
+    const draft = latest.current;
+    const empty = !draft.cloudId && isReminderNoteEmpty(draft);
+    return !draft.deleted && (empty || !!saveTimeout.current);
+  }, []);
+
+  const finalizeExit = useCallback(async () => {
     const pending = saveTimeout.current;
     if (pending) clearTimeout(pending);
-    const next = latest.current;
-    if (next.deleted) return;
-    if (!next.cloudId && isReminderNoteEmpty(next)) {
-      cancelReminderNotifications(next.reminder.notificationIds).catch(() => {});
-      noteRepo.hardDelete(noteId).catch(() => {});
+    saveTimeout.current = null;
+
+    const draft = latest.current;
+    if (draft.deleted) return;
+    if (!draft.cloudId && isReminderNoteEmpty(draft)) {
+      await cancelReminderNotifications(draft.reminder.notificationIds);
+      await noteRepo.hardDelete(noteId);
     } else if (pending) {
-      collaborationService.save(noteId, { title: next.title, content: contentFor(next.body, next.reminder) }).catch(() => {});
+      await collaborationService.save(noteId, {
+        title: draft.title,
+        content: contentFor(draft.body, draft.reminder),
+      });
     }
   }, [noteId]);
+
+  useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 
   const snapshot = () => ({ title: latest.current.title, body: latest.current.body, reminder: latest.current.reminder });
 

@@ -131,7 +131,11 @@ This is **gating, not encryption** — note `content` is stored in cleartext. Se
 `ReminderEditorScreen`
 create the note row first (empty), then navigate into it by `noteId`. Field
 changes trigger a debounced (800ms) `noteRepo.update`. The debounce timer is
-cleared on unmount and before delete. Normal note bodies are limited to 100,000
+cleared on unmount and before delete. When an editor route is removed, the shared
+exit guard waits for an untouched local draft to be hard-deleted—or for a pending
+save to finish—before Home/Folder regains focus and reloads its list. This applies
+to normal, checklist, expense, and reminder notes; unmount cleanup remains a
+fallback for non-navigation teardown. Normal note bodies are limited to 100,000
 characters; checklist items are limited to 500 characters and 500 items; see
 [Note Character Limits](NOTE_LIMITS.md).
 

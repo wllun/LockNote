@@ -23,7 +23,7 @@ _Snapshot: 2026-08-24. Check off items as they land._
 - [X] Settings backup export — creates a versioned, portable JSON file containing private/owned folders and notes, password hashes, pin state, note types, root-note relationships, and deletion tombstones. Incoming shared-note caches and account/collaboration identifiers are excluded.
 - [X] Backup import/restore — selects and validates a LockNote JSON backup (including schema version, references, timestamps, password-hash shape, duplicates, and a 25 MB limit), previews its counts, and requires an explicit Merge or Replace choice. Merge uses ID/timestamp conflict handling; Replace resets private data while preserving Shared-with-me notes. Both paths preserve `folder_id = null`, soft deletes, and native/web repository parity.
 - [X] Decide on `hardDelete()` — now called by the editor's empty-note cleanup on exit; no user-facing "permanently delete" flow (not needed)
-- [X] Clean up empty notes on editor exit (editor hard-deletes the row on unmount if title, content, and password are all empty; also flushes a pending auto-save on exit)
+- [X] Clean up empty notes on editor exit — navigation now awaits the hard-delete before returning to Home/Folder, preventing its focus reload from racing and briefly retaining an untouched note. The same guarded exit flushes pending auto-saves for non-empty notes, with unmount cleanup as a fallback.
 
 ### Supabase (now active — not vestigial)
 - [X] Revived for account auth (Phase 2 of ROADMAP.md). `src/services/supabaseClient.js` creates the client (AsyncStorage-backed session persistence); `src/context/AuthContext.js` exposes `useAuth()` app-wide.
