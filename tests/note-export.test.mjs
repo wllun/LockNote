@@ -121,7 +121,7 @@ test('renders expense rows and the calculated total in PDF HTML', () => {
 
   assert.match(html, /<table>/);
   assert.match(html, /Lunch &amp; coffee/);
-  assert.match(html, /RM 18\.50/);
+  assert.match(html, /\$ 18\.50/);
 });
 
 test('renders monthly categories and the summary note in expense PDF HTML', () => {
@@ -147,7 +147,7 @@ test('renders monthly categories and the summary note in expense PDF HTML', () =
   assert.match(html, /Lunch, &lt;coffee&gt; - 2 matching entries/);
   assert.match(html, /Manual amount/);
   assert.match(html, /Categorized total/);
-  assert.match(html, /RM 1,284\.50/);
+  assert.match(html, /\$ 1,284\.50/);
   assert.match(html, /Check &lt;receipts&gt;<br>Claim before Friday\./);
 });
 
@@ -191,6 +191,7 @@ test('renders and normalizes monthly commitments in expense exports', () => {
     rows: [],
     total: 0,
     monthlyCommitments,
+    currency: 'MYR',
   });
 
   assert.equal(monthlyCommitments[0].remark, 'Rent');
@@ -199,4 +200,5 @@ test('renders and normalizes monthly commitments in expense exports', () => {
   assert.match(html, /<td>Unpaid<\/td><td>Internet<\/td>/);
   assert.match(html, /Remaining/);
   assert.match(html, /RM 129\.90/);
+  assert.match(html, /Amount \(RM\)/);
 });

@@ -1,4 +1,24 @@
+import { EXPENSE_CURRENCIES } from './expense-currencies.mjs';
+
+export { EXPENSE_CURRENCIES } from './expense-currencies.mjs';
+
 export const EXPENSE_NOTE_TYPE = 'expense';
+export const DEFAULT_EXPENSE_CURRENCY = 'USD';
+
+export const normalizeExpenseCurrency = (value) => {
+  const code = String(value?.code ?? value ?? '').trim().toUpperCase();
+  return EXPENSE_CURRENCIES.some((currency) => currency.code === code)
+    ? code
+    : DEFAULT_EXPENSE_CURRENCY;
+};
+
+export const getExpenseCurrency = (value) => {
+  const code = normalizeExpenseCurrency(value);
+  return EXPENSE_CURRENCIES.find((currency) => currency.code === code);
+};
+
+export const getExpenseCurrencySymbol = (value) =>
+  getExpenseCurrency(value).symbol;
 
 const createRowId = () =>
   Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
@@ -144,6 +164,7 @@ export const applyMonthlyCommitmentTemplate = (template) =>
 
 const emptyParsedExpenseNote = () => ({
   sourceVersion: 2,
+  currency: DEFAULT_EXPENSE_CURRENCY,
   rows: [],
   categories: [],
   summaryNote: '',
@@ -212,6 +233,7 @@ export const parseExpenseNote = (content) => {
       const rows = normalizeRows(parsed.rows);
       return {
         sourceVersion: Number(parsed.version) || 2,
+        currency: normalizeExpenseCurrency(parsed.currency),
         rows,
         categories: recalculateExpenseCategories(rows, parsed.categories),
         summaryNote: typeof parsed.summary_note === 'string' ? parsed.summary_note : '',
@@ -230,6 +252,7 @@ export const parseExpenseNote = (content) => {
     ) {
       return {
         sourceVersion: 1,
+        currency: DEFAULT_EXPENSE_CURRENCY,
         rows: [
           createExpenseRow({
             id: 'legacy-entry',
@@ -254,10 +277,12 @@ export const serializeExpenseNote = (
   rows,
   categories = [],
   summaryNote = '',
-  monthlyCommitments = []
+  monthlyCommitments = [],
+  currency = DEFAULT_EXPENSE_CURRENCY
 ) =>
   JSON.stringify({
-    version: 5,
+    version: 6,
+    currency: normalizeExpenseCurrency(currency),
     rows: normalizeRows(rows).map((row) => ({
       ...row,
       amount: normalizeExpenseAmountInput(row.amount),
@@ -266,6 +291,17 @@ export const serializeExpenseNote = (
     summary_note: typeof summaryNote === 'string' ? summaryNote : '',
     monthlyCommitments: normalizeMonthlyCommitments(monthlyCommitments),
   });
+
+export const setExpenseNoteCurrency = (content, currency) => {
+  const parsed = parseExpenseNote(content);
+  return serializeExpenseNote(
+    parsed.rows,
+    parsed.categories,
+    parsed.summaryNote,
+    parsed.monthlyCommitments,
+    currency
+  );
+};
 
 export const expenseRowHasContent = (row) =>
   !!row.date.trim() || !!row.remark.trim() || !!row.amount.trim();
@@ -278,13 +314,17 @@ export const isExpenseNoteEmpty = (
   rows,
   categories = [],
   summaryNote = '',
-  monthlyCommitments = []
+  monthlyCommitments = [],
+  currency = DEFAULT_EXPENSE_CURRENCY,
+  hasExplicitCurrencyChange =
+    normalizeExpenseCurrency(currency) !== DEFAULT_EXPENSE_CURRENCY
 ) =>
   !title.trim() &&
   !rows.some(expenseRowHasContent) &&
   !categories.length &&
   !summaryNote.trim() &&
-  !normalizeMonthlyCommitments(monthlyCommitments).length;
+  !normalizeMonthlyCommitments(monthlyCommitments).length &&
+  !hasExplicitCurrencyChange;
 
 export const sanitizeExpenseDateInput = (value) =>
   String(value ?? '').replace(/\D/g, '');
@@ -443,3 +483,6 @@ export const formatExpenseAmount = (value) => {
     maximumFractionDigits: 2,
   });
 };
+
+export const formatExpenseMoney = (value, currency = DEFAULT_EXPENSE_CURRENCY) =>
+  `${getExpenseCurrencySymbol(currency)} ${formatExpenseAmount(value)}`;

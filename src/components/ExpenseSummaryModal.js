@@ -18,7 +18,8 @@ import {
   calculateCategorizedTotal,
   calculateExpenseCategory,
   findExpenseCategory,
-  formatExpenseAmount,
+  formatExpenseMoney,
+  getExpenseCurrency,
   recalculateExpenseCategories,
 } from '../utils/expense-record.mjs';
 import { EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS } from '../utils/note-limits.mjs';
@@ -32,6 +33,7 @@ const ExpenseSummaryModal = ({
   rows,
   categories,
   summaryNote,
+  currency,
   saveStatus,
   onSave,
   onDelete,
@@ -68,6 +70,7 @@ const ExpenseSummaryModal = ({
     [categories, rows]
   );
   const categorizedTotal = calculateCategorizedTotal(liveCategories);
+  const selectedCurrency = getExpenseCurrency(currency);
   const categoryWithSameName = categoryName.trim()
     ? findExpenseCategory(liveCategories, categoryName)
     : null;
@@ -258,7 +261,9 @@ const ExpenseSummaryModal = ({
 
               <View style={styles.totalCard}>
                 <Text style={styles.totalLabel}>CATEGORIZED TOTAL</Text>
-                <Text style={styles.totalValue}>RM {formatExpenseAmount(categorizedTotal)}</Text>
+                <Text style={styles.totalValue}>
+                  {formatExpenseMoney(categorizedTotal, currency)}
+                </Text>
               </View>
 
               <Text style={styles.sectionTitle}>Saved categories</Text>
@@ -279,7 +284,7 @@ const ExpenseSummaryModal = ({
                       </Text>
                     </View>
                     <Text style={styles.categoryAmount}>
-                      RM {formatExpenseAmount(category.amount)}
+                      {formatExpenseMoney(category.amount, currency)}
                     </Text>
                     <Pressable
                       style={({ pressed }) => [styles.rowMenuButton, pressed && styles.pressed]}
@@ -433,14 +438,14 @@ const ExpenseSummaryModal = ({
               <View
                 style={styles.calculatedAmountCard}
                 accessible
-                accessibilityLabel={`Automatically calculated amount RM ${formatExpenseAmount(formCalculation.amount)} from ${formCalculation.matchCount} matching ${formCalculation.matchCount === 1 ? 'entry' : 'entries'}`}
+                accessibilityLabel={`Automatically calculated amount ${formatExpenseMoney(formCalculation.amount, currency)} in ${selectedCurrency.name} from ${formCalculation.matchCount} matching ${formCalculation.matchCount === 1 ? 'entry' : 'entries'}`}
               >
                 <View style={styles.calculatedAmountIcon}>
                   <Ionicons name="calculator-outline" size={20} color={colors.primary} />
                 </View>
                 <View style={styles.calculatedAmountInfo}>
                   <Text style={styles.calculatedAmountValue}>
-                    RM {formatExpenseAmount(formCalculation.amount)}
+                    {formatExpenseMoney(formCalculation.amount, currency)}
                   </Text>
                   <Text style={styles.calculatedAmountMeta}>
                     {formCalculation.matchCount} matching {formCalculation.matchCount === 1 ? 'entry' : 'entries'} · Updates automatically
@@ -527,7 +532,7 @@ const ExpenseSummaryModal = ({
                     {activeCategory?.name}
                   </Text>
                   <Text style={styles.categoryActionAmount}>
-                    RM {formatExpenseAmount(activeCategory?.amount ?? 0)} ·{' '}
+                    {formatExpenseMoney(activeCategory?.amount ?? 0, currency)} ·{' '}
                     {activeCategory?.match_count ?? 0} matching
                   </Text>
                 </View>

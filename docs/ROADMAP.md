@@ -37,7 +37,7 @@ When the user presses the Add button, let them choose one of these note types:
 - [ ] Note — plaintext
 - [X] Checklist — checkbox listing
 - [X] Expense Record — titled multi-row date, remark, and amount table with automatic totals
-- [ ] Expense Record currency selection — currently fixed to RM; consider a per-note currency selector and currency-aware formatting throughout the editor and note summaries
+- [X] Expense Record currency selection — searchable complete current ISO 4217 selector, Settings default with an optional apply-to-existing action, per-note amount-header override, and currency-aware summaries/exports; amounts are never exchange-rate converted
 - [ ] Reminder — plaintext with notification settings
 
 ## Additional / backlog (unphased)

@@ -1,6 +1,6 @@
 import {
   buildNoteExportHtml,
-  formatExportAmount,
+  formatExportMoney,
   getExpenseExportCategories,
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
@@ -10,6 +10,7 @@ import {
   getExportFileName,
   getExportTitle,
 } from './note-export.mjs';
+import { getExpenseCurrency } from './expense-record.mjs';
 import { formatReminderSchedule, normalizeReminder } from './reminder-note.mjs';
 
 const callBrowserMethod = (target, method, errorMessage, ...args) => {
@@ -135,6 +136,7 @@ export const exportNoteImage = async (_viewRef, data) => {
   const rows = isExpense ? getExpenseExportRows(data.rows) : null;
   const categories = getExpenseExportCategories(data.categories);
   const commitments = getExpenseExportMonthlyCommitments(data.monthlyCommitments);
+  const currency = getExpenseCurrency(data.currency);
   const isChecklist = data.type === 'checklist' || Array.isArray(data.checklistItems);
   const isReminder = data.type === 'reminder';
   const checklistItems = getChecklistExportItems(data.checklistItems);
@@ -184,7 +186,7 @@ export const exportNoteImage = async (_viewRef, data) => {
       y += 42;
       commitments.forEach((item) => {
         context.fillStyle = '#30384c'; context.font = 'bold 24px sans-serif'; context.fillText(item.remark, padding, y, 420);
-        context.textAlign = 'right'; context.fillText(`RM ${formatExportAmount(item.amount)}`, width - padding, y); context.textAlign = 'left';
+        context.textAlign = 'right'; context.fillText(formatExportMoney(item.amount, currency.code), width - padding, y); context.textAlign = 'left';
         context.fillStyle = '#687086'; context.font = '19px sans-serif';
         context.fillText(
           `${item.day ? `Due day ${item.day}` : 'No due day'} - ${item.isPaid ? 'Paid' : 'Unpaid'}`,
@@ -198,7 +200,7 @@ export const exportNoteImage = async (_viewRef, data) => {
         .filter((item) => !item.isPaid)
         .reduce((sum, item) => sum + item.amount, 0);
       context.fillStyle = '#4854dc'; context.font = 'bold 25px sans-serif'; context.textAlign = 'right';
-      context.fillText(`Remaining  RM ${formatExportAmount(remaining)}`, width - padding, y + 4);
+      context.fillText(`Remaining  ${formatExportMoney(remaining, currency.code)}`, width - padding, y + 4);
       context.textAlign = 'left'; y += 58;
     }
 
@@ -209,10 +211,10 @@ export const exportNoteImage = async (_viewRef, data) => {
     context.fillStyle = '#172033'; context.font = 'bold 34px sans-serif';
     context.fillText('Daily expenses', padding, y);
     y += 50;
-    context.font = 'bold 28px sans-serif'; context.fillText('Day', padding, y); context.fillText('Remark', 260, y); context.textAlign = 'right'; context.fillText('RM', width - padding, y); context.textAlign = 'left';
+    context.font = 'bold 28px sans-serif'; context.fillText('Day', padding, y); context.fillText('Remark', 260, y); context.textAlign = 'right'; context.fillText(currency.symbol, width - padding, y); context.textAlign = 'left';
     context.font = '28px sans-serif';
     rows.forEach((row) => { y += 58; context.fillText(row.date || '', padding, y); context.fillText(row.remark || '', 260, y, 480); context.textAlign = 'right'; context.fillText(row.amount || '0.00', width - padding, y); context.textAlign = 'left'; });
-    y += 72; context.font = 'bold 34px sans-serif'; context.textAlign = 'right'; context.fillText(`Total  RM ${formatExportAmount(data.total)}`, width - padding, y); context.textAlign = 'left';
+    y += 72; context.font = 'bold 34px sans-serif'; context.textAlign = 'right'; context.fillText(`Total  ${formatExportMoney(data.total, currency.code)}`, width - padding, y); context.textAlign = 'left';
 
     if (hasMonthlySummary) {
       y += 72;
@@ -221,13 +223,13 @@ export const exportNoteImage = async (_viewRef, data) => {
       y += 42;
       categories.forEach((category) => {
         context.fillStyle = '#30384c'; context.font = 'bold 24px sans-serif'; context.fillText(category.name, padding, y, 420);
-        context.textAlign = 'right'; context.fillText(`RM ${formatExportAmount(category.amount)}`, width - padding, y); context.textAlign = 'left';
+        context.textAlign = 'right'; context.fillText(formatExportMoney(category.amount, currency.code), width - padding, y); context.textAlign = 'left';
         context.fillStyle = '#687086'; context.font = '19px sans-serif'; context.fillText(getExpenseExportCategoryDescription(category), padding, y + 27, width - padding * 2 - 220);
         y += 62;
       });
       if (categories.length) {
         context.fillStyle = '#4854dc'; context.font = 'bold 25px sans-serif'; context.textAlign = 'right';
-        context.fillText(`Categorized total  RM ${formatExportAmount(getExpenseExportCategorizedTotal(categories))}`, width - padding, y + 4);
+        context.fillText(`Categorized total  ${formatExportMoney(getExpenseExportCategorizedTotal(categories), currency.code)}`, width - padding, y + 4);
         context.textAlign = 'left'; y += 58;
       }
       if (summaryNote) {

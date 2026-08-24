@@ -33,6 +33,7 @@ import CollaborationFooter from '../components/CollaborationFooter';
 import { collaborationService } from '../services/collaborationService';
 import PasswordModal from '../components/PasswordModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
+import ExpenseCurrencyModal from '../components/expense-currency-modal';
 import DestructiveConfirmationModal from '../components/DestructiveConfirmationModal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { confirmDestructiveAction } from '../utils/confirm-action';
@@ -52,7 +53,9 @@ import {
   createExpenseRow,
   createMonthlyCommitment,
   createMonthlyCommitmentTemplate,
-  formatExpenseAmount,
+  DEFAULT_EXPENSE_CURRENCY,
+  formatExpenseMoney,
+  getExpenseCurrency,
   isExpenseNoteEmpty,
   isPointWithinDropTarget,
   moveExpenseRow,
@@ -70,6 +73,7 @@ import {
   shouldShowExpenseRowPlaceholder,
   upsertExpenseCategory,
 } from '../utils/expense-record.mjs';
+import { expenseCurrencyPreference } from '../utils/expense-currency-preference';
 import { radius, shadow, useTheme } from '../theme';
 import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
 
@@ -250,6 +254,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [categories, setCategories] = useState([]);
   const [summaryNote, setSummaryNote] = useState('');
   const [monthlyCommitments, setMonthlyCommitments] = useState([]);
+  const [currency, setCurrency] = useState(DEFAULT_EXPENSE_CURRENCY);
   const [isCommitmentsExpanded, setIsCommitmentsExpanded] = useState(true);
   const [savedCommitmentTemplate, setSavedCommitmentTemplate] = useState([]);
   const [isSavingCommitmentTemplate, setIsSavingCommitmentTemplate] = useState(false);
@@ -263,6 +268,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [lockPassword, setLockPassword] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
@@ -296,6 +302,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     categories: [],
     summaryNote: '',
     monthlyCommitments: [],
+    currency: DEFAULT_EXPENSE_CURRENCY,
+    initialCurrency: DEFAULT_EXPENSE_CURRENCY,
+    currencyChanged: false,
     hasPassword: false,
     isPinned: false,
     cloudId: null,
@@ -308,10 +317,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     categories: latest.current.categories,
     summaryNote: latest.current.summaryNote,
     monthlyCommitments: latest.current.monthlyCommitments,
+    currency: latest.current.currency,
+    currencyChanged: latest.current.currencyChanged,
   }), []);
 
   const commitmentTotals = calculateMonthlyCommitmentTotals(monthlyCommitments);
   const total = calculateExpenseGrandTotal(rows, monthlyCommitments);
+  const selectedCurrency = getExpenseCurrency(currency);
   const savedCommitmentTotals = calculateMonthlyCommitmentTotals(
     savedCommitmentTemplate
   );
@@ -377,6 +389,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       if (!note) return;
 
       const parsed = parseExpenseNote(note.content);
+      const loadedCurrency = note.content
+        ? parsed.currency
+        : await expenseCurrencyPreference.load();
       const loadedRows = (
         parsed.rows.length ? parsed.rows : [createExpenseRow()]
       ).map((row) => ({
@@ -398,6 +413,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       setCategories(loadedCategories);
       setSummaryNote(parsed.summaryNote);
       setMonthlyCommitments(parsed.monthlyCommitments);
+      setCurrency(loadedCurrency);
       setHasPassword(!!note.password);
       setIsPinned(!!note.is_pinned);
       latest.current = {
@@ -407,6 +423,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         categories: loadedCategories,
         summaryNote: parsed.summaryNote,
         monthlyCommitments: parsed.monthlyCommitments,
+        currency: loadedCurrency,
+        initialCurrency: loadedCurrency,
+        currencyChanged: false,
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
         cloudId: note.cloud_id,
@@ -431,7 +450,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       nextRows,
       nextCategories = latest.current.categories,
       nextSummaryNote = latest.current.summaryNote,
-      nextMonthlyCommitments = latest.current.monthlyCommitments
+      nextMonthlyCommitments = latest.current.monthlyCommitments,
+      nextCurrency = latest.current.currency
     ) => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       setSaveStatus('Saving...');
@@ -445,7 +465,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               nextRows,
               nextCategories,
               nextSummaryNote,
-              nextMonthlyCommitments
+              nextMonthlyCommitments,
+              nextCurrency
             ),
           });
           setSaveStatus('Saved');
@@ -467,17 +488,21 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     setCategories(snapshot.categories);
     setSummaryNote(snapshot.summaryNote);
     setMonthlyCommitments(snapshot.monthlyCommitments);
+    setCurrency(snapshot.currency);
     latest.current.title = snapshot.title;
     latest.current.rows = snapshot.rows;
     latest.current.categories = snapshot.categories;
     latest.current.summaryNote = snapshot.summaryNote;
     latest.current.monthlyCommitments = snapshot.monthlyCommitments;
+    latest.current.currency = snapshot.currency;
+    latest.current.currencyChanged = snapshot.currencyChanged;
     scheduleSave(
       snapshot.title,
       snapshot.rows,
       snapshot.categories,
       snapshot.summaryNote,
-      snapshot.monthlyCommitments
+      snapshot.monthlyCommitments,
+      snapshot.currency
     );
   };
 
@@ -515,7 +540,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           latest.current.rows,
           nextCategories,
           latest.current.summaryNote,
-          latest.current.monthlyCommitments
+          latest.current.monthlyCommitments,
+          latest.current.currency
         ),
       });
       setSaveStatus('Saved');
@@ -571,6 +597,27 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       latest.current.categories,
       value,
       latest.current.monthlyCommitments
+    );
+  };
+
+  const handleCurrencyChange = (nextCurrency) => {
+    if (nextCurrency === latest.current.currency) {
+      setShowCurrencyModal(false);
+      return;
+    }
+    remember(getUndoSnapshot());
+    setCurrency(nextCurrency);
+    latest.current.currency = nextCurrency;
+    latest.current.currencyChanged =
+      nextCurrency !== latest.current.initialCurrency;
+    setShowCurrencyModal(false);
+    scheduleSave(
+      latest.current.title,
+      latest.current.rows,
+      latest.current.categories,
+      latest.current.summaryNote,
+      latest.current.monthlyCommitments,
+      nextCurrency
     );
   };
 
@@ -737,7 +784,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           value:
             amount === null
               ? item.amount.trim() || 'Not entered'
-              : `RM ${formatExpenseAmount(amount)}`,
+              : formatExpenseMoney(amount, currency),
         },
         {
           label: 'Status',
@@ -831,7 +878,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           value:
             amount === null
               ? row.amount.trim() || 'Not entered'
-              : `RM ${formatExpenseAmount(amount)}`,
+              : formatExpenseMoney(amount, currency),
         },
       ],
       confirmLabel: 'Delete row',
@@ -1232,6 +1279,22 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     loadSavedCommitmentTemplate();
   }, [loadRecord, loadSavedCommitmentTemplate]);
 
+  useEffect(
+    () =>
+      navigation.addListener('focus', async () => {
+        if (saveTimeout.current) return;
+        try {
+          const note = await noteRepo.getById(noteId);
+          if (!note?.content) return;
+          const storedCurrency = parseExpenseNote(note.content).currency;
+          if (storedCurrency !== latest.current.currency) await loadRecord();
+        } catch (error) {
+          console.error('Expense currency refresh failed:', error);
+        }
+      }),
+    [loadRecord, navigation, noteId]
+  );
+
   const isEmptyDraft = useCallback((draft) =>
     !draft.cloudId &&
     !draft.hasPassword &&
@@ -1241,7 +1304,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       draft.rows,
       draft.categories,
       draft.summaryNote,
-      draft.monthlyCommitments
+      draft.monthlyCommitments,
+      draft.currency,
+      draft.currencyChanged
     ), []);
 
   const needsExitCleanup = useCallback(() => {
@@ -1265,7 +1330,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           draft.rows,
           draft.categories,
           draft.summaryNote,
-          draft.monthlyCommitments
+          draft.monthlyCommitments,
+          draft.currency
         ),
       });
     }
@@ -1364,7 +1430,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             <View style={styles.summaryContent}>
               <Text style={styles.totalLabel}>GRAND TOTAL</Text>
               <Text style={styles.totalText}>
-                RM {formatExpenseAmount(total)}
+                {formatExpenseMoney(total, currency)}
               </Text>
             </View>
           </View>
@@ -1374,8 +1440,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               <Text style={styles.sectionTitle}>Monthly commitments</Text>
               <View style={styles.commitmentStatusRow}>
                 <Text style={styles.commitmentProgress} numberOfLines={1}>
-                  {commitmentTotals.paidCount} of {commitmentTotals.count} paid · RM{' '}
-                  {formatExpenseAmount(commitmentTotals.remaining)} left
+                  {commitmentTotals.paidCount} of {commitmentTotals.count} paid ·{' '}
+                  {formatExpenseMoney(commitmentTotals.remaining, currency)} left
                 </Text>
               </View>
             </View>
@@ -1439,8 +1505,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                   <Text style={styles.savedTemplateTitle}>Use your saved bills</Text>
                   <Text style={styles.savedTemplateHint}>
                     {savedCommitmentTemplate.length}{' '}
-                    {savedCommitmentTemplate.length === 1 ? 'bill' : 'bills'} · RM{' '}
-                    {formatExpenseAmount(savedCommitmentTotals.total)} · all unpaid
+                    {savedCommitmentTemplate.length === 1 ? 'bill' : 'bills'} ·{' '}
+                    {formatExpenseMoney(savedCommitmentTotals.total, currency)} · all unpaid
                   </Text>
                 </View>
                 <Pressable
@@ -1548,7 +1614,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     accessibilityLabel={`Edit amount for ${commitment.remark}`}
                   >
                     <Text style={styles.commitmentAmount} numberOfLines={1}>
-                      RM {formatExpenseAmount(commitment.amount)}
+                      {formatExpenseMoney(commitment.amount, currency)}
                     </Text>
                   </Pressable>
                 </View>
@@ -1644,7 +1710,21 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 Day
               </Text>
               <Text style={[styles.headerCell, styles.remarkColumn]}>Remark</Text>
-              <Text style={[styles.headerCell, styles.amountColumn]}>RM</Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.amountHeaderButton,
+                  pressed && styles.amountHeaderButtonPressed,
+                ]}
+                onPress={() => setShowCurrencyModal(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`Amount currency ${selectedCurrency.name}, ${selectedCurrency.code}`}
+                accessibilityHint="Changes the currency for this expense note"
+              >
+                <Text style={styles.amountHeaderText}>
+                  {selectedCurrency.symbol}
+                </Text>
+                <Ionicons name="chevron-down" size={12} color={colors.card} />
+              </Pressable>
             </View>
 
             {rows.map((row, index) => {
@@ -1930,7 +2010,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             </View>
             <Text style={styles.dragPreviewAmount} numberOfLines={1}>
               {activeDrag.row.amount.trim()
-                ? `RM ${activeDrag.row.amount.trim()}`
+                ? `${selectedCurrency.symbol} ${activeDrag.row.amount.trim()}`
                 : 'No amount'}
             </Text>
           </Animated.View>
@@ -2062,12 +2142,20 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
+      <ExpenseCurrencyModal
+        visible={showCurrencyModal}
+        value={currency}
+        onSelect={handleCurrencyChange}
+        onClose={() => setShowCurrencyModal(false)}
+      />
+
       <ExpenseSummaryModal
         visible={showSummaryModal}
         onClose={() => setShowSummaryModal(false)}
         rows={rows}
         categories={categories}
         summaryNote={summaryNote}
+        currency={currency}
         saveStatus={saveStatus}
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}
@@ -2093,6 +2181,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         categories={categories}
         summaryNote={summaryNote}
         monthlyCommitments={monthlyCommitments}
+        currency={currency}
         type="expense"
       />
       <NoteShareModal visible={showShareModal} noteId={noteId} onClose={() => setShowShareModal(false)} onChanged={loadRecord} onLeft={() => navigation.goBack()} />
@@ -2193,7 +2282,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                   />
                 </View>
                 <View style={styles.commitmentFormField}>
-                  <Text style={styles.commitmentInputLabel}>Amount (RM)</Text>
+                  <Text style={styles.commitmentInputLabel}>
+                    Amount ({selectedCurrency.symbol})
+                  </Text>
                   <TextInput
                     style={[styles.commitmentInput, styles.commitmentAmountInput]}
                     value={commitmentDraft?.amount ?? ''}
@@ -2207,7 +2298,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     placeholderTextColor={colors.textTertiary}
                     inputMode="decimal"
                     keyboardType="decimal-pad"
-                    accessibilityLabel="Monthly bill amount in ringgit"
+                    accessibilityLabel={`Monthly bill amount in ${selectedCurrency.name}`}
                   />
                 </View>
               </View>
@@ -2913,6 +3004,26 @@ const makeStyles = (colors) =>
     amountColumn: {
       width: 76,
       textAlign: 'right',
+    },
+    amountHeaderButton: {
+      width: 76,
+      minHeight: 46,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 4,
+      paddingHorizontal: 10,
+      borderRightWidth: 1,
+      borderRightColor: 'rgba(255,255,255,0.18)',
+    },
+    amountHeaderButtonPressed: {
+      backgroundColor: 'rgba(255,255,255,0.12)',
+    },
+    amountHeaderText: {
+      color: colors.card,
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: '800',
     },
     amountInput: {
       textAlign: 'right',

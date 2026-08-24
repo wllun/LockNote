@@ -85,13 +85,13 @@ _Snapshot: 2026-08-24. Check off items as they land._
 When the user presses the Add button, let them choose one of these note types:
 
 - [X] Add selection popup on both the Home and Folder Add buttons (unsupported types are clearly marked as coming soon)
-- [ ] Note — plaintext
+- [X] Note — plaintext
 - [X] Checklist — ordered checkbox items with drag-handle reordering, inline editing, progress, local autosave, list/search previews, pin/password/delete support, and PDF/image export
 - [X] Expense Record — titled multi-row table with direct date/remark/amount entry, row add/delete/reorder controls, total, local persistence, list summaries, password/pin support, and 800 ms autosave
 - [X] Expense Record monthly summaries — named categories support multiple case-insensitive remark keywords with automatically updated totals, same-name updates, and one shared auto-saved summary note
-- [X] Expense Record monthly commitments checklist — Option C paid-status section with progress, remaining amount, add/edit/reset, drag reorder, recycle-bin delete, version 5 persistence, and exports. See [MONTHLY_EXPENSE_CHECKLIST.md](MONTHLY_EXPENSE_CHECKLIST.md)
+- [X] Expense Record monthly commitments checklist — Option C paid-status section with progress, remaining amount, add/edit/reset, drag reorder, recycle-bin delete, version 6 persistence, and exports. See [MONTHLY_EXPENSE_CHECKLIST.md](MONTHLY_EXPENSE_CHECKLIST.md)
 - [X] Expense Record reusable monthly commitments — save a local bill template and apply it to an empty expense note with fresh IDs and every bill unpaid
-- [ ] Expense Record currency selection — currently uses RM; consider storing a currency code per expense note and applying it consistently to table headers, totals, and Home/Folder summaries
+- [X] Expense Record currency selection — Settings provides a searchable selector containing all 178 current ISO 4217 Currency & Funds codes, stores the default for new notes (USD/$ initially), and prompts whether a change should also update all existing private/owned expense notes without converting amounts. Each note keeps its own currency code, which can also be changed from the amount-column header and is consistently applied to summaries, Home/Folder cards, and exports.
 - [X] Reminder — plaintext note body with one-time/daily/weekly/monthly local notification settings, list previews, Undo, pin/password/delete handling, and PDF/image export
 
 ### Additional / backlog (unphased)

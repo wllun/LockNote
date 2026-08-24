@@ -11,9 +11,10 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { radius, shadow, useTheme } from '../theme';
 import {
-  calculateExpenseNoteGrandTotal,
+  calculateExpenseGrandTotal,
   EXPENSE_NOTE_TYPE,
-  formatExpenseAmount,
+  formatExpenseMoney,
+  parseExpenseNote,
 } from '../utils/expense-record.mjs';
 import {
   CHECKLIST_NOTE_TYPE,
@@ -48,6 +49,7 @@ const NoteItem = ({
   const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
   const isChecklist = note.note_type === CHECKLIST_NOTE_TYPE;
   const isReminder = note.note_type === REMINDER_NOTE_TYPE;
+  const expense = isExpense ? parseExpenseNote(note.content) : null;
   const checklistItems = isChecklist ? parseChecklistNote(note.content).items : [];
   const reminder = isReminder ? parseReminderNote(note.content).reminder : null;
   const displayTitle = isExpense
@@ -58,7 +60,10 @@ const NoteItem = ({
         ? note.title.trim() || 'Reminder'
       : note.title || 'Untitled';
   const preview = isExpense
-    ? `RM ${formatExpenseAmount(calculateExpenseNoteGrandTotal(note.content))}`
+    ? formatExpenseMoney(
+        calculateExpenseGrandTotal(expense.rows, expense.monthlyCommitments),
+        expense.currency
+      )
     : isChecklist
       ? checklistProgressOnly
         ? getChecklistProgressPreview(checklistItems)

@@ -11,7 +11,12 @@ import {
   createExpenseRow,
   createMonthlyCommitment,
   createMonthlyCommitmentTemplate,
+  DEFAULT_EXPENSE_CURRENCY,
+  EXPENSE_CURRENCIES,
   expenseRowHasContent,
+  formatExpenseMoney,
+  getExpenseCurrency,
+  getExpenseCurrencySymbol,
   isExpenseNoteEmpty,
   isPointWithinDropTarget,
   moveExpenseRow,
@@ -19,6 +24,7 @@ import {
   moveMonthlyCommitment,
   moveMonthlyCommitmentToIndex,
   normalizeExpenseAmountInput,
+  normalizeExpenseCurrency,
   normalizeExpenseCategoryKeyword,
   parseExpenseAmount,
   parseMonthlyCommitmentTemplate,
@@ -27,6 +33,7 @@ import {
   sanitizeExpenseAmountInput,
   sanitizeExpenseDateInput,
   serializeExpenseNote,
+  setExpenseNoteCurrency,
   shouldShowExpenseRowPlaceholder,
   upsertExpenseCategory,
   removeExpenseCategory,
@@ -89,7 +96,8 @@ test('serializes and parses multiple expense rows', () => {
   ];
 
   assert.deepEqual(parseExpenseNote(serializeExpenseNote(rows)), {
-    sourceVersion: 5,
+    sourceVersion: 6,
+    currency: 'USD',
     rows: [
       { ...rows[0], amount: '98.00' },
       { ...rows[1], amount: '89.00' },
@@ -112,6 +120,7 @@ test('converts the previous single-entry format into a table row', () => {
     ),
     {
       sourceVersion: 1,
+      currency: 'USD',
       rows: [
         {
           id: 'legacy-entry',
@@ -127,8 +136,8 @@ test('converts the previous single-entry format into a table row', () => {
   );
 });
 
-test('returns no rows for missing or malformed content', () => {
-  const empty = { sourceVersion: 2, rows: [], categories: [], summaryNote: '', monthlyCommitments: [] };
+test('returns no rows and the default currency for missing or malformed content', () => {
+  const empty = { sourceVersion: 2, currency: 'USD', rows: [], categories: [], summaryNote: '', monthlyCommitments: [] };
   assert.deepEqual(parseExpenseNote(''), empty);
   assert.deepEqual(parseExpenseNote('not json'), empty);
   assert.deepEqual(parseExpenseNote('[]'), empty);
@@ -210,6 +219,46 @@ test('detects populated rows and abandoned empty expense notes', () => {
   );
   assert.equal(isExpenseNoteEmpty('Expense Jun 2026', [blankRow]), false);
   assert.equal(isExpenseNoteEmpty('', [dateOnlyRow]), false);
+  assert.equal(isExpenseNoteEmpty('', [blankRow], [], '', [], 'MYR'), false);
+  assert.equal(
+    isExpenseNoteEmpty('', [blankRow], [], '', [], 'MYR', false),
+    true
+  );
+});
+
+test('stores one supported currency per expense note and defaults to US dollars', () => {
+  const rows = [createExpenseRow({ remark: 'Coffee', amount: '4.50' })];
+  const parsed = parseExpenseNote(serializeExpenseNote(rows, [], '', [], 'MYR'));
+
+  assert.equal(DEFAULT_EXPENSE_CURRENCY, 'USD');
+  assert.equal(parsed.currency, 'MYR');
+  assert.equal(parsed.rows[0].amount, '4.50');
+  assert.equal(getExpenseCurrency(parsed.currency).name, 'Malaysian Ringgit');
+  assert.equal(getExpenseCurrencySymbol(parsed.currency), 'RM');
+  assert.equal(formatExpenseMoney(4.5, parsed.currency), 'RM 4.50');
+  assert.equal(formatExpenseMoney(4.5), '$ 4.50');
+  assert.equal(normalizeExpenseCurrency('not-supported'), 'USD');
+  assert.equal(parseExpenseNote(JSON.stringify({ version: 5, rows: [] })).currency, 'USD');
+
+  const relabeled = parseExpenseNote(
+    setExpenseNoteCurrency(serializeExpenseNote(rows, [], '', [], 'MYR'), 'EUR')
+  );
+  assert.equal(relabeled.currency, 'EUR');
+  assert.equal(relabeled.rows[0].amount, '4.50');
+});
+
+test('supports the complete current ISO 4217 currency and funds list', () => {
+  const codes = EXPENSE_CURRENCIES.map((currency) => currency.code);
+
+  assert.equal(EXPENSE_CURRENCIES.length, 178);
+  assert.equal(new Set(codes).size, EXPENSE_CURRENCIES.length);
+  assert.ok(codes.includes('AFN'));
+  assert.ok(codes.includes('XDR'));
+  assert.ok(codes.includes('XCG'));
+  assert.ok(codes.includes('ZWG'));
+  assert.equal(codes.includes('BGN'), false);
+  assert.equal(normalizeExpenseCurrency('xdr'), 'XDR');
+  assert.equal(getExpenseCurrencySymbol('XDR'), 'XDR');
 });
 
 test('shows table placeholders only in the first row while all rows are empty', () => {
@@ -307,7 +356,7 @@ test('migrates and recalculates version 3 single-keyword categories', () => {
   assert.equal(parsed.summaryNote, '');
 });
 
-test('persists categories and shared notes in version 5 content', () => {
+test('persists categories and shared notes in version 6 content', () => {
   const rows = [createExpenseRow({ id: '1', remark: 'Lunch', amount: '12.00' })];
   const categories = [
     { id: 'food', name: 'Food', keywords: ['Lunch', 'Dinner'], amount: 600, match_count: 5 },
@@ -318,7 +367,7 @@ test('persists categories and shared notes in version 5 content', () => {
     serializeExpenseNote(rows, categories, 'Check cash receipts.')
   );
 
-  assert.equal(parsed.sourceVersion, 5);
+  assert.equal(parsed.sourceVersion, 6);
   const calculatedCategories = [
     { ...categories[0], amount: 12, match_count: 1 },
     { ...categories[1], amount: 0, match_count: 0 },

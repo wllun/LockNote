@@ -76,12 +76,23 @@ resurrect a deleted item.
 as versioned JSON in `content` and edited by `ExpenseRecordEditorScreen`. Version
 4 also stores named monthly-summary categories and one shared summary note in the
 same payload. Version 5 adds an independent monthly-commitment checklist with a
-bill name, optional due day, amount, and paid state. Categories contain multiple
+bill name, optional due day, amount, and paid state. Version 6 stores a supported
+currency code per expense note. The searchable selector contains the complete
+current ISO 4217 Currency & Funds list (SIX List One, published 2026-01-01);
+missing or unsupported codes safely default to USD (`$`). The selected symbol is
+presentation metadata and does not convert stored amounts. Categories contain multiple
 case-insensitive remark keywords and use a calculated amount derived from matching
 daily-expense rows; saving a normalized category name again updates it
 instead of creating a duplicate. The note's `title` remains in the normal title
 column. Expense grand totals add daily-expense rows and checked monthly
 commitments; unchecked commitments are excluded.
+
+The device-level default expense currency is stored in AsyncStorage under
+`@locknote_expense_currency` and is read when a new, still-empty expense note is
+opened. Settings can change that default for future notes or explicitly rewrite
+the currency metadata of every active private/owned expense note. The bulk action
+uses normal note save paths (including collaboration saves for owned shared notes),
+excludes Shared-with-me caches, and never performs exchange-rate conversion.
 
 Reminder notes use `reminder` and store a plaintext body plus notification
 settings as versioned JSON in `content`. `ReminderEditorScreen` supports one-time,

@@ -10,7 +10,7 @@ import {
   shareNotePdf,
 } from '../utils/note-export-adapter';
 import {
-  formatExportAmount,
+  formatExportMoney,
   getExpenseExportCategories,
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
@@ -19,6 +19,10 @@ import {
   getChecklistExportItems,
   getExportTitle,
 } from '../utils/note-export.mjs';
+import {
+  DEFAULT_EXPENSE_CURRENCY,
+  getExpenseCurrency,
+} from '../utils/expense-record.mjs';
 import { radius, shadow, useTheme } from '../theme';
 import { formatReminderSchedule, normalizeReminder } from '../utils/reminder-note.mjs';
 
@@ -32,6 +36,7 @@ const NoteExportModal = ({
   categories = [],
   summaryNote = '',
   monthlyCommitments = [],
+  currency = DEFAULT_EXPENSE_CURRENCY,
   checklistItems,
   type = 'note',
   reminder,
@@ -50,6 +55,7 @@ const NoteExportModal = ({
     categories,
     summaryNote,
     monthlyCommitments,
+    currency,
     checklistItems,
     type,
     reminder,
@@ -57,6 +63,7 @@ const NoteExportModal = ({
   const visibleRows = getExpenseExportRows(rows);
   const visibleCategories = getExpenseExportCategories(categories);
   const visibleCommitments = getExpenseExportMonthlyCommitments(monthlyCommitments);
+  const selectedCurrency = getExpenseCurrency(currency);
   const visibleChecklistItems = getChecklistExportItems(checklistItems);
   const checklistCompleted = visibleChecklistItems.filter((item) => item.completed).length;
   const visibleSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
@@ -187,17 +194,18 @@ const NoteExportModal = ({
                             </Text>
                           </View>
                           <Text style={styles.summaryCategoryAmount}>
-                            RM {formatExportAmount(item.amount)}
+                            {formatExportMoney(item.amount, currency)}
                           </Text>
                         </View>
                       ))}
                       <View style={styles.categorizedTotalRow}>
                         <Text style={styles.categorizedTotalLabel}>Remaining</Text>
                         <Text style={styles.categorizedTotalAmount}>
-                          RM {formatExportAmount(
+                          {formatExportMoney(
                             visibleCommitments
                               .filter((item) => !item.isPaid)
-                              .reduce((sum, item) => sum + item.amount, 0)
+                              .reduce((sum, item) => sum + item.amount, 0),
+                            currency
                           )}
                         </Text>
                       </View>
@@ -208,7 +216,9 @@ const NoteExportModal = ({
                     <View style={[styles.tableRow, styles.tableHeader]}>
                       <Text style={[styles.headerCell, styles.dateCell]}>Day</Text>
                       <Text style={[styles.headerCell, styles.remarkCell]}>Remark</Text>
-                      <Text style={[styles.headerCell, styles.amountCell]}>RM</Text>
+                      <Text style={[styles.headerCell, styles.amountCell]}>
+                        {selectedCurrency.symbol}
+                      </Text>
                     </View>
                     {visibleRows.map((row, index) => (
                       <View key={row.id || index} style={[styles.tableRow, index % 2 === 0 && styles.altRow]}>
@@ -217,7 +227,9 @@ const NoteExportModal = ({
                         <Text style={[styles.cell, styles.amountCell]}>{row.amount || '0.00'}</Text>
                       </View>
                     ))}
-                    <Text style={styles.total}>Total  RM {formatExportAmount(total)}</Text>
+                    <Text style={styles.total}>
+                      Total  {formatExportMoney(total, currency)}
+                    </Text>
                   </View>
                   {hasMonthlySummary && (
                     <View style={styles.monthlySummary}>
@@ -231,7 +243,7 @@ const NoteExportModal = ({
                             </Text>
                           </View>
                           <Text style={styles.summaryCategoryAmount}>
-                            RM {formatExportAmount(category.amount)}
+                            {formatExportMoney(category.amount, currency)}
                           </Text>
                         </View>
                       ))}
@@ -239,7 +251,10 @@ const NoteExportModal = ({
                         <View style={styles.categorizedTotalRow}>
                           <Text style={styles.categorizedTotalLabel}>Categorized total</Text>
                           <Text style={styles.categorizedTotalAmount}>
-                            RM {formatExportAmount(getExpenseExportCategorizedTotal(visibleCategories))}
+                            {formatExportMoney(
+                              getExpenseExportCategorizedTotal(visibleCategories),
+                              currency
+                            )}
                           </Text>
                         </View>
                       )}

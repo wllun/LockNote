@@ -14,7 +14,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { radius, shadow, useTheme, useThemeMode } from '../theme';
 import { recovery } from '../utils/recovery';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
+import ExpenseCurrencyModal from '../components/expense-currency-modal';
 import { backupService } from '../services/backupService';
+import { expenseCurrencyService } from '../services/expenseCurrencyService';
+import { expenseCurrencyPreference } from '../utils/expense-currency-preference';
+import {
+  DEFAULT_EXPENSE_CURRENCY,
+  getExpenseCurrency,
+} from '../utils/expense-record.mjs';
 
 const THEME_OPTIONS = [
   { mode: 'system', label: 'System', icon: 'contrast-outline' },
@@ -33,6 +40,12 @@ const SettingsScreen = () => {
   const [confirmPin, setConfirmPin] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
   const [backupBusy, setBackupBusy] = useState(null);
+  const [expenseCurrency, setExpenseCurrency] = useState(
+    DEFAULT_EXPENSE_CURRENCY
+  );
+  const [showExpenseCurrencyModal, setShowExpenseCurrencyModal] = useState(false);
+  const [currencyBusy, setCurrencyBusy] = useState(false);
+  const selectedExpenseCurrency = getExpenseCurrency(expenseCurrency);
 
   const refreshRecoveryStatus = useCallback(() => {
     recovery.hasPin().then(setHasRecovery);
@@ -40,7 +53,92 @@ const SettingsScreen = () => {
 
   useEffect(() => {
     refreshRecoveryStatus();
+    expenseCurrencyPreference.load().then(setExpenseCurrency);
   }, [refreshRecoveryStatus]);
+
+  const updateDefaultExpenseCurrency = async (nextCurrency, applyToExisting) => {
+    setCurrencyBusy(true);
+    try {
+      const savedCurrency = await expenseCurrencyPreference.save(nextCurrency);
+      setExpenseCurrency(savedCurrency);
+      if (!applyToExisting) return;
+
+      const result = await expenseCurrencyService.applyToExistingNotes(
+        savedCurrency
+      );
+      const hasIncompleteUpdates =
+        result.failedCount > 0 || result.pendingCloudCount > 0;
+      Alert.alert(
+        hasIncompleteUpdates ? 'Currency updated locally' : 'Currency updated',
+        result.noteCount
+          ? `The currency display was changed for ${result.updatedCount} existing private or owned expense note${result.updatedCount === 1 ? '' : 's'}. Entered amounts were not converted.`
+          : 'There were no existing expense notes to update. New expense notes will use the selected currency.',
+        [{ text: 'OK' }],
+        {
+          variant: hasIncompleteUpdates ? 'warning' : 'info',
+          iconName: 'cash-outline',
+          details: [
+            {
+              label: 'Default currency',
+              value: `${getExpenseCurrency(savedCurrency).name} (${savedCurrency})`,
+            },
+            ...(result.pendingCloudCount
+              ? [{
+                  label: 'Waiting to sync',
+                  value: String(result.pendingCloudCount),
+                }]
+              : []),
+            ...(result.failedCount
+              ? [{ label: 'Could not update', value: String(result.failedCount) }]
+              : []),
+          ],
+        }
+      );
+    } catch (error) {
+      Alert.alert(
+        'Currency update failed',
+        error?.message || 'LockNote could not update the expense currency.',
+        [{ text: 'OK' }],
+        { variant: 'error', iconName: 'alert-circle-outline' }
+      );
+    } finally {
+      setCurrencyBusy(false);
+    }
+  };
+
+  const handleExpenseCurrencySelect = (nextCurrency) => {
+    setShowExpenseCurrencyModal(false);
+    if (nextCurrency === expenseCurrency) return;
+
+    const current = getExpenseCurrency(expenseCurrency);
+    const next = getExpenseCurrency(nextCurrency);
+    Alert.alert(
+      'Change default expense currency?',
+      `New expense notes will use ${next.name} (${next.code}). Would you also like to apply it to all existing private and owned expense notes? Shared-with-you notes stay unchanged. Entered amounts will not be converted or exchanged.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'New notes only',
+          onPress: () => updateDefaultExpenseCurrency(next.code, false),
+        },
+        {
+          text: 'Apply to all',
+          onPress: () => updateDefaultExpenseCurrency(next.code, true),
+        },
+      ],
+      {
+        variant: 'warning',
+        iconName: 'cash-outline',
+        details: [
+          {
+            label: 'Current default',
+            value: `${current.code} · ${current.symbol}`,
+          },
+          { label: 'New default', value: `${next.code} · ${next.symbol}` },
+        ],
+      }
+    );
+  };
 
   const openRecoveryModal = () => {
     setPin('');
@@ -187,6 +285,7 @@ const SettingsScreen = () => {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
+      contentInsetAdjustmentBehavior="automatic"
     >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Appearance</Text>
@@ -259,6 +358,48 @@ const SettingsScreen = () => {
             </>
           )}
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Expenses</Text>
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={[styles.item, currencyBusy && styles.itemDisabled]}
+            activeOpacity={0.7}
+            onPress={() => setShowExpenseCurrencyModal(true)}
+            disabled={currencyBusy}
+            accessibilityRole="button"
+            accessibilityLabel={`Default expense currency ${selectedExpenseCurrency.name}, ${selectedExpenseCurrency.code}`}
+            accessibilityHint="Changes the default for new expense notes"
+          >
+            <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
+              <Ionicons name="cash-outline" size={19} color={colors.primary} />
+            </View>
+            <View style={styles.itemContent}>
+              <Text style={styles.itemLabel}>Default currency</Text>
+              <Text style={styles.itemDescription}>
+                Used when creating a new expense note
+              </Text>
+            </View>
+            {currencyBusy ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <View style={styles.currencyValueRow}>
+                <Text style={styles.currencyValue}>
+                  {selectedExpenseCurrency.code} · {selectedExpenseCurrency.symbol}
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={colors.textTertiary}
+                />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.dataNotice}>
+          Currency changes only the displayed unit. LockNote does not convert amounts.
+        </Text>
       </View>
 
       <View style={styles.section}>
@@ -369,6 +510,14 @@ const SettingsScreen = () => {
           </View>
         </KeyboardAwareModalContent>
       </Modal>
+
+      <ExpenseCurrencyModal
+        visible={showExpenseCurrencyModal}
+        value={expenseCurrency}
+        onSelect={handleExpenseCurrencySelect}
+        onClose={() => setShowExpenseCurrencyModal(false)}
+        description="Choose the default used when creating a new expense note."
+      />
     </ScrollView>
   );
 };
@@ -478,6 +627,16 @@ const makeStyles = (colors) =>
       fontSize: 13,
       color: colors.textTertiary,
       marginTop: 2,
+    },
+    currencyValueRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    currencyValue: {
+      color: colors.primary,
+      fontSize: 13,
+      fontWeight: '800',
     },
     dataNotice: {
       color: colors.textTertiary,

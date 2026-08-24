@@ -1,4 +1,9 @@
 import { formatReminderSchedule, normalizeReminder } from './reminder-note.mjs';
+import {
+  DEFAULT_EXPENSE_CURRENCY,
+  getExpenseCurrency,
+  normalizeExpenseCurrency,
+} from './expense-record.mjs';
 
 const asText = (value) => String(value ?? '');
 
@@ -77,6 +82,11 @@ export const formatExportAmount = (value) => {
   });
 };
 
+export const formatExportMoney = (
+  value,
+  currency = DEFAULT_EXPENSE_CURRENCY
+) => `${getExpenseCurrency(currency).symbol} ${formatExportAmount(value)}`;
+
 export const getExpenseExportCategories = (categories = []) =>
   (Array.isArray(categories) ? categories : [])
     .filter((category) => category && typeof category === 'object')
@@ -146,6 +156,7 @@ export const buildNoteExportHtml = ({
   categories = [],
   summaryNote = '',
   monthlyCommitments = [],
+  currency = DEFAULT_EXPENSE_CURRENCY,
   checklistItems,
   reminder,
   type = 'note',
@@ -160,17 +171,19 @@ export const buildNoteExportHtml = ({
   const exportRows = getExpenseExportRows(rows);
   const exportSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
   const exportCommitments = getExpenseExportMonthlyCommitments(monthlyCommitments);
+  const exportCurrency = normalizeExpenseCurrency(currency);
+  const currencySymbol = getExpenseCurrency(exportCurrency).symbol;
   const exportChecklistItems = getChecklistExportItems(checklistItems);
   const commitmentSummary = exportCommitments.length
-    ? `<section class="monthly-summary first-section"><h2>Monthly commitments</h2><table class="summary-table"><thead><tr><th>Status</th><th>Bill</th><th>Due</th><th class="amount">Amount (RM)</th></tr></thead><tbody>${exportCommitments
+    ? `<section class="monthly-summary first-section"><h2>Monthly commitments</h2><table class="summary-table"><thead><tr><th>Status</th><th>Bill</th><th>Due</th><th class="amount">Amount (${escapeHtml(currencySymbol)})</th></tr></thead><tbody>${exportCommitments
         .map((item) => `<tr><td>${item.isPaid ? 'Paid' : 'Unpaid'}</td><td>${escapeHtml(item.remark)}</td><td>${item.day ? `Day ${escapeHtml(item.day)}` : '-'}</td><td class="amount">${formatExportAmount(item.amount)}</td></tr>`)
-        .join('')}</tbody></table><div class="summary-total"><span>Remaining</span><strong>RM ${formatExportAmount(exportCommitments.filter((item) => !item.isPaid).reduce((sum, item) => sum + item.amount, 0))}</strong></div></section>`
+        .join('')}</tbody></table><div class="summary-total"><span>Remaining</span><strong>${formatExportMoney(exportCommitments.filter((item) => !item.isPaid).reduce((sum, item) => sum + item.amount, 0), exportCurrency)}</strong></div></section>`
     : '';
   const monthlySummary = isExpense && (exportCategories.length || exportSummaryNote)
     ? `<section class="monthly-summary"><h2>Monthly summary</h2>${exportCategories.length
-        ? `<table class="summary-table"><thead><tr><th>Category</th><th>Calculation</th><th class="amount">Amount (RM)</th></tr></thead><tbody>${exportCategories
+        ? `<table class="summary-table"><thead><tr><th>Category</th><th>Calculation</th><th class="amount">Amount (${escapeHtml(currencySymbol)})</th></tr></thead><tbody>${exportCategories
             .map((category) => `<tr><td>${escapeHtml(category.name)}</td><td>${escapeHtml(getExpenseExportCategoryDescription(category))}</td><td class="amount">${formatExportAmount(category.amount)}</td></tr>`)
-            .join('')}</tbody></table><div class="summary-total"><span>Categorized total</span><strong>RM ${formatExportAmount(getExpenseExportCategorizedTotal(exportCategories))}</strong></div>`
+            .join('')}</tbody></table><div class="summary-total"><span>Categorized total</span><strong>${formatExportMoney(getExpenseExportCategorizedTotal(exportCategories), exportCurrency)}</strong></div>`
         : ''}${exportSummaryNote
         ? `<div class="summary-note"><h3>Summary note</h3><p>${preserveLineBreaks(escapeHtml(exportSummaryNote))}</p></div>`
         : ''}</section>`
@@ -178,9 +191,9 @@ export const buildNoteExportHtml = ({
   const checklistCompleted = exportChecklistItems.filter((item) => item.completed).length;
   const exportReminder = normalizeReminder(reminder);
   const body = isExpense
-    ? `${commitmentSummary}<section class="daily-expenses${exportCommitments.length ? '' : ' first-section'}"><h2>Daily expenses</h2><table><thead><tr><th>Day</th><th>Remark</th><th class="amount">RM</th></tr></thead><tbody>${exportRows
+    ? `${commitmentSummary}<section class="daily-expenses${exportCommitments.length ? '' : ' first-section'}"><h2>Daily expenses</h2><table><thead><tr><th>Day</th><th>Remark</th><th class="amount">${escapeHtml(currencySymbol)}</th></tr></thead><tbody>${exportRows
         .map((row) => `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.remark)}</td><td class="amount">${escapeHtml(row.amount || '0.00')}</td></tr>`)
-        .join('')}</tbody></table><div class="total"><span>Total</span><strong>RM ${formatExportAmount(total)}</strong></div></section>${monthlySummary}`
+        .join('')}</tbody></table><div class="total"><span>Total</span><strong>${formatExportMoney(total, exportCurrency)}</strong></div></section>${monthlySummary}`
     : isChecklist
       ? `<div class="checklist-summary">${checklistCompleted} of ${exportChecklistItems.length} completed</div><div class="checklist">${exportChecklistItems.length
           ? exportChecklistItems
