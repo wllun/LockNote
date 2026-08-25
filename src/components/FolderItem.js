@@ -15,7 +15,14 @@ import { radius, shadow, useTheme } from '../theme';
 const entering = (index) =>
   Platform.OS === 'web' ? undefined : FadeInDown.duration(220).delay(Math.min(index * 40, 240));
 
-const FolderItem = ({ folder, noteCount = 0, onPress, onOpenActions, index = 0 }) => {
+const FolderItem = ({
+  folder,
+  noteCount = 0,
+  onPress,
+  onOpenActions,
+  index = 0,
+  strip = false,
+}) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -25,9 +32,9 @@ const FolderItem = ({ folder, noteCount = 0, onPress, onOpenActions, index = 0 }
   };
 
   return (
-    <Animated.View entering={entering(index)}>
+    <Animated.View entering={entering(index)} style={strip && styles.gridOuter}>
       <TouchableOpacity
-        style={styles.container}
+        style={[styles.container, strip && styles.containerGrid]}
         onPress={onPress}
         onLongPress={Platform.OS === 'web' ? undefined : onOpenActions}
         delayLongPress={450}
@@ -48,20 +55,26 @@ const FolderItem = ({ folder, noteCount = 0, onPress, onOpenActions, index = 0 }
           if (nativeEvent.actionName === 'longpress') onOpenActions?.();
         }}
       >
-        <View style={styles.iconContainer}>
-          <Ionicons name="folder" size={22} color={colors.folder} />
-          <View style={styles.noteCountBadge}>
+        <View style={[styles.iconContainer, strip && styles.iconContainerGrid]}>
+          <Ionicons
+            name="folder"
+            size={strip ? 72 : 22}
+            color={colors.folder}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+          <View style={[styles.noteCountBadge, strip && styles.noteCountBadgeGrid]}>
             <Text style={styles.noteCountText} accessible={false}>
               {noteCount}
             </Text>
           </View>
         </View>
-        <View style={styles.content}>
-          <Text style={styles.name} numberOfLines={1}>
+        <View style={[styles.content, strip && styles.contentGrid]}>
+          <Text style={[styles.name, strip && styles.nameGrid]} numberOfLines={strip ? 2 : 1}>
             {folder.name}
           </Text>
         </View>
-        <View style={styles.trailing}>
+        <View style={[styles.trailing, strip && styles.trailingGrid]}>
           {folder.password && (
             <Ionicons name="lock-closed" size={14} color={colors.textTertiary} />
           )}
@@ -87,7 +100,7 @@ const FolderItem = ({ folder, noteCount = 0, onPress, onOpenActions, index = 0 }
               />
             </Pressable>
           )}
-          {Platform.OS !== 'web' && (
+          {Platform.OS !== 'web' && !strip && (
             <Ionicons
               name="chevron-forward"
               size={18}
@@ -111,6 +124,21 @@ const makeStyles = (colors) =>
       borderRadius: radius.md,
       ...shadow.card,
     },
+    gridOuter: {
+      width: '100%',
+    },
+    containerGrid: {
+      minHeight: 122,
+      marginBottom: 0,
+      padding: 4,
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      position: 'relative',
+      backgroundColor: 'transparent',
+      shadowOpacity: 0,
+      elevation: 0,
+    },
     iconContainer: {
       width: 42,
       height: 42,
@@ -120,6 +148,14 @@ const makeStyles = (colors) =>
       alignItems: 'center',
       marginRight: 18,
       position: 'relative',
+    },
+    iconContainerGrid: {
+      width: 82,
+      height: 66,
+      borderRadius: 0,
+      backgroundColor: 'transparent',
+      marginRight: 0,
+      marginBottom: 7,
     },
     noteCountBadge: {
       position: 'absolute',
@@ -135,6 +171,13 @@ const makeStyles = (colors) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    noteCountBadgeGrid: {
+      right: 2,
+      bottom: 6,
+      minWidth: 24,
+      height: 24,
+      borderColor: colors.folder,
+    },
     noteCountText: {
       color: colors.card,
       fontSize: 12,
@@ -145,15 +188,34 @@ const makeStyles = (colors) =>
     content: {
       flex: 1,
     },
+    contentGrid: {
+      flexGrow: 0,
+      flexShrink: 0,
+      flexBasis: 'auto',
+      width: '100%',
+      minHeight: 36,
+      justifyContent: 'flex-start',
+      alignItems: 'center',
+    },
     name: {
       fontSize: 16,
       fontWeight: '600',
       color: colors.text,
     },
+    nameGrid: {
+      fontSize: 14,
+      lineHeight: 18,
+      textAlign: 'center',
+    },
     trailing: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+    },
+    trailingGrid: {
+      position: 'absolute',
+      right: -4,
+      top: -4,
     },
     pinBadge: {
       width: 24,

@@ -8,7 +8,9 @@ import {
   TextInput,
   Modal,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
@@ -28,6 +30,14 @@ import { confirmDestructiveAction } from '../utils/confirm-action';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
 import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
+import {
+  FOLDER_VIEW_MODES,
+  FOLDER_VIEW_MODE_STORAGE_KEY,
+  LEGACY_HOME_VIEW_MODE_STORAGE_KEY,
+  NOTE_VIEW_MODES,
+  NOTE_VIEW_MODE_STORAGE_KEY,
+  resolveViewModePreferences,
+} from '../utils/note-view-mode.mjs';
 
 const editorRouteFor = (note) => {
   if (note.note_type === EXPENSE_NOTE_TYPE) return 'ExpenseRecordEditor';
@@ -74,6 +84,8 @@ const HomeScreen = ({ navigation }) => {
     folders: [],
   });
   const [folderNoteCounts, setFolderNoteCounts] = useState({});
+  const [folderViewMode, setFolderViewMode] = useState('list');
+  const [noteViewMode, setNoteViewMode] = useState('list');
 
   const loadData = useCallback(async () => {
     try {
@@ -135,6 +147,39 @@ const HomeScreen = ({ navigation }) => {
     };
   }, [query]);
 
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      AsyncStorage.getItem(FOLDER_VIEW_MODE_STORAGE_KEY),
+      AsyncStorage.getItem(NOTE_VIEW_MODE_STORAGE_KEY),
+      AsyncStorage.getItem(LEGACY_HOME_VIEW_MODE_STORAGE_KEY),
+    ])
+      .then(([folderMode, noteMode, legacyMode]) => {
+        if (!active) return;
+        const preferences = resolveViewModePreferences({
+          folderMode,
+          noteMode,
+          legacyMode,
+        });
+        setFolderViewMode(preferences.folderViewMode);
+        setNoteViewMode(preferences.noteViewMode);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const changeFolderViewMode = (nextMode) => {
+    if (!FOLDER_VIEW_MODES.includes(nextMode) || nextMode === folderViewMode) return;
+    setFolderViewMode(nextMode);
+    AsyncStorage.setItem(FOLDER_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => {});
+  };
+
+  const changeNoteViewMode = (nextMode) => {
+    if (!NOTE_VIEW_MODES.includes(nextMode) || nextMode === noteViewMode) return;
+    setNoteViewMode(nextMode);
+    AsyncStorage.setItem(NOTE_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => {});
+  };
+
   // Refresh whichever view (list or search results) is currently showing.
   const refreshCurrent = useCallback(() => {
     const q = query.trim();
@@ -178,7 +223,11 @@ const HomeScreen = ({ navigation }) => {
     if (folder.password) {
       setPasswordModal({ visible: true, item: folder, type: 'folder', action: 'open' });
     } else {
-      navigation.navigate('Folder', { folderId: folder.id, folderName: folder.name });
+      navigation.navigate('Folder', {
+        folderId: folder.id,
+        folderName: folder.name,
+        noteViewMode,
+      });
     }
   };
 
@@ -198,7 +247,11 @@ const HomeScreen = ({ navigation }) => {
       return;
     }
     if (type === 'folder') {
-      navigation.navigate('Folder', { folderId: item.id, folderName: item.name });
+      navigation.navigate('Folder', {
+        folderId: item.id,
+        folderName: item.name,
+        noteViewMode,
+      });
     } else {
       navigation.navigate(editorRouteFor(item), { noteId: item.id });
     }
@@ -357,22 +410,115 @@ const HomeScreen = ({ navigation }) => {
   }, [navigation, loadData]);
 
   const searchBar = (
-    <View style={styles.searchBar}>
-      <Ionicons name="search" size={18} color={colors.textTertiary} />
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search folders and notes"
-        placeholderTextColor={colors.textTertiary}
-        value={query}
-        onChangeText={setQuery}
-        returnKeyType="search"
-        clearButtonMode="while-editing"
-      />
-      {query.length > 0 && (
-        <TouchableOpacity onPress={() => setQuery('')} activeOpacity={0.7}>
-          <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-        </TouchableOpacity>
-      )}
+    <View style={styles.homeToolbar}>
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={18} color={colors.textTertiary} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search folders and notes"
+          placeholderTextColor={colors.textTertiary}
+          value={query}
+          onChangeText={setQuery}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+        {query.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setQuery('')}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+          >
+            <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderViewControl = ({ scope, modes, value, onChange }) => (
+    <View
+      style={styles.sectionViewToggle}
+      accessibilityRole="tablist"
+      accessibilityLabel={`${scope} view options`}
+    >
+      {modes.map((mode) => {
+        const selected = value === mode;
+        const label = mode.charAt(0).toUpperCase() + mode.slice(1);
+        const iconName = mode === 'list'
+          ? 'list-outline'
+          : mode === 'strip'
+            ? 'albums-outline'
+            : 'grid-outline';
+        return (
+          <TouchableOpacity
+            key={mode}
+            style={[styles.sectionViewButton, selected && styles.viewButtonSelected]}
+            onPress={() => onChange(mode)}
+            activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityLabel={`${scope} ${label.toLowerCase()} view`}
+            accessibilityState={{ selected }}
+          >
+            <Ionicons
+              name={iconName}
+              size={19}
+              color={selected ? colors.primary : colors.textSecondary}
+            />
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const renderFolderItems = (folderList) => {
+    const items = folderList.map((folder, index) => (
+      <View
+        key={folder.id}
+        style={folderViewMode === 'strip' ? styles.folderStripItem : undefined}
+      >
+          <FolderItem
+            folder={folder}
+            noteCount={folderNoteCounts[folder.id] ?? 0}
+            index={index}
+            strip={folderViewMode === 'strip'}
+            onPress={() => handleFolderPress(folder)}
+            onOpenActions={() => openItemActions(folder, 'folder')}
+          />
+      </View>
+    ));
+
+    if (folderViewMode === 'strip') {
+      return (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.folderStrip}
+          contentContainerStyle={styles.folderStripContent}
+        >
+          {items}
+        </ScrollView>
+      );
+    }
+
+    return <View>{items}</View>;
+  };
+
+  const renderNoteItems = (noteList) => (
+    <View style={noteViewMode === 'grid' ? styles.itemsGrid : undefined}>
+      {noteList.map((note, index) => (
+        <View key={note.id} style={noteViewMode === 'grid' ? styles.gridItem : undefined}>
+          <NoteItem
+            note={note}
+            index={index}
+            grid={noteViewMode === 'grid'}
+            checklistProgressOnly
+            reminderScheduleOnly
+            onPress={() => handleNotePress(note)}
+            onOpenActions={() => openItemActions(note, 'note')}
+          />
+        </View>
+      ))}
     </View>
   );
 
@@ -392,35 +538,28 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Folders</Text>
+              {renderViewControl({
+                scope: 'Folders',
+                modes: FOLDER_VIEW_MODES,
+                value: folderViewMode,
+                onChange: changeFolderViewMode,
+              })}
             </View>
-            {results.folders.map((folder, index) => (
-              <FolderItem
-                key={folder.id}
-                folder={folder}
-                noteCount={folderNoteCounts[folder.id] ?? 0}
-                index={index}
-                onPress={() => handleFolderPress(folder)}
-                onOpenActions={() => openItemActions(folder, 'folder')}
-              />
-            ))}
+            {renderFolderItems(results.folders)}
           </View>
         )}
         {results.notes.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Notes</Text>
+              {renderViewControl({
+                scope: 'Notes',
+                modes: NOTE_VIEW_MODES,
+                value: noteViewMode,
+                onChange: changeNoteViewMode,
+              })}
             </View>
-            {results.notes.map((note, index) => (
-              <NoteItem
-                key={note.id}
-                note={note}
-                index={index}
-                checklistProgressOnly
-                reminderScheduleOnly
-                onPress={() => handleNotePress(note)}
-                onOpenActions={() => openItemActions(note, 'note')}
-              />
-            ))}
+            {renderNoteItems(results.notes)}
           </View>
         )}
       </>
@@ -432,13 +571,23 @@ const HomeScreen = ({ navigation }) => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Folders</Text>
-          <TouchableOpacity
-            onPress={() => setShowFolderModal(true)}
-            style={styles.addFolderButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="add" size={20} color={colors.primary} />
-          </TouchableOpacity>
+          <View style={styles.sectionHeaderActions}>
+            {renderViewControl({
+              scope: 'Folders',
+              modes: FOLDER_VIEW_MODES,
+              value: folderViewMode,
+              onChange: changeFolderViewMode,
+            })}
+            <TouchableOpacity
+              onPress={() => setShowFolderModal(true)}
+              style={styles.addFolderButton}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Add folder"
+            >
+              <Ionicons name="add" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
         {folders.length === 0 ? (
           <View style={styles.emptyState}>
@@ -446,22 +595,19 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.emptyText}>No folders yet</Text>
           </View>
         ) : (
-          folders.map((folder, index) => (
-            <FolderItem
-              key={folder.id}
-              folder={folder}
-              noteCount={folderNoteCounts[folder.id] ?? 0}
-              index={index}
-              onPress={() => handleFolderPress(folder)}
-              onOpenActions={() => openItemActions(folder, 'folder')}
-            />
-          ))
+          renderFolderItems(folders)
         )}
       </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Notes</Text>
+          {renderViewControl({
+            scope: 'Notes',
+            modes: NOTE_VIEW_MODES,
+            value: noteViewMode,
+            onChange: changeNoteViewMode,
+          })}
         </View>
         {notes.length === 0 ? (
           <View style={styles.emptyState}>
@@ -470,17 +616,7 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.emptyHint}>Tap + to create one</Text>
           </View>
         ) : (
-          notes.map((note, index) => (
-            <NoteItem
-              key={note.id}
-              note={note}
-              index={index}
-              checklistProgressOnly
-              reminderScheduleOnly
-              onPress={() => handleNotePress(note)}
-              onOpenActions={() => openItemActions(note, 'note')}
-            />
-          ))
+          renderNoteItems(notes)
         )}
       </View>
     </>
@@ -672,7 +808,15 @@ const makeStyles = (colors) =>
     listContent: {
       paddingBottom: 100,
     },
+    homeToolbar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginHorizontal: 16,
+      marginTop: 16,
+    },
     searchBar: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
@@ -680,9 +824,28 @@ const makeStyles = (colors) =>
       borderRadius: radius.md,
       paddingHorizontal: 14,
       paddingVertical: 10,
-      marginHorizontal: 16,
-      marginTop: 16,
       ...shadow.card,
+    },
+    sectionViewToggle: {
+      height: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 2,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      ...shadow.card,
+    },
+    sectionViewButton: {
+      width: 44,
+      height: 44,
+      borderRadius: radius.sm,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    viewButtonSelected: {
+      backgroundColor: colors.primarySoft,
     },
     searchInput: {
       flex: 1,
@@ -700,14 +863,39 @@ const makeStyles = (colors) =>
       alignItems: 'center',
       marginBottom: 12,
     },
+    sectionHeaderActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     sectionTitle: {
       fontSize: 18,
       fontWeight: '700',
       color: colors.text,
     },
+    itemsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'stretch',
+      gap: 10,
+    },
+    gridItem: {
+      width: '48.4%',
+    },
+    folderStrip: {
+      marginHorizontal: -16,
+    },
+    folderStripContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 2,
+      gap: 12,
+    },
+    folderStripItem: {
+      width: 104,
+    },
     addFolderButton: {
-      width: 32,
-      height: 32,
+      width: 44,
+      height: 44,
       borderRadius: radius.full,
       backgroundColor: colors.primarySoft,
       justifyContent: 'center',

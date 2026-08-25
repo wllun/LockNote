@@ -41,6 +41,7 @@ const NoteItem = ({
   index = 0,
   checklistProgressOnly = false,
   reminderScheduleOnly = false,
+  grid = false,
 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -81,9 +82,9 @@ const NoteItem = ({
   };
 
   return (
-    <Animated.View entering={entering(index)}>
+    <Animated.View entering={entering(index)} style={grid && styles.gridOuter}>
       <TouchableOpacity
-        style={styles.container}
+        style={[styles.container, grid && styles.containerGrid]}
         onPress={onPress}
         onLongPress={Platform.OS === 'web' ? undefined : onOpenActions}
         delayLongPress={450}
@@ -102,8 +103,8 @@ const NoteItem = ({
           if (nativeEvent.actionName === 'longpress') onOpenActions?.();
         }}
       >
-        <View style={styles.header}>
-          <Text style={styles.title} numberOfLines={1}>
+        <View style={[styles.header, grid && styles.headerGrid]}>
+          <Text style={[styles.title, grid && styles.titleGrid]} numberOfLines={grid ? 2 : 1}>
             {displayTitle}
           </Text>
           {isPlainNote && (
@@ -162,6 +163,7 @@ const NoteItem = ({
             <Pressable
               style={({ pressed }) => [
                 styles.webMenuButton,
+                grid && styles.webMenuButtonGrid,
                 pressed && styles.webMenuButtonPressed,
               ]}
               onPress={handleActionsPress}
@@ -176,7 +178,7 @@ const NoteItem = ({
             </Pressable>
           )}
         </View>
-        <Text style={styles.preview} numberOfLines={2}>
+        <Text style={[styles.preview, grid && styles.previewGrid]} numberOfLines={2}>
           {locked
             ? isExpense
               ? 'Locked expense record'
@@ -213,17 +215,40 @@ const makeStyles = (colors) =>
       borderRadius: radius.md,
       ...shadow.card,
     },
+    gridOuter: {
+      flex: 1,
+    },
+    containerGrid: {
+      flex: 1,
+      minHeight: 154,
+      marginBottom: 0,
+      padding: 13,
+    },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
       marginBottom: 4,
     },
+    headerGrid: {
+      alignItems: 'flex-start',
+      flexWrap: 'wrap',
+      gap: 5,
+      marginBottom: 7,
+      position: 'relative',
+    },
     title: {
       fontSize: 16,
       fontWeight: '600',
       color: colors.text,
       flex: 1,
+    },
+    titleGrid: {
+      flexBasis: '100%',
+      lineHeight: 20,
+      minHeight: 40,
+      marginBottom: 2,
+      paddingRight: Platform.OS === 'web' ? 28 : 0,
     },
     lockBadge: {
       width: 24,
@@ -279,11 +304,21 @@ const makeStyles = (colors) =>
     webMenuButtonPressed: {
       backgroundColor: colors.inputBg,
     },
+    webMenuButtonGrid: {
+      position: 'absolute',
+      right: -9,
+      top: -9,
+    },
     preview: {
       fontSize: 14,
       color: colors.textSecondary,
       marginBottom: 8,
       lineHeight: 20,
+    },
+    previewGrid: {
+      fontSize: 13,
+      lineHeight: 18,
+      marginBottom: 8,
     },
     updatedAtRow: {
       flexDirection: 'row',

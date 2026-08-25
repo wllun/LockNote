@@ -99,7 +99,7 @@ When the user presses the Add button, let them choose one of these note types:
 - [X] Pin — already shipped free in Phase 1 scope; decide which tier it belongs to
 - [ ] Coloring note
 - [ ] Custom note background images — allow users to select, change, or remove a background image per note while preserving text readability and local-only storage
-- [ ] View (list/grid?)
+- [X] View controls — Home independently persists Folder List/Strip and Note List/Grid choices. Search results follow their section setting, notes inside folders inherit the Notes choice, and the former combined preference migrates automatically. Mobile contextual actions use long-press, while web retains visible three-dot controls.
 - [ ] Sort
 - [ ] Trash (currently soft-delete with no trash UI)
 - [ ] Archive

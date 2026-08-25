@@ -41,6 +41,15 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 
 Screens reload their data on the navigation `focus` event (listener registered in `useEffect`, cleaned up on unmount) rather than holding shared state — so returning from the editor reflects edits without a store.
 
+Home has independent view preferences for its two content sections: folders can
+use a vertical list or horizontal icon strip, while notes can use a list or
+two-column grid. Search results use the matching section preference, and notes
+inside an opened folder follow the Notes preference. The choices are persisted
+in AsyncStorage under `@locknote_folder_view_mode` and
+`@locknote_note_view_mode`. The former combined `@locknote_home_view_mode`
+preference remains a migration fallback; its grid value maps to folder strip and
+note grid. List is the fallback when no valid preference has been saved.
+
 App-wide messages and confirmations are presented by `AppDialogHost`, mounted
 beside the navigator in `App.js`. Screens and components call the `AppAlert`
 adapter with the same title/message/button shape as React Native's `Alert`, so

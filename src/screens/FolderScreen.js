@@ -14,6 +14,7 @@ import {
   RefreshControl,
   TextInput,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
@@ -31,6 +32,11 @@ import { confirmDestructiveAction } from '../utils/confirm-action';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
 import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
+import {
+  LEGACY_HOME_VIEW_MODE_STORAGE_KEY,
+  NOTE_VIEW_MODE_STORAGE_KEY,
+  resolveViewModePreferences,
+} from '../utils/note-view-mode.mjs';
 
 const editorRouteFor = (note) => {
   if (note.note_type === EXPENSE_NOTE_TYPE) return 'ExpenseRecordEditor';
@@ -113,6 +119,10 @@ const FolderScreen = ({ route, navigation }) => {
   const { folderId, folderName } = route.params;
   const [currentFolderName, setCurrentFolderName] = useState(folderName || 'Folder');
   const [notes, setNotes] = useState([]);
+  const requestedNoteViewMode = route.params?.noteViewMode ?? route.params?.viewMode;
+  const [noteViewMode, setNoteViewMode] = useState(() =>
+    resolveViewModePreferences({ noteMode: requestedNoteViewMode }).noteViewMode
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [showNoteTypeModal, setShowNoteTypeModal] = useState(false);
   const [passwordModal, setPasswordModal] = useState({
@@ -129,6 +139,27 @@ const FolderScreen = ({ route, navigation }) => {
     note: null,
     folders: [],
   });
+
+  useEffect(() => {
+    if (requestedNoteViewMode) {
+      setNoteViewMode(
+        resolveViewModePreferences({ noteMode: requestedNoteViewMode }).noteViewMode
+      );
+      return undefined;
+    }
+
+    let active = true;
+    Promise.all([
+      AsyncStorage.getItem(NOTE_VIEW_MODE_STORAGE_KEY),
+      AsyncStorage.getItem(LEGACY_HOME_VIEW_MODE_STORAGE_KEY),
+    ])
+      .then(([noteMode, legacyMode]) => {
+        if (!active) return;
+        setNoteViewMode(resolveViewModePreferences({ noteMode, legacyMode }).noteViewMode);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [requestedNoteViewMode]);
 
   const loadNotes = useCallback(async () => {
     try {
@@ -302,16 +333,22 @@ const FolderScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <FlatList
+        key={noteViewMode}
         data={notes}
+        numColumns={noteViewMode === 'grid' ? 2 : 1}
+        columnWrapperStyle={noteViewMode === 'grid' ? styles.gridRow : undefined}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item, index }) => (
-          <NoteItem
-            note={item}
-            index={index}
-            onPress={() => handleNotePress(item)}
-            onOpenActions={() => openItemActions(item)}
-          />
+          <View style={noteViewMode === 'grid' ? styles.gridItem : undefined}>
+            <NoteItem
+              note={item}
+              index={index}
+              grid={noteViewMode === 'grid'}
+              onPress={() => handleNotePress(item)}
+              onOpenActions={() => openItemActions(item)}
+            />
+          </View>
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -459,6 +496,14 @@ const makeStyles = (colors) =>
       padding: 16,
       paddingBottom: 100,
       flexGrow: 1,
+    },
+    gridRow: {
+      gap: 10,
+      alignItems: 'stretch',
+    },
+    gridItem: {
+      flex: 1,
+      maxWidth: '48.5%',
     },
     emptyState: {
       flex: 1,
