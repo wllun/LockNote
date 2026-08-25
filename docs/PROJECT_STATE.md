@@ -22,7 +22,7 @@ _Snapshot: 2026-08-24. Check off items as they land._
 - [X] Wire up search UI — Home has a search bar that queries `folderRepo.search()` + `noteRepo.search()` (added `folderRepo.search()` to both repos); results replace the default lists, password gating preserved
 - [X] Settings backup export — creates a versioned, portable JSON file containing private/owned folders and notes, password hashes, pin state, note types, root-note relationships, and deletion tombstones. Incoming shared-note caches and account/collaboration identifiers are excluded.
 - [X] Backup import/restore — selects and validates a LockNote JSON backup (including schema version, references, timestamps, password-hash shape, duplicates, and a 25 MB limit), previews its counts, and requires an explicit Merge or Replace choice. Merge uses ID/timestamp conflict handling; Replace resets private data while preserving Shared-with-me notes. Both paths preserve `folder_id = null`, soft deletes, and native/web repository parity.
-- [X] Decide on `hardDelete()` — now called by the editor's empty-note cleanup on exit; no user-facing "permanently delete" flow (not needed)
+- [X] Decide on `hardDelete()` — used by empty-draft cleanup and the Trash permanent-delete/30-day retention flows.
 - [X] Clean up empty notes on editor exit — navigation now awaits the hard-delete before returning to Home/Folder, preventing its focus reload from racing and briefly retaining an untouched note. The same guarded exit flushes pending auto-saves for non-empty notes, with unmount cleanup as a fallback.
 
 ### Supabase (now active — not vestigial)
@@ -101,7 +101,7 @@ When the user presses the Add button, let them choose one of these note types:
 - [ ] Custom note background images — allow users to select, change, or remove a background image per note while preserving text readability and local-only storage
 - [X] View controls — Home independently persists Folder List/Strip and Note List/Grid choices. Search results follow their section setting, notes inside folders inherit the Notes choice, and the former combined preference migrates automatically. Mobile contextual actions use long-press, while web retains visible three-dot controls.
 - [ ] Sort
-- [ ] Trash (currently soft-delete with no trash UI)
+- [X] Trash — Settings lists soft-deleted notes only, with Restore and password-gated Delete forever inside each row's three-dots menu. Folders are deleted permanently while their notes move to Trash as Home notes. Empty Trash safely removes unlocked notes, and local note content is purged after 30 days at startup or when Trash opens.
 - [ ] Archive
 
 ## Caveats (not bugs — document, don't "fix" silently)

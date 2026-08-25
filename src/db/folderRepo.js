@@ -22,6 +22,14 @@ export const folderRepo = {
     );
   },
 
+  // Cleanup reads legacy soft-deleted folders so they can be discarded.
+  async getDeleted() {
+    const db = getDB();
+    return await db.getAllAsync(
+      `SELECT * FROM folders WHERE is_deleted = 1 ORDER BY updated_at DESC`
+    );
+  },
+
   async create(name, password = null) {
     const db = getDB();
     const { hashPassword } = require('../utils/crypto');

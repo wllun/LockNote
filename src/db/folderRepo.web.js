@@ -55,6 +55,14 @@ export const folderRepo = {
     return folders.find((f) => f.id === id && !f.is_deleted) || null;
   },
 
+  // Cleanup reads legacy soft-deleted folders so they can be discarded.
+  async getDeleted() {
+    const folders = await getStorage();
+    return folders
+      .filter((folder) => !!folder.is_deleted)
+      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  },
+
   async create(name, password = null) {
     const id = generateId();
     const timestamp = now();

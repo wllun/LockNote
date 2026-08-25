@@ -13,6 +13,7 @@ import ReminderEditorScreen from '../screens/ReminderEditorScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProfileTabScreen from '../screens/ProfileTabScreen';
 import SharedScreen from '../screens/SharedScreen';
+import TrashScreen from '../screens/TrashScreen';
 import { useTheme, useThemeMode } from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -59,6 +60,11 @@ const SettingsStack = ({ screenOptions }) => (
       name="SettingsMain"
       component={SettingsScreen}
       options={{ title: 'Settings' }}
+    />
+    <Stack.Screen
+      name="Trash"
+      component={TrashScreen}
+      options={{ title: 'Trash' }}
     />
   </Stack.Navigator>
 );

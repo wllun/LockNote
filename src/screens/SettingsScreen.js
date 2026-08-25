@@ -29,7 +29,7 @@ const THEME_OPTIONS = [
   { mode: 'dark', label: 'Dark', icon: 'moon-outline' },
 ];
 
-const SettingsScreen = () => {
+const SettingsScreen = ({ navigation }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { mode, setMode } = useThemeMode();
@@ -405,6 +405,24 @@ const SettingsScreen = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Data</Text>
         <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.item}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Trash')}
+            accessibilityRole="button"
+            accessibilityLabel="Open Trash"
+            accessibilityHint="View, restore, or permanently delete removed notes"
+          >
+            <View style={[styles.iconCircle, { backgroundColor: colors.dangerSoft }]}>
+              <Ionicons name="trash-outline" size={19} color={colors.danger} />
+            </View>
+            <View style={styles.itemContent}>
+              <Text style={styles.itemLabel}>Trash</Text>
+              <Text style={styles.itemDescription}>Notes deleted permanently after 30 days</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+          <View style={styles.separator} />
           <TouchableOpacity
             style={[styles.item, backupBusy && styles.itemDisabled]}
             activeOpacity={0.7}

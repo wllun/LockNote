@@ -8,6 +8,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider, useTheme, useThemeMode } from './src/theme';
 import { AuthProvider } from './src/context/AuthContext';
 import AppDialogHost from './src/components/AppDialogHost';
+import { trashService } from './src/services/trashService';
 
 function AppRoot() {
   const colors = useTheme();
@@ -16,7 +17,14 @@ function AppRoot() {
 
   useEffect(() => {
     initDB()
-      .then(() => setReady(true))
+      .then(async () => {
+        try {
+          await trashService.purgeExpired();
+        } catch (error) {
+          console.warn('Failed to clean expired trash:', error);
+        }
+        setReady(true);
+      })
       .catch((err) => {
         console.error('Failed to initialize database:', err);
       });

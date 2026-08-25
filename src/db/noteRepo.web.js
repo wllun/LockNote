@@ -70,6 +70,15 @@ export const noteRepo = {
     return note ? normalizeNote(note) : null;
   },
 
+  // Trash is the only UI allowed to read soft-deleted note records.
+  async getDeleted() {
+    const notes = await getStorage();
+    return notes
+      .filter((note) => !!note.is_deleted)
+      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+      .map(normalizeNote);
+  },
+
   async create(folderId = null, title = '', content = '', password = null, noteType = 'note') {
     const id = generateId();
     const timestamp = now();
@@ -146,6 +155,33 @@ export const noteRepo = {
         if (notes[index].share_origin !== 'incoming') {
           upsertTombstone(tombstones, id, timestamp);
         }
+      }
+    });
+  },
+
+  async restore(id, folderId = null) {
+    return await mutateStorage((notes, tombstones) => {
+      const note = notes.find((item) => item.id === id && item.is_deleted);
+      if (!note || note.share_origin === 'incoming') return null;
+
+      Object.assign(note, COLLABORATION_DEFAULTS, {
+        folder_id: folderId,
+        is_deleted: 0,
+        updated_at: now(),
+      });
+      const tombstoneIndex = tombstones.findIndex((item) => item.id === id);
+      if (tombstoneIndex !== -1) tombstones.splice(tombstoneIndex, 1);
+      return normalizeNote(note);
+    });
+  },
+
+  async detachFromFolder(folderId) {
+    await mutateStorage((notes) => {
+      const timestamp = now();
+      for (const note of notes) {
+        if (note.folder_id !== folderId) continue;
+        note.folder_id = null;
+        if (!note.is_deleted) note.updated_at = timestamp;
       }
     });
   },

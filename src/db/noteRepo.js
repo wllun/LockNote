@@ -30,6 +30,14 @@ export const noteRepo = {
     );
   },
 
+  // Trash is the only UI allowed to read soft-deleted note rows.
+  async getDeleted() {
+    const db = getDB();
+    return await db.getAllAsync(
+      `SELECT * FROM notes WHERE is_deleted = 1 ORDER BY updated_at DESC`
+    );
+  },
+
   async create(folderId = null, title = '', content = '', password = null, noteType = 'note') {
     const db = getDB();
     const { hashPassword } = require('../utils/crypto');
@@ -126,6 +134,40 @@ export const noteRepo = {
         [timestamp, id]
       );
     });
+  },
+
+  async restore(id, folderId = null) {
+    const db = getDB();
+    const timestamp = now();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync(
+        `UPDATE notes SET
+           folder_id = ?, is_deleted = 0, updated_at = ?,
+           cloud_id = NULL, cloud_owner_id = NULL, share_origin = 'private',
+           share_role = NULL, collaborator_count = 0, server_revision = 0,
+           last_edited_by_id = NULL, last_edited_by_email = NULL,
+           last_edited_at = NULL, sync_status = NULL, last_synced_at = NULL
+         WHERE id = ? AND is_deleted = 1 AND share_origin != 'incoming'`,
+        [folderId, timestamp, id]
+      );
+      await txn.runAsync(
+        `DELETE FROM sync_tombstones WHERE entity_type = 'note' AND entity_id = ?`,
+        [id]
+      );
+    });
+    return await this.getById(id);
+  },
+
+  async detachFromFolder(folderId) {
+    const db = getDB();
+    const timestamp = now();
+    await db.runAsync(
+      `UPDATE notes
+       SET folder_id = NULL,
+           updated_at = CASE WHEN is_deleted = 0 THEN ? ELSE updated_at END
+       WHERE folder_id = ?`,
+      [timestamp, folderId]
+    );
   },
 
   async hardDelete(id) {
