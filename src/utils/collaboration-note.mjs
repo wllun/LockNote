@@ -20,6 +20,7 @@ export const normalizeCollaborationNote = (note) => ({
   ...COLLABORATION_DEFAULTS,
   ...note,
   note_type: note?.note_type || 'note',
+  is_archived: note?.is_archived ? 1 : 0,
   share_origin: note?.share_origin || SHARE_ORIGIN_PRIVATE,
   collaborator_count: Number(note?.collaborator_count) || 0,
   server_revision: Number(note?.server_revision) || 0,

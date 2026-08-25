@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createPrivateSyncService } from '../src/services/privateSyncService.mjs';
 import {
   buildSyncPayload,
+  cloudFolderForLocal,
   cloudNoteForLocal,
   noteRecordForCloud,
   parseSyncResponse,
@@ -20,6 +21,7 @@ const localNote = (overrides = {}) => ({
   note_type: 'note',
   password: 'sha256-hash',
   is_pinned: 1,
+  is_archived: 1,
   is_deleted: 0,
   share_origin: 'private',
   created_at: timestamp,
@@ -31,7 +33,7 @@ test('builds active records and deletion tombstones without incoming shared note
   const payload = buildSyncPayload(
     {
       records: [{
-        id: 'folder-1', name: 'Work', password: null, is_pinned: 0,
+        id: 'folder-1', name: 'Work', password: null, is_pinned: 0, is_archived: 1,
         created_at: timestamp, updated_at: timestamp,
       }],
       tombstones: [{ id: 'folder-old', updated_at: timestamp }],
@@ -47,10 +49,12 @@ test('builds active records and deletion tombstones without incoming shared note
 
   assert.deepEqual(payload.folders.map((item) => item.id), ['folder-1', 'folder-old']);
   assert.equal(payload.folders[1].is_deleted, true);
+  assert.equal(payload.folders[0].is_archived, true);
   assert.deepEqual(payload.notes.map((item) => item.id), ['note-1', 'note-old']);
   assert.equal(payload.notes[0].folder_id, null);
   assert.equal(payload.notes[0].password, 'sha256-hash');
   assert.equal('color' in payload.notes[0], false);
+  assert.equal(payload.notes[0].is_archived, true);
 });
 
 test('deduplicates a stale active row and tombstone with deletion winning a tie', () => {
@@ -84,10 +88,26 @@ test('keeps reminder notification registrations device-local', () => {
   const restoredReminder = parseReminderNote(restored.content).reminder;
   assert.equal(restoredReminder.enabled, true);
   assert.deepEqual(restoredReminder.notificationIds, ['native-id']);
+  assert.equal(restored.is_archived, 1);
 });
 
 test('rejects malformed server snapshots before local data is changed', () => {
   assert.throws(() => parseSyncResponse({ folders: [] }), /invalid response/i);
+});
+
+test('preserves local archive state when an older sync response omits it', () => {
+  const cloud = noteRecordForCloud(localNote());
+  delete cloud.is_archived;
+  const restored = cloudNoteForLocal(cloud, localNote({ is_archived: 1 }));
+  assert.equal(restored.is_archived, 1);
+});
+
+test('preserves local folder archive state when an older sync response omits it', () => {
+  const restored = cloudFolderForLocal(
+    { id: 'folder-1', name: 'Work', is_pinned: false, created_at: timestamp, updated_at: timestamp },
+    { id: 'folder-1', is_archived: 1 },
+  );
+  assert.equal(restored.is_archived, 1);
 });
 
 test('sync service pushes snapshots, then applies folders before notes', async () => {
@@ -115,6 +135,7 @@ test('sync service pushes snapshots, then applies folders before notes', async (
           data: {
             folders: [{
               id: 'folder-1', name: 'Work', password: null, is_pinned: false,
+              is_archived: true,
               is_deleted: false, created_at: timestamp, updated_at: timestamp,
             }],
             notes: [remoteNote],
@@ -125,6 +146,7 @@ test('sync service pushes snapshots, then applies folders before notes', async (
     },
     folderRepo: {
       getSyncSnapshot: async () => ({ records: [], tombstones: [] }),
+      getById: async () => ({ id: 'folder-1', is_archived: 0 }),
       applySyncSnapshot: async (records, tombstones) => {
         events.push(['folders', records.length, tombstones.length]);
       },

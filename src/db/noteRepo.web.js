@@ -10,6 +10,7 @@ const now = () => new Date().toISOString();
 
 const NOTES_KEY = '@locknote_notes';
 const TOMBSTONES_KEY = '@locknote_note_sync_tombstones';
+const FOLDERS_KEY = '@locknote_folders';
 
 const getStorage = async () => {
   const data = await AsyncStorage.getItem(NOTES_KEY);
@@ -51,7 +52,7 @@ export const noteRepo = {
   async getRootNotes() {
     const notes = await getStorage();
     return notes
-      .filter((n) => n.folder_id === null && !n.is_deleted && n.share_origin !== 'incoming')
+      .filter((n) => n.folder_id === null && !n.is_deleted && !n.is_archived && n.share_origin !== 'incoming')
       .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at))
       .map(normalizeNote);
   },
@@ -59,7 +60,7 @@ export const noteRepo = {
   async getByFolderId(folderId) {
     const notes = await getStorage();
     return notes
-      .filter((n) => n.folder_id === folderId && !n.is_deleted && n.share_origin !== 'incoming')
+      .filter((n) => n.folder_id === folderId && !n.is_deleted && !n.is_archived && n.share_origin !== 'incoming')
       .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at))
       .map(normalizeNote);
   },
@@ -68,6 +69,33 @@ export const noteRepo = {
     const notes = await getStorage();
     const note = notes.find((n) => n.id === id && !n.is_deleted);
     return note ? normalizeNote(note) : null;
+  },
+
+  // Trash is the only UI allowed to read soft-deleted note records.
+  async getDeleted() {
+    const notes = await getStorage();
+    return notes
+      .filter((note) => !!note.is_deleted)
+      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+      .map(normalizeNote);
+  },
+
+  async getActiveByFolderId(folderId) {
+    const notes = await getStorage();
+    return notes
+      .filter((note) =>
+        note.folder_id === folderId && !note.is_deleted && note.share_origin !== 'incoming'
+      )
+      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+      .map(normalizeNote);
+  },
+
+  async getArchived() {
+    const notes = await getStorage();
+    return notes
+      .filter((note) => !note.is_deleted && !!note.is_archived && note.share_origin !== 'incoming')
+      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+      .map(normalizeNote);
   },
 
   async create(folderId = null, title = '', content = '', password = null, noteType = 'note') {
@@ -84,6 +112,7 @@ export const noteRepo = {
       password: passwordHash,
       is_deleted: 0,
       is_pinned: 0,
+      is_archived: 0,
       created_at: timestamp,
       updated_at: timestamp,
       ...COLLABORATION_DEFAULTS,
@@ -114,6 +143,9 @@ export const noteRepo = {
       if (updates.is_pinned !== undefined) {
         notes[index].is_pinned = updates.is_pinned ? 1 : 0;
       }
+      if (updates.is_archived !== undefined) {
+        notes[index].is_archived = updates.is_archived ? 1 : 0;
+      }
       for (const field of [
         'cloud_id', 'cloud_owner_id', 'share_origin', 'share_role',
         'collaborator_count', 'server_revision', 'last_edited_by_id',
@@ -142,10 +174,63 @@ export const noteRepo = {
       if (index !== -1) {
         const timestamp = now();
         notes[index].is_deleted = 1;
+        notes[index].is_archived = 0;
         notes[index].updated_at = timestamp;
         if (notes[index].share_origin !== 'incoming') {
           upsertTombstone(tombstones, id, timestamp);
         }
+      }
+    });
+  },
+
+  async archive(id) {
+    return await mutateStorage((notes) => {
+      const note = notes.find((item) =>
+        item.id === id && !item.is_deleted && item.share_origin !== 'incoming'
+      );
+      if (!note) return null;
+      note.is_archived = 1;
+      note.updated_at = now();
+      return normalizeNote(note);
+    });
+  },
+
+  async unarchive(id) {
+    return await mutateStorage((notes) => {
+      const note = notes.find((item) =>
+        item.id === id && !item.is_deleted && item.share_origin !== 'incoming'
+      );
+      if (!note) return null;
+      note.is_archived = 0;
+      note.updated_at = now();
+      return normalizeNote(note);
+    });
+  },
+
+  async restore(id, folderId = null) {
+    return await mutateStorage((notes, tombstones) => {
+      const note = notes.find((item) => item.id === id && item.is_deleted);
+      if (!note || note.share_origin === 'incoming') return null;
+
+      Object.assign(note, COLLABORATION_DEFAULTS, {
+        folder_id: folderId,
+        is_deleted: 0,
+        is_archived: 0,
+        updated_at: now(),
+      });
+      const tombstoneIndex = tombstones.findIndex((item) => item.id === id);
+      if (tombstoneIndex !== -1) tombstones.splice(tombstoneIndex, 1);
+      return normalizeNote(note);
+    });
+  },
+
+  async detachFromFolder(folderId) {
+    await mutateStorage((notes) => {
+      const timestamp = now();
+      for (const note of notes) {
+        if (note.folder_id !== folderId) continue;
+        note.folder_id = null;
+        if (!note.is_deleted) note.updated_at = timestamp;
       }
     });
   },
@@ -161,11 +246,22 @@ export const noteRepo = {
   },
 
   async search(query) {
-    const notes = await getStorage();
+    const [notes, folderData] = await Promise.all([
+      getStorage(),
+      AsyncStorage.getItem(FOLDERS_KEY),
+    ]);
+    const folders = folderData ? JSON.parse(folderData) : [];
+    const archivedFolderIds = new Set(
+      folders
+        .filter((folder) => !folder.is_deleted && !!folder.is_archived)
+        .map((folder) => folder.id)
+    );
     return notes
       .filter(
         (n) =>
           !n.is_deleted &&
+          !n.is_archived &&
+          !archivedFolderIds.has(n.folder_id) &&
           n.share_origin !== 'incoming' &&
           (n.title.toLowerCase().includes(query.toLowerCase()) ||
             n.content.toLowerCase().includes(query.toLowerCase()))
@@ -177,7 +273,7 @@ export const noteRepo = {
   async getSharedWithMe() {
     const notes = await getStorage();
     return notes
-      .filter((note) => !note.is_deleted && note.share_origin === 'incoming')
+      .filter((note) => !note.is_deleted && !note.is_archived && note.share_origin === 'incoming')
       .sort((a, b) => new Date(b.last_edited_at || b.updated_at) - new Date(a.last_edited_at || a.updated_at))
       .map(normalizeNote);
   },
@@ -213,6 +309,7 @@ export const noteRepo = {
           ...remote,
           is_deleted: 0,
           is_pinned: remote.is_pinned ? 1 : 0,
+          is_archived: remote.is_archived ? 1 : 0,
         });
         const index = notes.findIndex((note) => note.id === remote.id);
         if (index === -1) {
@@ -236,6 +333,7 @@ export const noteRepo = {
         );
         if (note && new Date(note.updated_at) <= new Date(tombstone.updated_at)) {
           note.is_deleted = 1;
+          note.is_archived = 0;
           note.updated_at = tombstone.updated_at;
         }
       }
@@ -252,6 +350,7 @@ export const noteRepo = {
           ...note,
           is_deleted: 0,
           is_pinned: note.is_pinned ? 1 : 0,
+          is_archived: note.is_archived ? 1 : 0,
           ...COLLABORATION_DEFAULTS,
         }));
       notes.splice(0, notes.length, ...incomingNotes, ...restoredNotes);

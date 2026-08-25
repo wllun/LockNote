@@ -300,6 +300,26 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  const handleArchiveFolder = async (folder) => {
+    try {
+      const archived = await folderRepo.archive(folder.id);
+      if (!archived) throw new Error('Folder no longer exists');
+      refreshCurrent();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to archive folder');
+    }
+  };
+
+  const handleArchiveNote = async (note) => {
+    try {
+      const archived = await noteRepo.archive(note.id);
+      if (!archived) throw new Error('Note no longer exists');
+      refreshCurrent();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to archive note');
+    }
+  };
+
   const openItemActions = (item, type) => {
     setItemActions({ visible: true, item, type });
   };
@@ -349,14 +369,14 @@ const HomeScreen = ({ navigation }) => {
 
   const confirmDeleteFolder = async (folder) => {
     try {
-      const folderNotes = await noteRepo.getByFolderId(folder.id);
+      const folderNotes = await noteRepo.getActiveByFolderId(folder.id);
       const noteCount = folderNotes.length;
       const detail =
         noteCount === 0
-          ? 'Are you sure you want to delete this folder?'
-          : `This will also delete ${noteCount} ${
+          ? 'The folder will be permanently deleted.'
+          : `The folder will be permanently deleted. ${noteCount} ${
               noteCount === 1 ? 'note' : 'notes'
-            } inside the folder.`;
+            } inside will move to Trash.`;
 
       confirmDestructiveAction({
         title: 'Delete this folder?',
@@ -374,7 +394,8 @@ const HomeScreen = ({ navigation }) => {
             await Promise.all(
               folderNotes.map((note) => softDeleteNoteWithCleanup(noteRepo, note))
             );
-            await folderRepo.softDelete(folder.id);
+            await noteRepo.detachFromFolder(folder.id);
+            await folderRepo.hardDelete(folder.id);
             refreshCurrent();
           } catch (error) {
             Alert.alert('Error', 'Failed to delete folder');
@@ -708,6 +729,11 @@ const HomeScreen = ({ navigation }) => {
           itemActions.type === 'note'
             ? () => setColorNote(itemActions.item)
             : undefined
+        }
+        onArchive={
+          itemActions.type === 'folder'
+            ? () => handleArchiveFolder(itemActions.item)
+            : () => handleArchiveNote(itemActions.item)
         }
         onDelete={() => {
           if (itemActions.type === 'folder') {

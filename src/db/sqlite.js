@@ -30,6 +30,7 @@ export const initDB = async () => {
       password TEXT,
       is_deleted INTEGER DEFAULT 0,
       is_pinned INTEGER DEFAULT 0,
+      is_archived INTEGER DEFAULT 0,
       cloud_id TEXT,
       cloud_owner_id TEXT,
       share_origin TEXT NOT NULL DEFAULT 'private',
@@ -54,6 +55,7 @@ export const initDB = async () => {
       password TEXT,
       is_deleted INTEGER DEFAULT 0,
       is_pinned INTEGER DEFAULT 0,
+      is_archived INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
@@ -89,6 +91,16 @@ export const initDB = async () => {
   if (noteColumns.some((column) => column.name === 'color')) {
     await db.execAsync(`ALTER TABLE notes DROP COLUMN color`);
   }
+
+  const folderColumns = await db.getAllAsync('PRAGMA table_info(folders)');
+  if (!folderColumns.some((column) => column.name === 'is_archived')) {
+    await db.execAsync(`ALTER TABLE folders ADD COLUMN is_archived INTEGER DEFAULT 0`);
+  }
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_folders_is_archived ON folders(is_archived)');
+  if (!noteColumns.some((column) => column.name === 'is_archived')) {
+    await db.execAsync(`ALTER TABLE notes ADD COLUMN is_archived INTEGER DEFAULT 0`);
+  }
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_notes_is_archived ON notes(is_archived)');
 
   const collaborationColumns = [
     ['cloud_id', 'TEXT'],

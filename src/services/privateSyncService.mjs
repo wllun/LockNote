@@ -39,9 +39,11 @@ export const createPrivateSyncService = ({
     if (error) throw error;
 
     const response = parseSyncResponse(data);
-    const folderRecords = response.folders
-      .filter((folder) => !folder.is_deleted)
-      .map(cloudFolderForLocal);
+    const folderRecords = [];
+    for (const remote of response.folders.filter((folder) => !folder.is_deleted)) {
+      const existing = await folderRepo.getById(remote.id);
+      folderRecords.push(cloudFolderForLocal(remote, existing));
+    }
     const folderTombstones = response.folders
       .filter((folder) => folder.is_deleted)
       .map(({ id, updated_at }) => ({ id, updated_at }));

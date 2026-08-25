@@ -10,7 +10,7 @@ export const folderRepo = {
   async getAll() {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM folders WHERE is_deleted = 0 ORDER BY is_pinned DESC, created_at DESC`
+      `SELECT * FROM folders WHERE is_deleted = 0 AND is_archived = 0 ORDER BY is_pinned DESC, created_at DESC`
     );
   },
 
@@ -19,6 +19,21 @@ export const folderRepo = {
     return await db.getFirstAsync(
       `SELECT * FROM folders WHERE id = ? AND is_deleted = 0`,
       [id]
+    );
+  },
+
+  // Cleanup reads legacy soft-deleted folders so they can be discarded.
+  async getDeleted() {
+    const db = getDB();
+    return await db.getAllAsync(
+      `SELECT * FROM folders WHERE is_deleted = 1 ORDER BY updated_at DESC`
+    );
+  },
+
+  async getArchived() {
+    const db = getDB();
+    return await db.getAllAsync(
+      `SELECT * FROM folders WHERE is_deleted = 0 AND is_archived = 1 ORDER BY updated_at DESC`
     );
   },
 
@@ -56,6 +71,10 @@ export const folderRepo = {
       fields.push('is_pinned = ?');
       values.push(updates.is_pinned ? 1 : 0);
     }
+    if (updates.is_archived !== undefined) {
+      fields.push('is_archived = ?');
+      values.push(updates.is_archived ? 1 : 0);
+    }
 
     if (fields.length === 0) return await this.getById(id);
 
@@ -82,10 +101,28 @@ export const folderRepo = {
         [id, timestamp]
       );
       await txn.runAsync(
-        `UPDATE folders SET is_deleted = 1, updated_at = ? WHERE id = ?`,
+        `UPDATE folders SET is_deleted = 1, is_archived = 0, updated_at = ? WHERE id = ?`,
         [timestamp, id]
       );
     });
+  },
+
+  async archive(id) {
+    const db = getDB();
+    await db.runAsync(
+      `UPDATE folders SET is_archived = 1, updated_at = ? WHERE id = ? AND is_deleted = 0`,
+      [now(), id]
+    );
+    return await this.getById(id);
+  },
+
+  async unarchive(id) {
+    const db = getDB();
+    await db.runAsync(
+      `UPDATE folders SET is_archived = 0, updated_at = ? WHERE id = ? AND is_deleted = 0`,
+      [now(), id]
+    );
+    return await this.getById(id);
   },
 
   async hardDelete(id) {
@@ -105,7 +142,7 @@ export const folderRepo = {
   async getNoteCount(folderId) {
     const db = getDB();
     const result = await db.getFirstAsync(
-      `SELECT COUNT(*) as count FROM notes WHERE folder_id = ? AND is_deleted = 0`,
+      `SELECT COUNT(*) as count FROM notes WHERE folder_id = ? AND is_deleted = 0 AND is_archived = 0`,
       [folderId]
     );
     return result?.count || 0;
@@ -114,7 +151,7 @@ export const folderRepo = {
   async search(query) {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM folders WHERE is_deleted = 0 AND name LIKE ? ORDER BY is_pinned DESC, created_at DESC`,
+      `SELECT * FROM folders WHERE is_deleted = 0 AND is_archived = 0 AND name LIKE ? ORDER BY is_pinned DESC, created_at DESC`,
       [`%${query}%`]
     );
   },
@@ -123,7 +160,7 @@ export const folderRepo = {
     const db = getDB();
     const [records, tombstones] = await Promise.all([
       db.getAllAsync(
-        `SELECT id, name, password, is_pinned, created_at, updated_at
+        `SELECT id, name, password, is_pinned, is_archived, created_at, updated_at
          FROM folders WHERE is_deleted = 0`
       ),
       db.getAllAsync(
@@ -140,13 +177,14 @@ export const folderRepo = {
       for (const folder of records) {
         await txn.runAsync(
           `INSERT INTO folders (
-             id, name, password, is_deleted, is_pinned, created_at, updated_at
-           ) VALUES (?, ?, ?, 0, ?, ?, ?)
+             id, name, password, is_deleted, is_pinned, is_archived, created_at, updated_at
+           ) VALUES (?, ?, ?, 0, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              name = excluded.name,
              password = excluded.password,
              is_deleted = 0,
              is_pinned = excluded.is_pinned,
+             is_archived = excluded.is_archived,
              created_at = excluded.created_at,
              updated_at = excluded.updated_at
            WHERE excluded.updated_at >= folders.updated_at`,
@@ -155,6 +193,7 @@ export const folderRepo = {
             folder.name,
             folder.password || null,
             folder.is_pinned ? 1 : 0,
+            folder.is_archived ? 1 : 0,
             folder.created_at,
             folder.updated_at,
           ]
@@ -176,7 +215,7 @@ export const folderRepo = {
           [tombstone.id, tombstone.updated_at]
         );
         await txn.runAsync(
-          `UPDATE folders SET is_deleted = 1, updated_at = ?
+          `UPDATE folders SET is_deleted = 1, is_archived = 0, updated_at = ?
            WHERE id = ? AND updated_at <= ?`,
           [tombstone.updated_at, tombstone.id, tombstone.updated_at]
         );
@@ -193,13 +232,14 @@ export const folderRepo = {
       for (const folder of records) {
         await txn.runAsync(
           `INSERT INTO folders (
-             id, name, password, is_deleted, is_pinned, created_at, updated_at
-           ) VALUES (?, ?, ?, 0, ?, ?, ?)`,
+             id, name, password, is_deleted, is_pinned, is_archived, created_at, updated_at
+           ) VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
           [
             folder.id,
             folder.name,
             folder.password || null,
             folder.is_pinned ? 1 : 0,
+            folder.is_archived ? 1 : 0,
             folder.created_at,
             folder.updated_at,
           ]

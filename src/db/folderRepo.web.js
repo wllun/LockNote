@@ -46,13 +46,28 @@ export const folderRepo = {
   async getAll() {
     const folders = await getStorage();
     return folders
-      .filter((f) => !f.is_deleted)
+      .filter((f) => !f.is_deleted && !f.is_archived)
       .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.created_at) - new Date(a.created_at));
   },
 
   async getById(id) {
     const folders = await getStorage();
     return folders.find((f) => f.id === id && !f.is_deleted) || null;
+  },
+
+  // Cleanup reads legacy soft-deleted folders so they can be discarded.
+  async getDeleted() {
+    const folders = await getStorage();
+    return folders
+      .filter((folder) => !!folder.is_deleted)
+      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  },
+
+  async getArchived() {
+    const folders = await getStorage();
+    return folders
+      .filter((folder) => !folder.is_deleted && !!folder.is_archived)
+      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   },
 
   async create(name, password = null) {
@@ -66,6 +81,7 @@ export const folderRepo = {
       password: passwordHash,
       is_deleted: 0,
       is_pinned: 0,
+      is_archived: 0,
       created_at: timestamp,
       updated_at: timestamp,
     };
@@ -87,6 +103,7 @@ export const folderRepo = {
       if (updates.name !== undefined) folders[index].name = updates.name;
       if (updates.password !== undefined) folders[index].password = passwordHash;
       if (updates.is_pinned !== undefined) folders[index].is_pinned = updates.is_pinned ? 1 : 0;
+      if (updates.is_archived !== undefined) folders[index].is_archived = updates.is_archived ? 1 : 0;
       folders[index].updated_at = now();
       return folders[index];
     });
@@ -98,8 +115,29 @@ export const folderRepo = {
       if (index === -1) return;
       const timestamp = now();
       folders[index].is_deleted = 1;
+      folders[index].is_archived = 0;
       folders[index].updated_at = timestamp;
       upsertTombstone(tombstones, id, timestamp);
+    });
+  },
+
+  async archive(id) {
+    return await mutateStorage((folders) => {
+      const folder = folders.find((item) => item.id === id && !item.is_deleted);
+      if (!folder) return null;
+      folder.is_archived = 1;
+      folder.updated_at = now();
+      return folder;
+    });
+  },
+
+  async unarchive(id) {
+    return await mutateStorage((folders) => {
+      const folder = folders.find((item) => item.id === id && !item.is_deleted);
+      if (!folder) return null;
+      folder.is_archived = 0;
+      folder.updated_at = now();
+      return folder;
     });
   },
 
@@ -121,7 +159,7 @@ export const folderRepo = {
     const folders = await getStorage();
     const q = query.toLowerCase();
     return folders
-      .filter((f) => !f.is_deleted && f.name.toLowerCase().includes(q))
+      .filter((f) => !f.is_deleted && !f.is_archived && f.name.toLowerCase().includes(q))
       .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.created_at) - new Date(a.created_at));
   },
 
@@ -136,6 +174,7 @@ export const folderRepo = {
           name: folder.name,
           password: folder.password || null,
           is_pinned: folder.is_pinned || 0,
+          is_archived: folder.is_archived || 0,
           created_at: folder.created_at,
           updated_at: folder.updated_at,
         })),
@@ -148,13 +187,19 @@ export const folderRepo = {
       for (const remote of records) {
         const index = folders.findIndex((folder) => folder.id === remote.id);
         if (index === -1) {
-          folders.push({ ...remote, is_deleted: 0, is_pinned: remote.is_pinned ? 1 : 0 });
+          folders.push({
+            ...remote,
+            is_deleted: 0,
+            is_pinned: remote.is_pinned ? 1 : 0,
+            is_archived: remote.is_archived ? 1 : 0,
+          });
         } else if (new Date(remote.updated_at) >= new Date(folders[index].updated_at)) {
           folders[index] = {
             ...folders[index],
             ...remote,
             is_deleted: 0,
             is_pinned: remote.is_pinned ? 1 : 0,
+            is_archived: remote.is_archived ? 1 : 0,
           };
         }
         const tombstoneIndex = localTombstones.findIndex((item) =>
@@ -168,6 +213,7 @@ export const folderRepo = {
         const folder = folders.find((item) => item.id === tombstone.id);
         if (folder && new Date(folder.updated_at) <= new Date(tombstone.updated_at)) {
           folder.is_deleted = 1;
+          folder.is_archived = 0;
           folder.updated_at = tombstone.updated_at;
         }
       }
@@ -180,6 +226,7 @@ export const folderRepo = {
         ...folder,
         is_deleted: 0,
         is_pinned: folder.is_pinned ? 1 : 0,
+        is_archived: folder.is_archived ? 1 : 0,
       })));
       localTombstones.splice(0, localTombstones.length, ...tombstones);
     });

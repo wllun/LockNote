@@ -28,14 +28,15 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 2. `App.js` calls `initDB()`:
    - **native** — opens `locknote.db`, sets WAL + foreign keys, creates `folders`/`notes` tables and indexes if absent
    - **web** — no-op (AsyncStorage is schemaless)
-3. Once ready, renders `AppNavigator`; a spinner shows until then.
+3. Runs best-effort Trash cleanup for soft-deleted records that reached 30 days.
+4. Once ready, renders `AppNavigator`; a spinner shows until then.
 
 ## Navigation
 
 `AppNavigator` = bottom tab navigator with four tabs:
 
 - **Home** (native stack): `HomeScreen` → `FolderScreen` → the note-type editor (`NoteEditorScreen`, `ChecklistEditorScreen`, `ExpenseRecordEditorScreen`, or `ReminderEditorScreen`)
-- **Settings** (native stack): `SettingsScreen`
+- **Settings** (native stack): `SettingsScreen` → `ArchiveScreen` / `TrashScreen`; Archive can open an archived `FolderScreen` or any note-type editor
 - **Shared** (native stack): `SharedScreen` → a shared note-type editor
 - **Profile** (native stack): `ProfileTabScreen` → `AuthScreen` (logged out) or `ProfileScreen` (logged in), switched via `useAuth()`
 
@@ -58,8 +59,9 @@ dialog on native and web. Destructive flows can also provide item details withou
 changing their existing repository or password-gating behavior.
 
 List items expose contextual actions through long-press on native and a visible
-three-dots button on web. Note actions are color, pin, move, and soft-delete; folder
-actions are rename, pin, and soft-delete. Moving a note updates `folder_id`, with `null`
+three-dots button on web. Note actions are color, pin, move, archive, and soft-delete;
+folder actions are rename, pin, archive, and move to Trash. Moving a note updates
+`folder_id`, with `null`
 representing Home. Deleting a folder soft-deletes its contained notes first so
 normal reads do not leave inaccessible active notes behind. Deleting a locked
 note uses one combined destructive confirmation that shows the note details,
@@ -71,9 +73,9 @@ confirmation is shown; unlocked-item deletion is unchanged.
 
 Two tables / collections. Timestamps are ISO strings; IDs are generated client-side (`Date.now()` base36 + random suffix).
 
-**folders**: `id, name, password, is_deleted, created_at, updated_at`
+**folders**: `id, name, password, is_deleted, is_pinned, is_archived, created_at, updated_at`
 
-**notes**: `id, folder_id (nullable → root note), title, content, note_type, password, is_deleted, created_at, updated_at`
+**notes**: `id, folder_id (nullable → root note), title, content, note_type, password, is_deleted, is_pinned, is_archived, created_at, updated_at` plus collaboration/sync metadata
 
 **sync_tombstones** (native) / per-repository tombstone keys (web): deleted
 folder/note IDs and deletion timestamps. Normal reads still filter deleted rows;
@@ -135,11 +137,40 @@ expense note. This app-level template is stored locally in AsyncStorage under
 `@locknote_monthly_commitment_template`, excludes paid state and note-specific
 IDs, and creates fresh unpaid commitments when applied.
 
-On native, `notes.folder_id` has `ON DELETE CASCADE` and there are indexes on `folder_id` and both `is_deleted` columns.
+On native, `notes.folder_id` has `ON DELETE CASCADE`; archive indexes cover both folders and notes, alongside the existing folder/deletion indexes.
 
 ### Conventions
 
-- **Soft delete** — `softDelete()` sets `is_deleted = 1`; every read filters `is_deleted = 0`. `hardDelete()` exists but is not wired to any UI.
+- **Archive** — folder/note `archive()` sets `is_archived = 1`. Home and folder
+  list reads exclude archived rows; search also excludes ordinary notes whose
+  parent folder is archived. Settings → Archive intentionally reads archived
+  folders and private/owned notes through each repository's `getArchived()`.
+  Opening an archived folder shows its visible child notes without rewriting
+  their own archive flags. Restoring a folder therefore reveals its visible
+  contents again while notes archived individually remain archived. Moving an
+  archived folder to Trash follows normal folder-deletion semantics: every
+  active child note moves to Trash as a root note and the folder container is
+  permanently removed. Folder and note archive state is included in portable
+  backups and private-account sync.
+
+- **Soft delete** — note `softDelete()` sets `is_deleted = 1`; normal reads
+  filter `is_deleted = 0`. Settings → Trash is the intentional exception and
+  reads deleted notes through `noteRepo.getDeleted()`. Restore removes the note
+  tombstone and advances `updated_at` so a later private sync can propagate the
+  active record. A note returns to its original folder when that folder still
+  exists, otherwise it returns to Home. Previously shared notes return as
+  private notes because their cloud collaboration was removed when deleted.
+- **Folder deletion** — folders are not retained in Trash. After their active
+  notes are soft-deleted, `noteRepo.detachFromFolder()` moves those trashed
+  notes to Home/root semantics and the folder is hard-deleted. Startup/Trash
+  cleanup applies the same conversion to legacy soft-deleted folders.
+- **30-day Trash retention** — startup and opening Trash call `trashService.purgeExpired()`.
+  The soft-deletion `updated_at` is the deletion time. At 30 days, the local
+  note row is hard-deleted; sync tombstones are retained because they do
+  not contain note content and are still needed to prevent resurrection on
+  another device. Each row has a three-dots menu for Restore and Delete forever.
+  Locked notes require their password before user-triggered permanent deletion.
+  Empty Trash removes unlocked notes and leaves locked ones for individual confirmation.
 - **Root notes** — `folder_id IS NULL` means the note lives on the Home screen, not in a folder.
 - **Ordering** — folders by `created_at DESC`, notes by `updated_at DESC`.
 
@@ -209,7 +240,7 @@ remain SHA-256 access-gate hashes; they are never uploaded as plaintext.
 
 Settings → Export Backup builds a schema-versioned `locknote-backup` JSON file
 from the repositories' active private/owned records and sync tombstones. The
-file includes folders, notes, note types, pin state, ISO timestamps, nullable
+file includes folders, notes, note types, pin/archive state, ISO timestamps, nullable
 `folder_id` relationships, and existing SHA-256 access-gate hashes. It does not
 include incoming shared-note caches or account/collaboration identifiers.
 

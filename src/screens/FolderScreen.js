@@ -264,6 +264,16 @@ const FolderScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleArchiveNote = async (note) => {
+    try {
+      const archived = await noteRepo.archive(note.id);
+      if (!archived) throw new Error('Note no longer exists');
+      loadNotes();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to archive note');
+    }
+  };
+
   const openItemActions = (note) => {
     setItemActions({ visible: true, note });
   };
@@ -406,6 +416,7 @@ const FolderScreen = ({ route, navigation }) => {
         onTogglePin={() => handleToggleNotePin(itemActions.note)}
         onMove={() => openMoveNote(itemActions.note)}
         onColor={() => setColorNote(itemActions.note)}
+        onArchive={() => handleArchiveNote(itemActions.note)}
         onDelete={() => handleDeleteNote(itemActions.note)}
       />
 

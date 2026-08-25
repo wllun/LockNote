@@ -10,14 +10,14 @@ export const noteRepo = {
   async getRootNotes() {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE folder_id IS NULL AND is_deleted = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, updated_at DESC`
+      `SELECT * FROM notes WHERE folder_id IS NULL AND is_deleted = 0 AND is_archived = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, updated_at DESC`
     );
   },
 
   async getByFolderId(folderId) {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, updated_at DESC`,
+      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 AND is_archived = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, updated_at DESC`,
       [folderId]
     );
   },
@@ -27,6 +27,29 @@ export const noteRepo = {
     return await db.getFirstAsync(
       `SELECT * FROM notes WHERE id = ? AND is_deleted = 0`,
       [id]
+    );
+  },
+
+  // Trash is the only UI allowed to read soft-deleted note rows.
+  async getDeleted() {
+    const db = getDB();
+    return await db.getAllAsync(
+      `SELECT * FROM notes WHERE is_deleted = 1 ORDER BY updated_at DESC`
+    );
+  },
+
+  async getActiveByFolderId(folderId) {
+    const db = getDB();
+    return await db.getAllAsync(
+      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 AND share_origin != 'incoming' ORDER BY updated_at DESC`,
+      [folderId]
+    );
+  },
+
+  async getArchived() {
+    const db = getDB();
+    return await db.getAllAsync(
+      `SELECT * FROM notes WHERE is_deleted = 0 AND is_archived = 1 AND share_origin != 'incoming' ORDER BY updated_at DESC`
     );
   },
 
@@ -76,6 +99,10 @@ export const noteRepo = {
       fields.push('is_pinned = ?');
       values.push(updates.is_pinned ? 1 : 0);
     }
+    if (updates.is_archived !== undefined) {
+      fields.push('is_archived = ?');
+      values.push(updates.is_archived ? 1 : 0);
+    }
     for (const field of [
       'cloud_id', 'cloud_owner_id', 'share_origin', 'share_role',
       'collaborator_count', 'server_revision', 'last_edited_by_id',
@@ -122,10 +149,64 @@ export const noteRepo = {
         [timestamp, id]
       );
       await txn.runAsync(
-        `UPDATE notes SET is_deleted = 1, updated_at = ? WHERE id = ?`,
+        `UPDATE notes SET is_deleted = 1, is_archived = 0, updated_at = ? WHERE id = ?`,
         [timestamp, id]
       );
     });
+  },
+
+  async archive(id) {
+    const db = getDB();
+    await db.runAsync(
+      `UPDATE notes SET is_archived = 1, updated_at = ?
+       WHERE id = ? AND is_deleted = 0 AND share_origin != 'incoming'`,
+      [now(), id]
+    );
+    return await this.getById(id);
+  },
+
+  async unarchive(id) {
+    const db = getDB();
+    await db.runAsync(
+      `UPDATE notes SET is_archived = 0, updated_at = ?
+       WHERE id = ? AND is_deleted = 0 AND share_origin != 'incoming'`,
+      [now(), id]
+    );
+    return await this.getById(id);
+  },
+
+  async restore(id, folderId = null) {
+    const db = getDB();
+    const timestamp = now();
+    await db.withExclusiveTransactionAsync(async (txn) => {
+      await txn.runAsync(
+        `UPDATE notes SET
+           folder_id = ?, is_deleted = 0, is_archived = 0, updated_at = ?,
+           cloud_id = NULL, cloud_owner_id = NULL, share_origin = 'private',
+           share_role = NULL, collaborator_count = 0, server_revision = 0,
+           last_edited_by_id = NULL, last_edited_by_email = NULL,
+           last_edited_at = NULL, sync_status = NULL, last_synced_at = NULL
+         WHERE id = ? AND is_deleted = 1 AND share_origin != 'incoming'`,
+        [folderId, timestamp, id]
+      );
+      await txn.runAsync(
+        `DELETE FROM sync_tombstones WHERE entity_type = 'note' AND entity_id = ?`,
+        [id]
+      );
+    });
+    return await this.getById(id);
+  },
+
+  async detachFromFolder(folderId) {
+    const db = getDB();
+    const timestamp = now();
+    await db.runAsync(
+      `UPDATE notes
+       SET folder_id = NULL,
+           updated_at = CASE WHEN is_deleted = 0 THEN ? ELSE updated_at END
+       WHERE folder_id = ?`,
+      [timestamp, folderId]
+    );
   },
 
   async hardDelete(id) {
@@ -146,7 +227,18 @@ export const noteRepo = {
   async search(query) {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE is_deleted = 0 AND share_origin != 'incoming' AND (title LIKE ? OR content LIKE ?) ORDER BY is_pinned DESC, updated_at DESC`,
+      `SELECT notes.* FROM notes
+       WHERE notes.is_deleted = 0
+         AND notes.is_archived = 0
+         AND notes.share_origin != 'incoming'
+         AND NOT EXISTS (
+           SELECT 1 FROM folders
+           WHERE folders.id = notes.folder_id
+             AND folders.is_deleted = 0
+             AND folders.is_archived = 1
+         )
+         AND (notes.title LIKE ? OR notes.content LIKE ?)
+       ORDER BY notes.is_pinned DESC, notes.updated_at DESC`,
       [`%${query}%`, `%${query}%`]
     );
   },
@@ -154,7 +246,7 @@ export const noteRepo = {
   async getSharedWithMe() {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE is_deleted = 0 AND share_origin = 'incoming' ORDER BY last_edited_at DESC, updated_at DESC`
+      `SELECT * FROM notes WHERE is_deleted = 0 AND is_archived = 0 AND share_origin = 'incoming' ORDER BY last_edited_at DESC, updated_at DESC`
     );
   },
 
@@ -195,11 +287,11 @@ export const noteRepo = {
         await txn.runAsync(
           `INSERT INTO notes (
              id, folder_id, title, content, note_type, password, is_deleted,
-             is_pinned, created_at, updated_at, cloud_id, cloud_owner_id,
+             is_pinned, is_archived, created_at, updated_at, cloud_id, cloud_owner_id,
              share_origin, share_role, collaborator_count, server_revision,
              last_edited_by_id, last_edited_by_email, last_edited_at,
              sync_status, last_synced_at
-           ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
              folder_id = excluded.folder_id,
              title = excluded.title,
@@ -208,6 +300,7 @@ export const noteRepo = {
              password = excluded.password,
              is_deleted = 0,
              is_pinned = excluded.is_pinned,
+             is_archived = excluded.is_archived,
              created_at = excluded.created_at,
              updated_at = excluded.updated_at,
              cloud_id = excluded.cloud_id,
@@ -231,6 +324,7 @@ export const noteRepo = {
             note.note_type || 'note',
             note.password || null,
             note.is_pinned ? 1 : 0,
+            note.is_archived ? 1 : 0,
             note.created_at,
             note.updated_at,
             note.cloud_id || null,
@@ -263,7 +357,7 @@ export const noteRepo = {
           [tombstone.id, tombstone.updated_at]
         );
         await txn.runAsync(
-          `UPDATE notes SET is_deleted = 1, updated_at = ?
+          `UPDATE notes SET is_deleted = 1, is_archived = 0, updated_at = ?
            WHERE id = ? AND share_origin != 'incoming' AND updated_at <= ?`,
           [tombstone.updated_at, tombstone.id, tombstone.updated_at]
         );
@@ -281,11 +375,11 @@ export const noteRepo = {
         await txn.runAsync(
           `INSERT INTO notes (
              id, folder_id, title, content, note_type, password, is_deleted,
-             is_pinned, created_at, updated_at, cloud_id, cloud_owner_id,
+             is_pinned, is_archived, created_at, updated_at, cloud_id, cloud_owner_id,
              share_origin, share_role, collaborator_count, server_revision,
              last_edited_by_id, last_edited_by_email, last_edited_at,
              sync_status, last_synced_at
-           ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, NULL, NULL, 'private', NULL, 0, 0,
+           ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, NULL, NULL, 'private', NULL, 0, 0,
              NULL, NULL, NULL, NULL, NULL)
            ON CONFLICT(id) DO NOTHING`,
           [
@@ -296,6 +390,7 @@ export const noteRepo = {
             note.note_type || 'note',
             note.password || null,
             note.is_pinned ? 1 : 0,
+            note.is_archived ? 1 : 0,
             note.created_at,
             note.updated_at,
           ]

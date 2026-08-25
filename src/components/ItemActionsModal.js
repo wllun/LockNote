@@ -19,13 +19,23 @@ const ItemActionsModal = ({
   onTogglePin,
   onColor,
   onMove,
+  onArchive,
+  trashMode = false,
+  archiveMode = false,
+  onRestore,
   onDelete,
 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const isNote = itemType === 'note';
-  const title = isNote ? 'Note actions' : 'Folder actions';
+  const title = trashMode
+    ? 'Trash actions'
+    : archiveMode
+      ? `Archived ${itemType} actions`
+      : isNote
+        ? 'Note actions'
+        : 'Folder actions';
 
   const runAction = (action) => {
     onClose();
@@ -75,28 +85,44 @@ const ItemActionsModal = ({
             </Pressable>
           </View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.action,
-              pressed && styles.pressed,
-            ]}
-            onPress={() => runAction(onTogglePin)}
-            accessibilityRole="button"
-            accessibilityLabel={isPinned ? `Unpin ${itemType}` : `Pin ${itemType}`}
-          >
-            <View style={styles.actionIcon}>
-              <Ionicons
-                name={isPinned ? 'pin' : 'pin-outline'}
-                size={20}
-                color={isPinned ? colors.primary : colors.textSecondary}
-              />
-            </View>
-            <Text style={styles.actionText}>
-              {isPinned ? 'Unpin' : 'Pin'}
-            </Text>
-          </Pressable>
+          {(trashMode || archiveMode) && (
+            <Pressable
+              style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+              onPress={() => runAction(onRestore)}
+              accessibilityRole="button"
+              accessibilityLabel={`Restore ${itemType}`}
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons name="arrow-undo-outline" size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.actionText}>Restore</Text>
+            </Pressable>
+          )}
 
-          {isNote && (
+          {!trashMode && !archiveMode && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.action,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => runAction(onTogglePin)}
+              accessibilityRole="button"
+              accessibilityLabel={isPinned ? `Unpin ${itemType}` : `Pin ${itemType}`}
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons
+                  name={isPinned ? 'pin' : 'pin-outline'}
+                  size={20}
+                  color={isPinned ? colors.primary : colors.textSecondary}
+                />
+              </View>
+              <Text style={styles.actionText}>
+                {isPinned ? 'Unpin' : 'Pin'}
+              </Text>
+            </Pressable>
+          )}
+
+          {!trashMode && !archiveMode && isNote && !!onColor && (
             <Pressable
               style={({ pressed }) => [styles.action, pressed && styles.pressed]}
               onPress={() => runAction(onColor)}
@@ -110,7 +136,7 @@ const ItemActionsModal = ({
             </Pressable>
           )}
 
-          {isNote && (
+          {!trashMode && !archiveMode && isNote && !!onMove && (
             <Pressable
               style={({ pressed }) => [
                 styles.action,
@@ -131,6 +157,20 @@ const ItemActionsModal = ({
             </Pressable>
           )}
 
+          {!trashMode && !archiveMode && !!onArchive && (
+            <Pressable
+              style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+              onPress={() => runAction(onArchive)}
+              accessibilityRole="button"
+              accessibilityLabel={`Archive ${itemType}`}
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons name="archive-outline" size={20} color={colors.textSecondary} />
+              </View>
+              <Text style={styles.actionText}>Archive</Text>
+            </Pressable>
+          )}
+
           <Pressable
             style={({ pressed }) => [
               styles.action,
@@ -139,13 +179,19 @@ const ItemActionsModal = ({
             ]}
             onPress={() => runAction(onDelete)}
             accessibilityRole="button"
-            accessibilityLabel={`Delete ${itemType}`}
+            accessibilityLabel={
+              trashMode
+                ? `Permanently delete ${itemType}`
+                : archiveMode
+                  ? `Move ${itemType} to Trash`
+                  : `Delete ${itemType}`
+            }
           >
             <View style={[styles.actionIcon, styles.deleteIcon]}>
               <Ionicons name="trash-outline" size={20} color={colors.danger} />
             </View>
             <Text style={[styles.actionText, styles.deleteText]}>
-              Delete
+              {trashMode ? 'Delete forever' : archiveMode ? 'Move to Trash' : 'Delete'}
             </Text>
           </Pressable>
         </View>
