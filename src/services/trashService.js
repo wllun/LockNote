@@ -1,7 +1,6 @@
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
 import { cancelNoteReminder } from '../utils/reminder-cleanup';
-import { noteColorPreference } from '../utils/note-color-preference';
 import { isTrashExpired } from '../utils/trash.mjs';
 
 const isVisibleTrashNote = (note) => note?.share_origin !== 'incoming';
@@ -9,7 +8,6 @@ const isVisibleTrashNote = (note) => note?.share_origin !== 'incoming';
 const permanentlyDeleteNote = async (note) => {
   await cancelNoteReminder(note);
   await noteRepo.hardDelete(note.id);
-  await noteColorPreference.remove(note.id);
 };
 
 const discardDeletedFolders = async () => {
