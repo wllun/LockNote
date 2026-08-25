@@ -139,11 +139,11 @@ const AppNavigator = () => {
         <Tab.Screen name="Home">
           {() => <HomeStack screenOptions={stackScreenOptions} />}
         </Tab.Screen>
-        <Tab.Screen name="Settings">
-          {() => <SettingsStack screenOptions={stackScreenOptions} />}
-        </Tab.Screen>
         <Tab.Screen name="Shared">
           {() => <SharedStack screenOptions={stackScreenOptions} />}
+        </Tab.Screen>
+        <Tab.Screen name="Settings">
+          {() => <SettingsStack screenOptions={stackScreenOptions} />}
         </Tab.Screen>
         <Tab.Screen name="Profile">
           {() => <ProfileStack screenOptions={stackScreenOptions} />}
