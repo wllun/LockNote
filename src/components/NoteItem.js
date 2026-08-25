@@ -49,6 +49,7 @@ const NoteItem = ({
   const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
   const isChecklist = note.note_type === CHECKLIST_NOTE_TYPE;
   const isReminder = note.note_type === REMINDER_NOTE_TYPE;
+  const isPlainNote = !isExpense && !isChecklist && !isReminder;
   const expense = isExpense ? parseExpenseNote(note.content) : null;
   const checklistItems = isChecklist ? parseChecklistNote(note.content).items : [];
   const reminder = isReminder ? parseReminderNote(note.content).reminder : null;
@@ -105,6 +106,12 @@ const NoteItem = ({
           <Text style={styles.title} numberOfLines={1}>
             {displayTitle}
           </Text>
+          {isPlainNote && (
+            <View style={styles.typeBadge}>
+              <Ionicons name="document-text-outline" size={12} color={colors.primary} />
+              <Text style={styles.typeBadgeText}>Note</Text>
+            </View>
+          )}
           {isExpense && (
             <View style={styles.typeBadge}>
               <Ionicons name="receipt-outline" size={12} color={colors.primary} />
