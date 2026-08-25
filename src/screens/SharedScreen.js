@@ -10,6 +10,7 @@ import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { radius, useTheme } from '../theme';
+import { noteColorPreference } from '../utils/note-color-preference';
 
 const routeFor = (note) => note.note_type === EXPENSE_NOTE_TYPE ? 'ExpenseRecordEditor' : note.note_type === CHECKLIST_NOTE_TYPE ? 'ChecklistEditor' : note.note_type === REMINDER_NOTE_TYPE ? 'ReminderEditor' : 'NoteEditor';
 
@@ -18,9 +19,9 @@ const SharedScreen = ({ navigation }) => {
   const { session, loading: authLoading } = useAuth();
   const [notes, setNotes] = useState([]); const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [message, setMessage] = useState('');
   const load = useCallback(async ({ refresh = true } = {}) => {
-    const cached = await noteRepo.getSharedWithMe(); setNotes(cached); setLoading(false);
+    const cached = await noteRepo.getSharedWithMe(); setNotes(await noteColorPreference.applyToNotes(cached)); setLoading(false);
     if (!refresh || !session || !isSupabaseConfigured) return;
-    try { const next = await collaborationService.refreshSharedWithMe(); setNotes(next); setMessage(''); }
+    try { const next = await collaborationService.refreshSharedWithMe(); setNotes(await noteColorPreference.applyToNotes(next)); setMessage(''); }
     catch (error) { setMessage(cached.length ? 'Offline · showing saved shared notes' : (error.message || 'Could not load shared notes.')); }
   }, [session?.user?.id]);
   useEffect(() => { load(); const unsubscribeFocus = navigation.addListener('focus', load); const unsubscribeCloud = collaborationService.subscribe(load); return () => { unsubscribeFocus(); unsubscribeCloud(); }; }, [load, navigation]);

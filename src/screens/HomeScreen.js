@@ -22,6 +22,7 @@ import PasswordModal from '../components/PasswordModal';
 import CreateNoteTypeModal from '../components/create-note-type-modal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import MoveNoteModal from '../components/MoveNoteModal';
+import NoteColorModal from '../components/note-color-modal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
@@ -30,6 +31,7 @@ import { confirmDestructiveAction } from '../utils/confirm-action';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
 import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
+import { noteColorPreference } from '../utils/note-color-preference';
 import {
   FOLDER_VIEW_MODES,
   FOLDER_VIEW_MODE_STORAGE_KEY,
@@ -83,6 +85,7 @@ const HomeScreen = ({ navigation }) => {
     note: null,
     folders: [],
   });
+  const [colorNote, setColorNote] = useState(null);
   const [folderNoteCounts, setFolderNoteCounts] = useState({});
   const [folderViewMode, setFolderViewMode] = useState('list');
   const [noteViewMode, setNoteViewMode] = useState('list');
@@ -93,9 +96,12 @@ const HomeScreen = ({ navigation }) => {
         folderRepo.getAll(),
         noteRepo.getRootNotes(),
       ]);
-      const noteCounts = await getFolderNoteCounts(foldersData);
+      const [noteCounts, coloredNotes] = await Promise.all([
+        getFolderNoteCounts(foldersData),
+        noteColorPreference.applyToNotes(notesData),
+      ]);
       setFolders(foldersData);
-      setNotes(notesData);
+      setNotes(coloredNotes);
       setFolderNoteCounts(noteCounts);
     } catch (error) {
       Alert.alert('Error', 'Failed to load data');
@@ -115,8 +121,11 @@ const HomeScreen = ({ navigation }) => {
   const runSearch = useCallback(async (q) => {
     try {
       const [f, n] = await Promise.all([folderRepo.search(q), noteRepo.search(q)]);
-      const noteCounts = await getFolderNoteCounts(f);
-      setResults({ folders: f, notes: n });
+      const [noteCounts, coloredNotes] = await Promise.all([
+        getFolderNoteCounts(f),
+        noteColorPreference.applyToNotes(n),
+      ]);
+      setResults({ folders: f, notes: coloredNotes });
       setFolderNoteCounts((current) => ({ ...current, ...noteCounts }));
     } catch (error) {
       setResults({ folders: [], notes: [] });
@@ -133,9 +142,12 @@ const HomeScreen = ({ navigation }) => {
     (async () => {
       try {
         const [f, n] = await Promise.all([folderRepo.search(q), noteRepo.search(q)]);
-        const noteCounts = await getFolderNoteCounts(f);
+        const [noteCounts, coloredNotes] = await Promise.all([
+          getFolderNoteCounts(f),
+          noteColorPreference.applyToNotes(n),
+        ]);
         if (!cancelled) {
-          setResults({ folders: f, notes: n });
+          setResults({ folders: f, notes: coloredNotes });
           setFolderNoteCounts((current) => ({ ...current, ...noteCounts }));
         }
       } catch (error) {
@@ -272,6 +284,19 @@ const HomeScreen = ({ navigation }) => {
       refreshCurrent();
     } catch (error) {
       Alert.alert('Error', 'Failed to update pin');
+    }
+  };
+
+  const handleChangeNoteColor = async (color) => {
+    const note = colorNote;
+    setColorNote(null);
+    if (!note) return;
+    try {
+      await noteColorPreference.save(note.id, color);
+      refreshCurrent();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to change note color');
+      refreshCurrent();
     }
   };
 
@@ -679,6 +704,11 @@ const HomeScreen = ({ navigation }) => {
             ? () => openMoveNote(itemActions.item)
             : undefined
         }
+        onColor={
+          itemActions.type === 'note'
+            ? () => setColorNote(itemActions.item)
+            : undefined
+        }
         onDelete={() => {
           if (itemActions.type === 'folder') {
             handleDeleteFolder(itemActions.item);
@@ -686,6 +716,13 @@ const HomeScreen = ({ navigation }) => {
             handleDeleteNote(itemActions.item);
           }
         }}
+      />
+
+      <NoteColorModal
+        visible={!!colorNote}
+        value={colorNote?.color}
+        onClose={() => setColorNote(null)}
+        onSelect={handleChangeNoteColor}
       />
 
       <MoveNoteModal

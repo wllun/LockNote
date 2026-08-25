@@ -1,6 +1,6 @@
 # Project State — TODO
 
-_Snapshot: 2026-08-24. Check off items as they land._
+_Snapshot: 2026-08-25. Check off items as they land._
 
 ## Done
 
@@ -97,7 +97,7 @@ When the user presses the Add button, let them choose one of these note types:
 ### Additional / backlog (unphased)
 
 - [X] Pin — already shipped free in Phase 1 scope; decide which tier it belongs to
-- [ ] Coloring note
+- [X] Coloring note — notes can use Default, Rose, Orange, Yellow, Green, Blue, or Purple from list actions and every editor. Semantic colors adapt to light/dark mode and are saved only as a per-device AsyncStorage preference; they are excluded from note rows, backup, private sync, and collaboration.
 - [ ] Custom note background images — allow users to select, change, or remove a background image per note while preserving text readability and local-only storage
 - [X] View controls — Home independently persists Folder List/Strip and Note List/Grid choices. Search results follow their section setting, notes inside folders inherit the Notes choice, and the former combined preference migrates automatically. Mobile contextual actions use long-press, while web retains visible three-dot controls.
 - [ ] Sort

@@ -30,6 +30,7 @@ import EditorUndoButton from '../components/editor-undo-button';
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
+import NoteColorModal from '../components/note-color-modal';
 import { collaborationService } from '../services/collaborationService';
 import PasswordModal from '../components/PasswordModal';
 import ExpenseSummaryModal from '../components/ExpenseSummaryModal';
@@ -76,6 +77,8 @@ import {
 import { expenseCurrencyPreference } from '../utils/expense-currency-preference';
 import { radius, shadow, useTheme } from '../theme';
 import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
+import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
+import { noteColorPreference } from '../utils/note-color-preference';
 
 const EXPENSE_ROW_MIN_HEIGHT = 48;
 const EXPENSE_REMARK_MAX_HEIGHT = 82;
@@ -262,6 +265,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [commitmentDraft, setCommitmentDraft] = useState(null);
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
+  const [showColorModal, setShowColorModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -307,6 +312,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     currencyChanged: false,
     hasPassword: false,
     isPinned: false,
+    color: DEFAULT_NOTE_COLOR,
     cloudId: null,
     deleted: false,
   });
@@ -387,6 +393,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     try {
       const note = await noteRepo.getById(noteId);
       if (!note) return;
+      const localColor = await noteColorPreference.load(noteId);
 
       const parsed = parseExpenseNote(note.content);
       const loadedCurrency = note.content
@@ -416,6 +423,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       setCurrency(loadedCurrency);
       setHasPassword(!!note.password);
       setIsPinned(!!note.is_pinned);
+      setNoteColor(localColor);
       latest.current = {
         ...latest.current,
         title: loadedTitle,
@@ -428,6 +436,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         currencyChanged: false,
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
+        color: localColor,
         cloudId: note.cloud_id,
       };
       clearUndo();
@@ -1235,6 +1244,18 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleChangeColor = async (color) => {
+    const nextColor = normalizeNoteColor(color);
+    setShowColorModal(false);
+    setNoteColor(nextColor);
+    latest.current.color = nextColor;
+    try {
+      await noteColorPreference.save(noteId, nextColor);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to change expense note color');
+    }
+  };
+
   const deleteExpenseRecord = async () => {
     try {
       if (saveTimeout.current) {
@@ -1243,6 +1264,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       }
       latest.current.deleted = true;
       await collaborationService.delete(noteId);
+      await noteColorPreference.remove(noteId);
       navigation.goBack();
     } catch {
       latest.current.deleted = false;
@@ -1299,6 +1321,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     !draft.cloudId &&
     !draft.hasPassword &&
     !draft.isPinned &&
+    draft.color === DEFAULT_NOTE_COLOR &&
     isExpenseNoteEmpty(
       draft.title,
       draft.rows,
@@ -1323,6 +1346,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     if (draft.deleted) return;
     if (isEmptyDraft(draft)) {
       await noteRepo.hardDelete(noteId);
+      await noteColorPreference.remove(noteId);
     } else if (pending) {
       await collaborationService.save(noteId, {
         title: draft.title.trim(),
@@ -1339,14 +1363,16 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 
+  const noteColorTheme = getNoteColorTheme(noteColor, colors);
+
   return (
     <KeyboardAvoidingView
       ref={dragAreaRef}
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[styles.container, { paddingTop: insets.top, backgroundColor: noteColorTheme.surface }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       onLayout={measureDragArea}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: noteColorTheme.surface }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.headerButton}
@@ -2057,6 +2083,16 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               <Text style={styles.actionsMenuText}>Share with people</Text>
             </Pressable>
             <Pressable
+              style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
+              onPress={() => { setShowActionsMenu(false); setShowColorModal(true); }}
+              accessibilityRole="button"
+              accessibilityLabel="Change expense note color"
+            >
+              <Ionicons name="color-palette-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Color</Text>
+            </Pressable>
+
+            <Pressable
               style={({ pressed }) => [
                 styles.actionsMenuItem,
                 pressed && styles.actionsMenuItemPressed,
@@ -2185,6 +2221,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         type="expense"
       />
       <NoteShareModal visible={showShareModal} noteId={noteId} onClose={() => setShowShareModal(false)} onChanged={loadRecord} onLeft={() => navigation.goBack()} />
+      <NoteColorModal visible={showColorModal} value={noteColor} onClose={() => setShowColorModal(false)} onSelect={handleChangeColor} />
 
       <PasswordModal
         visible={showDeletePasswordModal}

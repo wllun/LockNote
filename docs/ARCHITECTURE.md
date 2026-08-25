@@ -58,7 +58,7 @@ dialog on native and web. Destructive flows can also provide item details withou
 changing their existing repository or password-gating behavior.
 
 List items expose contextual actions through long-press on native and a visible
-three-dots button on web. Note actions are pin, move, and soft-delete; folder
+three-dots button on web. Note actions are color, pin, move, and soft-delete; folder
 actions are rename, pin, and soft-delete. Moving a note updates `folder_id`, with `null`
 representing Home. Deleting a folder soft-deletes its contained notes first so
 normal reads do not leave inaccessible active notes behind. Deleting a locked
@@ -95,6 +95,15 @@ daily-expense rows; saving a normalized category name again updates it
 instead of creating a duplicate. The note's `title` remains in the normal title
 column. Expense grand totals add daily-expense rows and checked monthly
 commitments; unchecked commitments are excluded.
+
+Note colors are presentation preferences, not note data. AsyncStorage key
+`@locknote_note_colors` maps local note IDs to a semantic palette name
+(`rose`, `orange`, `yellow`, `green`, `blue`, or `purple`); absence means
+`default`. Screens merge this preference into repository results only for
+rendering. It is device-local and excluded from SQLite note rows, web note
+records, backup, private account sync, and shared-note collaboration. A
+non-default local color still makes an otherwise empty draft meaningful on that
+device, so editor exit cleanup does not discard it.
 
 The device-level default expense currency is stored in AsyncStorage under
 `@locknote_expense_currency` and is read when a new, still-empty expense note is
@@ -223,7 +232,7 @@ Backup JSON contains plaintext note content and is not encrypted.
 
 ## Shared-note collaboration
 
-Release 1 shares individual notes by registered account email. Once sharing begins, the local row stores a cloud ID, ownership/origin, collaborator count, server revision, sync state, and last-editor metadata. Incoming notes are excluded from Home, folder, private-account sync, and search reads and appear only in the Shared tab.
+Release 1 shares individual notes by registered account email. Once sharing begins, the local row stores a cloud ID, ownership/origin, collaborator count, server revision, sync state, and last-editor metadata. Note color is not part of the collaborative snapshot; each collaborator may color the cached note independently on their own device. Incoming notes are excluded from Home, folder, private-account sync, and search reads and appear only in the Shared tab.
 
 Supabase stores `profiles`, `shared_notes`, and `note_members`. Row-level security limits reads to the owner and current members. Email lookup is performed by the authenticated `share-note` Edge Function so the client cannot enumerate account emails and never receives a service-role key. Content saves use an expected server revision; stale saves fail instead of silently replacing newer content. Realtime table events refresh the local cache and an open editor. Release 1 synchronizes complete saved note snapshots and does not provide character-level CRDT cursor merging.
 

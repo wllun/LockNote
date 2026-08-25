@@ -27,6 +27,15 @@ const lightColors = {
   backdropSoft: 'rgba(0,0,0,0.50)',
   backdrop: 'rgba(0,0,0,0.50)',
   backdropStrong: 'rgba(0,0,0,0.50)',
+  noteColors: {
+    default: { surface: '#FFFFFF', accent: '#CBD0DC' },
+    rose: { surface: '#FFF0F3', accent: '#E11D48' },
+    orange: { surface: '#FFF2E7', accent: '#EA580C' },
+    yellow: { surface: '#FFF8D8', accent: '#CA8A04' },
+    green: { surface: '#EAF8EF', accent: '#16A34A' },
+    blue: { surface: '#EAF3FF', accent: '#2563EB' },
+    purple: { surface: '#F3EDFF', accent: '#7C3AED' },
+  },
 };
 
 const darkColors = {
@@ -48,6 +57,15 @@ const darkColors = {
   backdropSoft: 'rgba(0,0,0,0.50)',
   backdrop: 'rgba(0,0,0,0.50)',
   backdropStrong: 'rgba(0,0,0,0.50)',
+  noteColors: {
+    default: { surface: '#1C2233', accent: '#59647C' },
+    rose: { surface: '#321B25', accent: '#FB7185' },
+    orange: { surface: '#342318', accent: '#FB923C' },
+    yellow: { surface: '#332F18', accent: '#FACC15' },
+    green: { surface: '#173023', accent: '#4ADE80' },
+    blue: { surface: '#192A3D', accent: '#60A5FA' },
+    purple: { surface: '#29213D', accent: '#A78BFA' },
+  },
 };
 
 export const radius = {

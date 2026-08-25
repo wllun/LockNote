@@ -12,6 +12,7 @@ import KeyboardAwareModalContent from '../components/keyboard-aware-modal-conten
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
+import NoteColorModal from '../components/note-color-modal';
 import { collaborationService } from '../services/collaborationService';
 import PasswordModal from '../components/PasswordModal';
 import ReminderScheduleModal from '../components/reminder-schedule-modal';
@@ -31,6 +32,8 @@ import {
 } from '../utils/reminder-notifications';
 import { radius, shadow, useTheme } from '../theme';
 import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
+import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
+import { noteColorPreference } from '../utils/note-color-preference';
 
 const ReminderEditorScreen = ({ route, navigation }) => {
   const { noteId } = route.params;
@@ -42,6 +45,8 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const [reminder, setReminder] = useState(() => normalizeReminder());
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
+  const [showColor, setShowColor] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -54,7 +59,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const saveTimeout = useRef(null);
   const bodyRef = useRef(null);
   const bodyLimitDialogShown = useRef(false);
-  const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, cloudId: null, deleted: false });
+  const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, cloudId: null, deleted: false });
   const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
 
   const contentFor = (nextBody, nextReminder) => serializeReminderNote({ body: nextBody, reminder: nextReminder });
@@ -80,8 +85,9 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     }, 800);
   }, [noteId]);
 
-  const applyLoadedNote = useCallback((note) => {
+  const applyLoadedNote = useCallback(async (note) => {
       if (!note) return;
+      const localColor = await noteColorPreference.load(noteId);
       const parsed = parseReminderNote(note.content);
       const next = {
         ...latest.current,
@@ -90,12 +96,13 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         reminder: parsed.reminder,
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
+        color: localColor,
         cloudId: note.cloud_id,
       };
       latest.current = next;
       setTitle(next.title); setBody(next.body); setReminder(next.reminder);
-      setHasPassword(next.hasPassword); setIsPinned(next.isPinned); clearUndo();
-  }, [clearUndo]);
+      setHasPassword(next.hasPassword); setIsPinned(next.isPinned); setNoteColor(next.color); clearUndo();
+  }, [clearUndo, noteId]);
 
   useEffect(() => {
     noteRepo.getById(noteId).then(applyLoadedNote)
@@ -104,7 +111,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
   const needsExitCleanup = useCallback(() => {
     const draft = latest.current;
-    const empty = !draft.cloudId && isReminderNoteEmpty(draft);
+    const empty = !draft.cloudId && isReminderNoteEmpty(draft) && draft.color === DEFAULT_NOTE_COLOR;
     return !draft.deleted && (empty || !!saveTimeout.current);
   }, []);
 
@@ -115,9 +122,10 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
     const draft = latest.current;
     if (draft.deleted) return;
-    if (!draft.cloudId && isReminderNoteEmpty(draft)) {
+    if (!draft.cloudId && isReminderNoteEmpty(draft) && draft.color === DEFAULT_NOTE_COLOR) {
       await cancelReminderNotifications(draft.reminder.notificationIds);
       await noteRepo.hardDelete(noteId);
+      await noteColorPreference.remove(noteId);
     } else if (pending) {
       await collaborationService.save(noteId, {
         title: draft.title,
@@ -280,6 +288,13 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     catch { Alert.alert('Error', 'Failed to update pin'); }
   };
 
+  const handleChangeColor = async (color) => {
+    const nextColor = normalizeNoteColor(color);
+    setShowColor(false); setNoteColor(nextColor); latest.current.color = nextColor;
+    try { await noteColorPreference.save(noteId, nextColor); }
+    catch { Alert.alert('Error', 'Failed to change reminder color'); }
+  };
+
   const deleteReminder = async () => {
     try {
       if (saveTimeout.current) {
@@ -289,6 +304,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       latest.current.deleted = true;
       await cancelReminderNotifications(latest.current.reminder.notificationIds);
       await collaborationService.delete(noteId);
+      await noteColorPreference.remove(noteId);
       navigation.goBack();
     } catch {
       latest.current.deleted = false;
@@ -311,8 +327,10 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   });
 
   const handleDelete = () => hasPassword ? setShowDeletePassword(true) : confirmDelete();
+  const noteColorTheme = getNoteColorTheme(noteColor, colors);
+
   return (
-    <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top, backgroundColor: noteColorTheme.surface }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={colors.text} /></TouchableOpacity>
         <View style={[styles.titleField, isTitleFocused && styles.titleFieldFocused]}>
@@ -349,6 +367,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         <View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setShowActions(false)} accessible={false} /><View style={[styles.actionMenu, { top: insets.top + 60 }]}>
           {[
             { icon: 'people-outline', text: 'Share with people', action: () => setShowShare(true) },
+            { icon: 'color-palette-outline', text: 'Color', action: () => setShowColor(true) },
             { icon: 'share-outline', text: 'Export PDF or image', action: () => setShowExport(true) },
             { icon: isPinned ? 'pin' : 'pin-outline', text: isPinned ? 'Unpin' : 'Pin', action: handleTogglePin },
             { icon: hasPassword ? 'lock-closed' : 'lock-open-outline', text: hasPassword ? 'Password protection' : 'Lock', action: () => setShowLock(true) },
@@ -360,6 +379,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       <ReminderScheduleModal visible={showSchedule} reminder={reminder} onClose={() => setShowSchedule(false)} onSave={handleScheduleSave} saving={scheduling} />
       <NoteExportModal visible={showExport} onClose={() => setShowExport(false)} title={title} content={body} type="reminder" reminder={reminder} />
       <NoteShareModal visible={showShare} noteId={noteId} onClose={() => setShowShare(false)} onLeft={() => navigation.goBack()} />
+      <NoteColorModal visible={showColor} value={noteColor} onClose={() => setShowColor(false)} onSelect={handleChangeColor} />
       <PasswordModal
         visible={showDeletePassword}
         onClose={() => setShowDeletePassword(false)}

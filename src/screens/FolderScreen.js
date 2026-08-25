@@ -24,6 +24,7 @@ import PasswordModal from '../components/PasswordModal';
 import CreateNoteTypeModal from '../components/create-note-type-modal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import MoveNoteModal from '../components/MoveNoteModal';
+import NoteColorModal from '../components/note-color-modal';
 import { hashPassword } from '../utils/crypto';
 import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
@@ -32,6 +33,7 @@ import { confirmDestructiveAction } from '../utils/confirm-action';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
 import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
+import { noteColorPreference } from '../utils/note-color-preference';
 import {
   LEGACY_HOME_VIEW_MODE_STORAGE_KEY,
   NOTE_VIEW_MODE_STORAGE_KEY,
@@ -139,6 +141,7 @@ const FolderScreen = ({ route, navigation }) => {
     note: null,
     folders: [],
   });
+  const [colorNote, setColorNote] = useState(null);
 
   useEffect(() => {
     if (requestedNoteViewMode) {
@@ -164,7 +167,7 @@ const FolderScreen = ({ route, navigation }) => {
   const loadNotes = useCallback(async () => {
     try {
       const notesData = await noteRepo.getByFolderId(folderId);
-      setNotes(notesData);
+      setNotes(await noteColorPreference.applyToNotes(notesData));
     } catch (error) {
       Alert.alert('Error', 'Failed to load notes');
     } finally {
@@ -245,6 +248,19 @@ const FolderScreen = ({ route, navigation }) => {
       loadNotes();
     } catch (error) {
       Alert.alert('Error', 'Failed to update pin');
+    }
+  };
+
+  const handleChangeNoteColor = async (color) => {
+    const note = colorNote;
+    setColorNote(null);
+    if (!note) return;
+    try {
+      await noteColorPreference.save(note.id, color);
+      loadNotes();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to change note color');
+      loadNotes();
     }
   };
 
@@ -389,7 +405,15 @@ const FolderScreen = ({ route, navigation }) => {
         onClose={closeItemActions}
         onTogglePin={() => handleToggleNotePin(itemActions.note)}
         onMove={() => openMoveNote(itemActions.note)}
+        onColor={() => setColorNote(itemActions.note)}
         onDelete={() => handleDeleteNote(itemActions.note)}
+      />
+
+      <NoteColorModal
+        visible={!!colorNote}
+        value={colorNote?.color}
+        onClose={() => setColorNote(null)}
+        onSelect={handleChangeNoteColor}
       />
 
       <MoveNoteModal

@@ -85,6 +85,10 @@ export const initDB = async () => {
   if (!noteColumns.some((column) => column.name === 'note_type')) {
     await db.execAsync(`ALTER TABLE notes ADD COLUMN note_type TEXT NOT NULL DEFAULT 'note'`);
   }
+  // Note color is a device preference in AsyncStorage, not note data.
+  if (noteColumns.some((column) => column.name === 'color')) {
+    await db.execAsync(`ALTER TABLE notes DROP COLUMN color`);
+  }
 
   const collaborationColumns = [
     ['cloud_id', 'TEXT'],

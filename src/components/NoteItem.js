@@ -29,6 +29,7 @@ import {
   REMINDER_NOTE_TYPE,
 } from '../utils/reminder-note.mjs';
 import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
+import { getNoteColorTheme } from '../utils/note-color.mjs';
 
 // ponytail: entering animations are native-only — reanimated web leaves items visibility:hidden
 const entering = (index) =>
@@ -45,6 +46,7 @@ const NoteItem = ({
 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const noteColor = getNoteColorTheme(note.color, colors);
 
   const locked = !!note.password;
   const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
@@ -84,7 +86,11 @@ const NoteItem = ({
   return (
     <Animated.View entering={entering(index)} style={grid && styles.gridOuter}>
       <TouchableOpacity
-        style={[styles.container, grid && styles.containerGrid]}
+        style={[
+          styles.container,
+          { backgroundColor: noteColor.surface, borderLeftColor: noteColor.accent },
+          grid && styles.containerGrid,
+        ]}
         onPress={onPress}
         onLongPress={Platform.OS === 'web' ? undefined : onOpenActions}
         delayLongPress={450}
@@ -213,6 +219,7 @@ const makeStyles = (colors) =>
       padding: 16,
       marginBottom: 10,
       borderRadius: radius.md,
+      borderLeftWidth: 4,
       ...shadow.card,
     },
     gridOuter: {

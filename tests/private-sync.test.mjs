@@ -38,7 +38,7 @@ test('builds active records and deletion tombstones without incoming shared note
     },
     {
       records: [
-        localNote(),
+        localNote({ color: 'purple' }),
         localNote({ id: 'incoming-1', share_origin: 'incoming' }),
       ],
       tombstones: [{ id: 'note-old', updated_at: timestamp }],
@@ -50,6 +50,7 @@ test('builds active records and deletion tombstones without incoming shared note
   assert.deepEqual(payload.notes.map((item) => item.id), ['note-1', 'note-old']);
   assert.equal(payload.notes[0].folder_id, null);
   assert.equal(payload.notes[0].password, 'sha256-hash');
+  assert.equal('color' in payload.notes[0], false);
 });
 
 test('deduplicates a stale active row and tombstone with deletion winning a tie', () => {

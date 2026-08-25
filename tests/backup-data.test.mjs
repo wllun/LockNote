@@ -54,7 +54,7 @@ test('creates a portable backup without collaboration metadata or incoming notes
     { records: [folder()], tombstones: [{ id: 'old-folder', updated_at: UPDATED }] },
     {
       records: [
-        note(),
+        note({ color: 'blue' }),
         note({ id: 'incoming', share_origin: 'incoming', cloud_id: 'shared-cloud-id' }),
       ],
       tombstones: [{ id: 'old-note', updated_at: UPDATED }],
@@ -66,6 +66,7 @@ test('creates a portable backup without collaboration metadata or incoming notes
   assert.equal(document.notes.records[0].folder_id, null);
   assert.equal(document.notes.records[0].password, HASH);
   assert.equal('cloud_id' in document.notes.records[0], false);
+  assert.equal('color' in document.notes.records[0], false);
   assert.deepEqual(document.notes.tombstones, [{ id: 'old-note', updated_at: UPDATED }]);
 });
 

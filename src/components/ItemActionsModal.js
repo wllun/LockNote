@@ -17,6 +17,7 @@ const ItemActionsModal = ({
   isPinned,
   onClose,
   onTogglePin,
+  onColor,
   onMove,
   onDelete,
 }) => {
@@ -94,6 +95,20 @@ const ItemActionsModal = ({
               {isPinned ? 'Unpin' : 'Pin'}
             </Text>
           </Pressable>
+
+          {isNote && (
+            <Pressable
+              style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+              onPress={() => runAction(onColor)}
+              accessibilityRole="button"
+              accessibilityLabel="Change note color"
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons name="color-palette-outline" size={20} color={colors.textSecondary} />
+              </View>
+              <Text style={styles.actionText}>Color</Text>
+            </Pressable>
+          )}
 
           {isNote && (
             <Pressable

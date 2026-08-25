@@ -18,6 +18,7 @@ import EditorUndoButton from '../components/editor-undo-button';
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
+import NoteColorModal from '../components/note-color-modal';
 import { collaborationService } from '../services/collaborationService';
 import PasswordModal from '../components/PasswordModal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
@@ -30,6 +31,12 @@ import {
   constrainNormalNoteContent,
   NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
 } from '../utils/note-limits.mjs';
+import {
+  DEFAULT_NOTE_COLOR,
+  getNoteColorTheme,
+  normalizeNoteColor,
+} from '../utils/note-color.mjs';
+import { noteColorPreference } from '../utils/note-color-preference';
 
 const NoteEditorScreen = ({ route, navigation }) => {
   const colors = useTheme();
@@ -40,6 +47,8 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [content, setContent] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
+  const [showColorModal, setShowColorModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -51,7 +60,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const contentRef = useRef(null);
   const contentLimitDialogShown = useRef(false);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
-  const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, cloudId: null, deleted: false });
+  const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, cloudId: null, deleted: false });
   const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
   const insets = useSafeAreaInsets();
 
@@ -59,16 +68,19 @@ const NoteEditorScreen = ({ route, navigation }) => {
     try {
       const note = await noteRepo.getById(noteId);
       if (note) {
+        const localColor = await noteColorPreference.load(noteId);
         setTitle(note.title);
         setContent(note.content);
         setHasPassword(!!note.password);
         setIsPinned(!!note.is_pinned);
+        setNoteColor(localColor);
         latest.current = {
           ...latest.current,
           title: note.title,
           content: note.content,
           hasPassword: !!note.password,
           isPinned: !!note.is_pinned,
+          color: localColor,
           cloudId: note.cloud_id,
         };
         clearUndo();
@@ -177,6 +189,18 @@ const NoteEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleChangeColor = async (color) => {
+    const nextColor = normalizeNoteColor(color);
+    setShowColorModal(false);
+    setNoteColor(nextColor);
+    latest.current.color = nextColor;
+    try {
+      await noteColorPreference.save(noteId, nextColor);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to change note color');
+    }
+  };
+
   const deleteNote = async () => {
     try {
       if (saveTimeout.current) {
@@ -185,6 +209,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
       }
       latest.current.deleted = true;
       await collaborationService.delete(noteId);
+      await noteColorPreference.remove(noteId);
       navigation.goBack();
     } catch (error) {
       latest.current.deleted = false;
@@ -221,8 +246,8 @@ const NoteEditorScreen = ({ route, navigation }) => {
   }, [noteId]);
 
   const needsExitCleanup = useCallback(() => {
-    const { title, content, hasPassword, isPinned, cloudId, deleted } = latest.current;
-    const empty = !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned;
+    const { title, content, hasPassword, isPinned, color, cloudId, deleted } = latest.current;
+    const empty = !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR;
     return !deleted && (empty || !!saveTimeout.current);
   }, []);
 
@@ -231,10 +256,11 @@ const NoteEditorScreen = ({ route, navigation }) => {
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
-    const { title, content, hasPassword, isPinned, cloudId, deleted } = latest.current;
+    const { title, content, hasPassword, isPinned, color, cloudId, deleted } = latest.current;
     if (deleted) return;
-    if (!cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned) {
+    if (!cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR) {
       await noteRepo.hardDelete(noteId);
+      await noteColorPreference.remove(noteId);
     } else if (pending) {
       await collaborationService.save(noteId, { title, content });
     }
@@ -242,12 +268,14 @@ const NoteEditorScreen = ({ route, navigation }) => {
 
   useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 
+  const noteColorTheme = getNoteColorTheme(noteColor, colors);
+
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[styles.container, { paddingTop: insets.top, backgroundColor: noteColorTheme.surface }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: noteColorTheme.surface }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.headerButton}
@@ -302,7 +330,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.contentArea}>
+      <View style={[styles.contentArea, { backgroundColor: noteColorTheme.surface }]}>
         <TextInput
           ref={contentRef}
           style={[
@@ -347,6 +375,16 @@ const NoteEditorScreen = ({ route, navigation }) => {
               <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.actionsMenuText}>Share with people</Text>
             </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
+              onPress={() => { setShowActionsMenu(false); setShowColorModal(true); }}
+              accessibilityRole="button"
+              accessibilityLabel="Change note color"
+            >
+              <Ionicons name="color-palette-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Color</Text>
+            </Pressable>
+
             <Pressable
               style={({ pressed }) => [
                 styles.actionsMenuItem,
@@ -436,6 +474,12 @@ const NoteEditorScreen = ({ route, navigation }) => {
         onClose={() => setShowExportModal(false)}
         title={title}
         content={content}
+      />
+      <NoteColorModal
+        visible={showColorModal}
+        value={noteColor}
+        onClose={() => setShowColorModal(false)}
+        onSelect={handleChangeColor}
       />
       <NoteShareModal visible={showShareModal} noteId={noteId} onClose={() => setShowShareModal(false)} onChanged={loadNote} onLeft={() => navigation.goBack()} />
 
