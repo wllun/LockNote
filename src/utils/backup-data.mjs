@@ -58,6 +58,14 @@ const ensurePinned = (value, label) => {
   return value ? 1 : 0;
 };
 
+const ensureArchived = (value, label) => {
+  if (value === undefined) return 0;
+  if (value !== 0 && value !== 1 && value !== false && value !== true) {
+    fail(`${label} must be true or false.`);
+  }
+  return value ? 1 : 0;
+};
+
 const portableReminderContent = (content) => {
   const parsed = parseReminderNote(content);
   return serializeReminderNote({
@@ -75,6 +83,7 @@ const portableFolder = (folder) => ({
   name: folder.name,
   password: folder.password || null,
   is_pinned: folder.is_pinned ? 1 : 0,
+  is_archived: folder.is_archived ? 1 : 0,
   created_at: folder.created_at,
   updated_at: folder.updated_at,
 });
@@ -87,6 +96,7 @@ const portableNote = (note) => ({
   note_type: note.note_type || 'note',
   password: note.password || null,
   is_pinned: note.is_pinned ? 1 : 0,
+  is_archived: note.is_archived ? 1 : 0,
   created_at: note.created_at,
   updated_at: note.updated_at,
 });
@@ -158,6 +168,7 @@ const normalizeFolders = (section) => {
       name: ensureString(folder.name, `folders.records[${index}].name`, MAX_NAME_LENGTH),
       password: ensurePasswordHash(folder.password, `folders.records[${index}].password`),
       is_pinned: ensurePinned(folder.is_pinned, `folders.records[${index}].is_pinned`),
+      is_archived: ensureArchived(folder.is_archived, `folders.records[${index}].is_archived`),
       created_at: ensureTimestamp(folder.created_at, `folders.records[${index}].created_at`),
       updated_at: ensureTimestamp(folder.updated_at, `folders.records[${index}].updated_at`),
     };
@@ -199,6 +210,7 @@ const normalizeNotes = (section, folderIds) => {
       note_type: noteType,
       password: ensurePasswordHash(note.password, `notes.records[${index}].password`),
       is_pinned: ensurePinned(note.is_pinned, `notes.records[${index}].is_pinned`),
+      is_archived: ensureArchived(note.is_archived, `notes.records[${index}].is_archived`),
       created_at: ensureTimestamp(note.created_at, `notes.records[${index}].created_at`),
       updated_at: ensureTimestamp(note.updated_at, `notes.records[${index}].updated_at`),
       cloud_id: null,

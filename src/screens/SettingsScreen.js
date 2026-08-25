@@ -408,6 +408,24 @@ const SettingsScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.item}
             activeOpacity={0.7}
+            onPress={() => navigation.navigate('Archive')}
+            accessibilityRole="button"
+            accessibilityLabel="Open Archive"
+            accessibilityHint="View and restore archived notes"
+          >
+            <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
+              <Ionicons name="archive-outline" size={19} color={colors.primary} />
+            </View>
+            <View style={styles.itemContent}>
+              <Text style={styles.itemLabel}>Archive</Text>
+              <Text style={styles.itemDescription}>Folders and notes hidden from active lists</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          </TouchableOpacity>
+          <View style={styles.separator} />
+          <TouchableOpacity
+            style={styles.item}
+            activeOpacity={0.7}
             onPress={() => navigation.navigate('Trash')}
             accessibilityRole="button"
             accessibilityLabel="Open Trash"

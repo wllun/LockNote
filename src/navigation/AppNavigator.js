@@ -14,6 +14,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import ProfileTabScreen from '../screens/ProfileTabScreen';
 import SharedScreen from '../screens/SharedScreen';
 import TrashScreen from '../screens/TrashScreen';
+import ArchiveScreen from '../screens/ArchiveScreen';
 import { useTheme, useThemeMode } from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -62,10 +63,24 @@ const SettingsStack = ({ screenOptions }) => (
       options={{ title: 'Settings' }}
     />
     <Stack.Screen
+      name="Archive"
+      component={ArchiveScreen}
+      options={{ title: 'Archive' }}
+    />
+    <Stack.Screen
       name="Trash"
       component={TrashScreen}
       options={{ title: 'Trash' }}
     />
+    <Stack.Screen
+      name="Folder"
+      component={FolderScreen}
+      options={({ route }) => ({ title: route.params?.folderName || 'Folder' })}
+    />
+    <Stack.Screen name="NoteEditor" component={NoteEditorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ChecklistEditor" component={ChecklistEditorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ExpenseRecordEditor" component={ExpenseRecordEditorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ headerShown: false }} />
   </Stack.Navigator>
 );
 

@@ -19,6 +19,7 @@ const folder = (overrides = {}) => ({
   name: 'Work',
   password: HASH,
   is_pinned: 1,
+  is_archived: 1,
   created_at: CREATED,
   updated_at: UPDATED,
   ...overrides,
@@ -32,6 +33,7 @@ const note = (overrides = {}) => ({
   note_type: 'note',
   password: HASH,
   is_pinned: 0,
+  is_archived: 1,
   created_at: CREATED,
   updated_at: UPDATED,
   share_origin: 'private',
@@ -64,7 +66,9 @@ test('creates a portable backup without collaboration metadata or incoming notes
 
   assert.equal(document.notes.records.length, 1);
   assert.equal(document.notes.records[0].folder_id, null);
+  assert.equal(document.folders.records[0].is_archived, 1);
   assert.equal(document.notes.records[0].password, HASH);
+  assert.equal(document.notes.records[0].is_archived, 1);
   assert.equal('cloud_id' in document.notes.records[0], false);
   assert.deepEqual(document.notes.tombstones, [{ id: 'old-note', updated_at: UPDATED }]);
 });
@@ -102,6 +106,8 @@ test('validates a backup and resets restored notes to private collaboration stat
   assert.equal(restored.share_origin, 'private');
   assert.equal(restored.cloud_id, null);
   assert.equal(restored.folder_id, 'folder-1');
+  assert.equal(restored.is_archived, 1);
+  assert.equal(result.backup.folders.records[0].is_archived, 1);
 });
 
 test('rejects unsupported versions, plaintext passwords, duplicates, and orphan notes', () => {

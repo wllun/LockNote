@@ -253,7 +253,7 @@ const TrashScreen = ({ navigation }) => {
       <PasswordModal
         visible={!!passwordItem}
         onClose={() => setPasswordItem(null)}
-        onVerify={(password) => verifyPassword(password, passwordItem?.item?.password)}
+        onVerify={(password) => verifyPassword(password, passwordItem?.password)}
         onVerified={async () => {
           const pending = passwordItem;
           setPasswordItem(null);

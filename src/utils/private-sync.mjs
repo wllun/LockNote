@@ -33,6 +33,7 @@ export const folderRecordForCloud = (folder) => ({
   name: String(folder.name ?? ''),
   password: folder.password || null,
   is_pinned: asBoolean(folder.is_pinned),
+  is_archived: asBoolean(folder.is_archived),
   is_deleted: false,
   created_at: folder.created_at,
   updated_at: folder.updated_at,
@@ -53,6 +54,7 @@ export const noteRecordForCloud = (note) => {
     note_type: noteType,
     password: normalized.password || null,
     is_pinned: asBoolean(normalized.is_pinned),
+    is_archived: asBoolean(normalized.is_archived),
     is_deleted: false,
     created_at: normalized.created_at,
     updated_at: normalized.updated_at,
@@ -119,11 +121,14 @@ export const parseSyncResponse = (response) => {
   return response;
 };
 
-export const cloudFolderForLocal = (folder) => ({
+export const cloudFolderForLocal = (folder, existing = null) => ({
   id: folder.id,
   name: folder.name || '',
   password: folder.password || null,
   is_pinned: asBoolean(folder.is_pinned) ? 1 : 0,
+  is_archived: folder.is_archived === undefined
+    ? existing?.is_archived ? 1 : 0
+    : asBoolean(folder.is_archived) ? 1 : 0,
   created_at: folder.created_at,
   updated_at: folder.updated_at,
 });
@@ -146,6 +151,9 @@ export const cloudNoteForLocal = (note, existing = null) => {
     note_type: noteType,
     password: note.password || null,
     is_pinned: asBoolean(note.is_pinned) ? 1 : 0,
+    is_archived: note.is_archived === undefined
+      ? existing?.is_archived ? 1 : 0
+      : asBoolean(note.is_archived) ? 1 : 0,
     created_at: note.created_at,
     updated_at: note.updated_at,
     sync_status: collaboration.cloud_id ? 'synced' : null,

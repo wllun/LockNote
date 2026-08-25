@@ -48,4 +48,4 @@ When the user presses the Add button, let them choose one of these note types:
 - [ ] View (list/grid?)
 - [ ] Sort
 - [ ] Trash (currently soft-delete with no trash UI — see PROJECT_STATE)
-- [ ] Archive
+- [X] Archive — folders and notes can be hidden, opened, restored, or moved to Trash from Settings without flattening folder contents during archive/restore.

@@ -275,6 +275,26 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  const handleArchiveFolder = async (folder) => {
+    try {
+      const archived = await folderRepo.archive(folder.id);
+      if (!archived) throw new Error('Folder no longer exists');
+      refreshCurrent();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to archive folder');
+    }
+  };
+
+  const handleArchiveNote = async (note) => {
+    try {
+      const archived = await noteRepo.archive(note.id);
+      if (!archived) throw new Error('Note no longer exists');
+      refreshCurrent();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to archive note');
+    }
+  };
+
   const openItemActions = (item, type) => {
     setItemActions({ visible: true, item, type });
   };
@@ -324,7 +344,7 @@ const HomeScreen = ({ navigation }) => {
 
   const confirmDeleteFolder = async (folder) => {
     try {
-      const folderNotes = await noteRepo.getByFolderId(folder.id);
+      const folderNotes = await noteRepo.getActiveByFolderId(folder.id);
       const noteCount = folderNotes.length;
       const detail =
         noteCount === 0
@@ -679,6 +699,11 @@ const HomeScreen = ({ navigation }) => {
           itemActions.type === 'note'
             ? () => openMoveNote(itemActions.item)
             : undefined
+        }
+        onArchive={
+          itemActions.type === 'folder'
+            ? () => handleArchiveFolder(itemActions.item)
+            : () => handleArchiveNote(itemActions.item)
         }
         onDelete={() => {
           if (itemActions.type === 'folder') {
