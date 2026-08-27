@@ -626,7 +626,7 @@ const HomeScreen = ({ navigation }) => {
             })}
             <TouchableOpacity
               onPress={() => setShowFolderModal(true)}
-              style={styles.addFolderButton}
+              style={styles.sectionAddButton}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Add folder"
@@ -648,12 +648,23 @@ const HomeScreen = ({ navigation }) => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Notes</Text>
-          {renderViewControl({
-            scope: 'Notes',
-            modes: NOTE_VIEW_MODES,
-            value: noteViewMode,
-            onChange: changeNoteViewMode,
-          })}
+          <View style={styles.sectionHeaderActions}>
+            {renderViewControl({
+              scope: 'Notes',
+              modes: NOTE_VIEW_MODES,
+              value: noteViewMode,
+              onChange: changeNoteViewMode,
+            })}
+            <TouchableOpacity
+              onPress={() => setShowNoteTypeModal(true)}
+              style={styles.sectionAddButton}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Add note"
+            >
+              <Ionicons name="add" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
         {notes.length === 0 ? (
           <View style={styles.emptyState}>
@@ -956,7 +967,7 @@ const makeStyles = (colors) =>
     folderStripItem: {
       width: 104,
     },
-    addFolderButton: {
+    sectionAddButton: {
       width: 44,
       height: 44,
       borderRadius: radius.full,
