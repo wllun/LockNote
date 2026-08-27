@@ -110,7 +110,7 @@ const NoteItem = ({
         }}
       >
         <View style={[styles.header, grid && styles.headerGrid]}>
-          <Text style={[styles.title, grid && styles.titleGrid]} numberOfLines={grid ? 2 : 1}>
+          <Text style={[styles.title, grid && styles.titleGrid]} numberOfLines={1}>
             {displayTitle}
           </Text>
           {isPlainNote && (
@@ -195,7 +195,7 @@ const NoteItem = ({
                 : 'Locked note'
             : preview}
         </Text>
-        <View style={styles.updatedAtRow}>
+        <View style={[styles.updatedAtRow, grid && styles.updatedAtRowGrid]}>
           <Ionicons
             name="time-outline"
             size={13}
@@ -253,8 +253,6 @@ const makeStyles = (colors) =>
     titleGrid: {
       flexBasis: '100%',
       lineHeight: 20,
-      minHeight: 40,
-      marginBottom: 2,
       paddingRight: Platform.OS === 'web' ? 28 : 0,
     },
     lockBadge: {
@@ -331,6 +329,9 @@ const makeStyles = (colors) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,
+    },
+    updatedAtRowGrid: {
+      marginTop: 'auto',
     },
     updatedAt: {
       fontSize: 12,
