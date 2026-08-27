@@ -534,6 +534,7 @@ const makeStyles = (colors) =>
     },
     gridRow: {
       gap: 10,
+      marginBottom: 10,
       alignItems: 'stretch',
     },
     gridItem: {
