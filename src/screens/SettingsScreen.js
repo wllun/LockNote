@@ -332,8 +332,8 @@ const SettingsScreen = ({ navigation }) => {
               <Text style={styles.itemLabel}>Recovery PIN</Text>
               <Text style={styles.itemDescription}>
                 {hasRecovery
-                  ? 'Enabled — tap to change'
-                  : 'Not set — lets you reset a forgotten password'}
+                  ? 'Enabled · Tap to change'
+                  : 'Reset forgotten passwords'}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -378,7 +378,7 @@ const SettingsScreen = ({ navigation }) => {
             <View style={styles.itemContent}>
               <Text style={styles.itemLabel}>Default currency</Text>
               <Text style={styles.itemDescription}>
-                Used when creating a new expense note
+                For expense notes
               </Text>
             </View>
             {currencyBusy ? (
@@ -398,12 +398,12 @@ const SettingsScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.dataNotice}>
-          Currency changes only the displayed unit. LockNote does not convert amounts.
+          Currency changes the unit, not the amounts.
         </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Data</Text>
+        <Text style={styles.sectionTitle}>Files & Backup</Text>
         <View style={styles.card}>
           <TouchableOpacity
             style={styles.item}
@@ -418,7 +418,6 @@ const SettingsScreen = ({ navigation }) => {
             </View>
             <View style={styles.itemContent}>
               <Text style={styles.itemLabel}>Archive</Text>
-              <Text style={styles.itemDescription}>Folders and notes hidden from active lists</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
@@ -436,7 +435,6 @@ const SettingsScreen = ({ navigation }) => {
             </View>
             <View style={styles.itemContent}>
               <Text style={styles.itemLabel}>Trash</Text>
-              <Text style={styles.itemDescription}>Notes deleted permanently after 30 days</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
@@ -452,7 +450,6 @@ const SettingsScreen = ({ navigation }) => {
             </View>
             <View style={styles.itemContent}>
               <Text style={styles.itemLabel}>Import Backup</Text>
-              <Text style={styles.itemDescription}>Preview, then merge or replace</Text>
             </View>
             {backupBusy === 'import' || backupBusy === 'restore' ? (
               <ActivityIndicator size="small" color={colors.primary} />
@@ -461,9 +458,6 @@ const SettingsScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
         </View>
-        <Text style={styles.dataNotice}>
-          Backup files contain note content and password hashes. They are not encrypted.
-        </Text>
       </View>
 
       <View style={styles.section}>

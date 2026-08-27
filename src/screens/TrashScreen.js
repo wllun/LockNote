@@ -209,7 +209,7 @@ const TrashScreen = ({ navigation }) => {
                   <Ionicons name="time-outline" size={21} color={colors.primary} />
                 </View>
                 <Text style={styles.noticeText}>
-                  Items are permanently deleted {TRASH_RETENTION_DAYS} days after they enter Trash.
+                  Items are permanently deleted {TRASH_RETENTION_DAYS} days.
                 </Text>
               </View>
               <TouchableOpacity

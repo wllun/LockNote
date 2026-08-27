@@ -163,6 +163,11 @@ const AuthScreen = () => {
       : isSignUp
         ? 'Create Account'
         : 'Welcome Back';
+  const subtitle = recoveringPassword
+    ? 'Enter the new password you want to use'
+    : isForgot
+      ? 'We will email you a secure reset link'
+      : '';
 
   return (
     <KeyboardAvoidingView

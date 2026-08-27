@@ -224,7 +224,7 @@ const ArchiveScreen = ({ navigation }) => {
                 <Ionicons name="archive-outline" size={21} color={colors.primary} />
               </View>
               <Text style={styles.noticeText}>
-                Archived folders, their contents, and archived notes stay hidden from Home and search until restored.
+                Archived items stay hidden until restored.
               </Text>
             </View>
           ) : null}
