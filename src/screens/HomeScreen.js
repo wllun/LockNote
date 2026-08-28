@@ -569,23 +569,47 @@ const HomeScreen = ({ navigation }) => {
     return <View>{items}</View>;
   };
 
-  const renderNoteItems = (noteList) => (
-    <View style={noteViewMode === 'grid' ? styles.itemsGrid : undefined}>
-      {noteList.map((note, index) => (
-        <View key={note.id} style={noteViewMode === 'grid' ? styles.gridItem : undefined}>
-          <NoteItem
-            note={note}
-            index={index}
-            grid={noteViewMode === 'grid'}
-            checklistProgressOnly
-            reminderScheduleOnly
-            onPress={() => handleNotePress(note)}
-            onOpenActions={() => openItemActions(note, 'note')}
-          />
-        </View>
-      ))}
+  const renderNoteItem = (note, index, grid) => (
+    <View key={note.id} style={grid ? styles.gridItem : undefined}>
+      <NoteItem
+        note={note}
+        index={index}
+        grid={grid}
+        checklistProgressOnly
+        reminderScheduleOnly
+        onPress={() => handleNotePress(note)}
+        onOpenActions={() => openItemActions(note, 'note')}
+      />
     </View>
   );
+
+  const renderNoteItems = (noteList) => {
+    if (noteViewMode !== 'grid') {
+      return <View>{noteList.map((note, index) => renderNoteItem(note, index, false))}</View>;
+    }
+
+    const rows = [];
+    for (let index = 0; index < noteList.length; index += 2) {
+      const first = noteList[index];
+      const second = noteList[index + 1];
+      rows.push(
+        <View key={`note-row-${first.id}`} style={styles.gridRow}>
+          {renderNoteItem(first, index, true)}
+          {second ? (
+            renderNoteItem(second, index + 1, true)
+          ) : (
+            <View
+              style={styles.gridItem}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            />
+          )}
+        </View>
+      );
+    }
+
+    return <View style={styles.itemsGrid}>{rows}</View>;
+  };
 
   const renderSearchResults = () => {
     const empty = results.folders.length === 0 && results.notes.length === 0;
@@ -985,13 +1009,17 @@ const makeStyles = (colors) =>
       color: colors.text,
     },
     itemsGrid: {
+      gap: 10,
+    },
+    gridRow: {
+      width: '100%',
       flexDirection: 'row',
-      flexWrap: 'wrap',
       alignItems: 'stretch',
       gap: 10,
     },
     gridItem: {
-      width: '48.4%',
+      flex: 1,
+      minWidth: 0,
     },
     folderStrip: {
       marginHorizontal: -16,
