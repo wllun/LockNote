@@ -10,6 +10,7 @@ import {
   validatePasswordConfirmation,
 } from '../src/utils/auth.mjs';
 import {
+  sendLockPasswordResetLink,
   sendPasswordReset,
   signIn,
   signUp,
@@ -86,6 +87,19 @@ test('parses PKCE callbacks and confirmation callbacks', () => {
   );
 });
 
+test('recognizes a LockNote-password recovery callback separately from account recovery', () => {
+  assert.deepEqual(
+    parseAuthCallback('locknote://reset-lock-password?code=one-time-code'),
+    {
+      type: null,
+      accessToken: null,
+      refreshToken: null,
+      code: 'one-time-code',
+      intent: 'lock-password-recovery',
+    }
+  );
+});
+
 test('returns friendly callback errors for expired links', () => {
   const callback = parseAuthCallback(
     'locknote://reset-password#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'
@@ -150,6 +164,31 @@ test('password reset and update use the expected Supabase methods', async () => 
     ['reset', 'person@example.com', { redirectTo: 'locknote://reset-password' }],
     ['update', { password: 'new-secret' }],
   ]);
+});
+
+test('LockNote password recovery sends a non-signup one-time email link', async () => {
+  let received;
+  const auth = {
+    signInWithOtp: async (payload) => {
+      received = payload;
+      return { data: {}, error: null };
+    },
+  };
+
+  await sendLockPasswordResetLink(
+    auth,
+    true,
+    ' Person@Example.COM ',
+    'locknote://reset-lock-password'
+  );
+
+  assert.deepEqual(received, {
+    email: 'person@example.com',
+    options: {
+      emailRedirectTo: 'locknote://reset-lock-password',
+      shouldCreateUser: false,
+    },
+  });
 });
 
 test('service rejects missing configuration before making a request', async () => {

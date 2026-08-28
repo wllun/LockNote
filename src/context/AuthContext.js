@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [recoveringPassword, setRecoveringPassword] = useState(false);
+  const [recoveringLockPassword, setRecoveringLockPassword] = useState(false);
   const [authLinkError, setAuthLinkError] = useState('');
 
   useEffect(() => {
@@ -23,7 +24,10 @@ export const AuthProvider = ({ children }) => {
     const { data: subscription } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       if (event === 'PASSWORD_RECOVERY') setRecoveringPassword(true);
-      if (event === 'SIGNED_OUT') setRecoveringPassword(false);
+      if (event === 'SIGNED_OUT') {
+        setRecoveringPassword(false);
+        setRecoveringLockPassword(false);
+      }
     });
 
     const handleAuthUrl = async (url) => {
@@ -33,12 +37,16 @@ export const AuthProvider = ({ children }) => {
       setAuthLinkError('');
       if (callback.error) {
         setRecoveringPassword(false);
+        if (callback.intent === 'lock-password-recovery') {
+          setRecoveringLockPassword(false);
+        }
         setAuthLinkError(getAuthErrorMessage(callback.error));
         return;
       }
 
-      const isRecovery = callback.type === 'recovery';
-      if (isRecovery) setRecoveringPassword(true);
+      const isAccountRecovery = callback.type === 'recovery';
+      const isLockRecovery = callback.intent === 'lock-password-recovery';
+      if (isAccountRecovery) setRecoveringPassword(true);
 
       try {
         if (callback.code) {
@@ -53,8 +61,10 @@ export const AuthProvider = ({ children }) => {
         } else {
           throw new Error('The authentication link is incomplete.');
         }
+        if (isLockRecovery) setRecoveringLockPassword(true);
       } catch (error) {
-        if (isRecovery) setRecoveringPassword(false);
+        if (isAccountRecovery) setRecoveringPassword(false);
+        if (isLockRecovery) setRecoveringLockPassword(false);
         setAuthLinkError(getAuthErrorMessage(error));
       }
     };
@@ -79,6 +89,8 @@ export const AuthProvider = ({ children }) => {
         loading,
         recoveringPassword,
         finishPasswordRecovery: () => setRecoveringPassword(false),
+        recoveringLockPassword,
+        finishLockPasswordRecovery: () => setRecoveringLockPassword(false),
         authLinkError,
         clearAuthLinkError: () => setAuthLinkError(''),
       }}
@@ -93,6 +105,8 @@ export const useAuth = () => useContext(AuthContext) ?? {
   loading: false,
   recoveringPassword: false,
   finishPasswordRecovery: () => {},
+  recoveringLockPassword: false,
+  finishLockPasswordRecovery: () => {},
   authLinkError: '',
   clearAuthLinkError: () => {},
 };

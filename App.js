@@ -6,13 +6,15 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { initDB } from './src/db/sqlite';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider, useTheme, useThemeMode } from './src/theme';
-import { AuthProvider } from './src/context/AuthContext';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AppDialogHost from './src/components/AppDialogHost';
+import LockPasswordResetModal from './src/components/lock-password-reset-modal';
 import { trashService } from './src/services/trashService';
 
 function AppRoot() {
   const colors = useTheme();
   const { scheme } = useThemeMode();
+  const { recoveringLockPassword } = useAuth();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -41,6 +43,7 @@ function AppRoot() {
   return (
     <SafeAreaProvider>
       <AppNavigator />
+      <LockPasswordResetModal visible={recoveringLockPassword} />
       <AppDialogHost />
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
     </SafeAreaProvider>

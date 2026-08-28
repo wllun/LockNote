@@ -19,10 +19,10 @@ import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
 import NoteColorModal from '../components/note-color-modal';
+import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { collaborationService } from '../services/collaborationService';
+import { lockPasswordService } from '../services/lockPasswordService';
 import PasswordModal from '../components/PasswordModal';
-import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
-import { verifyPassword } from '../utils/crypto';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
 import { radius, shadow, useTheme } from '../theme';
@@ -54,7 +54,6 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
-  const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const saveTimeout = useRef(null);
   const contentRef = useRef(null);
@@ -150,32 +149,19 @@ const NoteEditorScreen = ({ route, navigation }) => {
     autoSave(snapshot.title, snapshot.content);
   };
 
-  const handleSetPassword = async () => {
-    if (!lockPassword.trim()) {
-      Alert.alert('Error', 'Please enter a password');
-      return;
-    }
-    try {
-      await noteRepo.update(noteId, { password: lockPassword });
-      setHasPassword(true);
-      latest.current.hasPassword = true;
-      setShowLockModal(false);
-      setLockPassword('');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to set password');
-    }
+  const handleSetPassword = async (password) => {
+    await lockPasswordService.lockNote(noteId, password);
+    setHasPassword(true);
+    latest.current.hasPassword = true;
   };
 
-  const handleRemovePassword = async () => {
-    try {
-      await noteRepo.update(noteId, { password: null });
-      setHasPassword(false);
-      latest.current.hasPassword = false;
-      setShowLockModal(false);
-      setLockPassword('');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to remove password');
-    }
+  const handleRemovePassword = async (password) => {
+    const note = await noteRepo.getById(noteId);
+    const valid = await lockPasswordService.verifyNotePassword(password, note);
+    if (!valid) throw new Error('Incorrect LockNote password.');
+    await noteRepo.update(noteId, { password: null });
+    setHasPassword(false);
+    latest.current.hasPassword = false;
   };
 
   const handleTogglePin = async () => {
@@ -434,16 +420,16 @@ const NoteEditorScreen = ({ route, navigation }) => {
               }}
               accessibilityRole="button"
               accessibilityLabel={
-                hasPassword ? 'Manage note password' : 'Set note password'
+                hasPassword ? 'Unlock note' : 'Lock note'
               }
             >
               <Ionicons
-                name={hasPassword ? 'lock-closed' : 'lock-open-outline'}
+                name={hasPassword ? 'lock-open-outline' : 'lock-closed-outline'}
                 size={20}
                 color={hasPassword ? colors.folder : colors.textSecondary}
               />
               <Text style={styles.actionsMenuText}>
-                {hasPassword ? 'Password protection' : 'Lock'}
+                {hasPassword ? 'Unlock' : 'Lock'}
               </Text>
             </Pressable>
 
@@ -488,12 +474,13 @@ const NoteEditorScreen = ({ route, navigation }) => {
         onClose={() => setShowDeletePasswordModal(false)}
         onVerify={async (password) => {
           const note = await noteRepo.getById(noteId);
-          return !!note?.password && verifyPassword(password, note.password);
+          return lockPasswordService.verifyNotePassword(password, note);
         }}
         onVerified={async () => {
           setShowDeletePasswordModal(false);
           await deleteNote();
         }}
+        passwordLabel="LockNote password"
         title="Delete this locked note?"
         subtitle="Enter its password to confirm deletion. This note and its content will be removed from your notes."
         verifyLabel="Delete note"
@@ -507,70 +494,13 @@ const NoteEditorScreen = ({ route, navigation }) => {
         ]}
       />
 
-      <Modal visible={showLockModal} animationType="fade" transparent>
-        <KeyboardAwareModalContent>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIconCircle}>
-              <Ionicons
-                name={hasPassword ? 'lock-closed' : 'lock-open-outline'}
-                size={26}
-                color={colors.primary}
-              />
-            </View>
-            <Text style={styles.modalTitle}>
-              {hasPassword ? 'Password Protection' : 'Set Password'}
-            </Text>
-            {hasPassword ? (
-              <Text style={styles.modalDescription}>
-                This note is password protected.
-              </Text>
-            ) : (
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Enter password"
-                placeholderTextColor={colors.textTertiary}
-                value={lockPassword}
-                onChangeText={setLockPassword}
-                secureTextEntry
-                autoFocus
-              />
-            )}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setShowLockModal(false);
-                  setLockPassword('');
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              {hasPassword ? (
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.removeButton]}
-                  activeOpacity={0.7}
-                  onPress={handleRemovePassword}
-                >
-                  <Text style={[styles.modalButtonText, styles.removeButtonText]}>
-                    Remove Lock
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.setButton]}
-                  activeOpacity={0.7}
-                  onPress={handleSetPassword}
-                >
-                  <Text style={[styles.modalButtonText, styles.setButtonText]}>
-                    Set Lock
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </KeyboardAwareModalContent>
-      </Modal>
+      <ManageNoteLockModal
+        visible={showLockModal}
+        isLocked={hasPassword}
+        onClose={() => setShowLockModal(false)}
+        onLock={handleSetPassword}
+        onUnlock={handleRemovePassword}
+      />
     </KeyboardAvoidingView>
   );
 };

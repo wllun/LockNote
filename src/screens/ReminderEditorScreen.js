@@ -8,15 +8,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import EditorUndoButton from '../components/editor-undo-button';
-import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
+import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
 import NoteColorModal from '../components/note-color-modal';
 import { collaborationService } from '../services/collaborationService';
+import { lockPasswordService } from '../services/lockPasswordService';
 import PasswordModal from '../components/PasswordModal';
 import ReminderScheduleModal from '../components/reminder-schedule-modal';
-import { verifyPassword } from '../utils/crypto';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
 import {
@@ -53,7 +53,6 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const [showShare, setShowShare] = useState(false);
   const [showLock, setShowLock] = useState(false);
   const [showDeletePassword, setShowDeletePassword] = useState(false);
-  const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const saveTimeout = useRef(null);
@@ -257,12 +256,10 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleSetPassword = async () => {
-    if (!lockPassword.trim()) return Alert.alert('Error', 'Please enter a password');
-    try {
-      await noteRepo.update(noteId, { password: lockPassword });
-      latest.current.hasPassword = true; setHasPassword(true); setShowLock(false); setLockPassword('');
-    } catch { Alert.alert('Error', 'Failed to set password'); return; }
+  const handleSetPassword = async (password) => {
+    await lockPasswordService.lockNote(noteId, password);
+    latest.current.hasPassword = true;
+    setHasPassword(true);
     try { await rescheduleForPrivacy(true); }
     catch {
       await cancelReminderNotifications(latest.current.reminder.notificationIds);
@@ -273,11 +270,14 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleRemovePassword = async () => {
-    try {
-      await noteRepo.update(noteId, { password: null });
-      latest.current.hasPassword = false; setHasPassword(false); setShowLock(false);
-    } catch { Alert.alert('Error', 'Failed to remove password'); return; }
+  const handleRemovePassword = async (password) => {
+    const note = await noteRepo.getById(noteId);
+    if (!await lockPasswordService.verifyNotePassword(password, note)) {
+      throw new Error('Incorrect LockNote password.');
+    }
+    await noteRepo.update(noteId, { password: null });
+    latest.current.hasPassword = false;
+    setHasPassword(false);
     try { await rescheduleForPrivacy(false); }
     catch { Alert.alert('Password removed', 'The note is unlocked, but its reminder notification could not be refreshed. Open reminder settings and set it again.'); }
   };
@@ -370,7 +370,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
             { icon: 'color-palette-outline', text: 'Color', action: () => setShowColor(true) },
             { icon: 'share-outline', text: 'Export PDF or image', action: () => setShowExport(true) },
             { icon: isPinned ? 'pin' : 'pin-outline', text: isPinned ? 'Unpin' : 'Pin', action: handleTogglePin },
-            { icon: hasPassword ? 'lock-closed' : 'lock-open-outline', text: hasPassword ? 'Password protection' : 'Lock', action: () => setShowLock(true) },
+            { icon: hasPassword ? 'lock-open-outline' : 'lock-closed-outline', text: hasPassword ? 'Unlock' : 'Lock', action: () => setShowLock(true) },
             { icon: 'trash-outline', text: 'Delete', danger: true, action: handleDelete },
           ].map((item) => <Pressable key={item.text} style={({ pressed }) => [styles.actionItem, item.danger && styles.actionDelete, pressed && styles.pressed]} onPress={() => { setShowActions(false); item.action(); }} accessibilityRole="button"><Ionicons name={item.icon} size={20} color={item.danger ? colors.danger : colors.textSecondary} /><Text style={[styles.actionText, item.danger && { color: colors.danger }]}>{item.text}</Text></Pressable>)}
         </View></View>
@@ -385,12 +385,13 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         onClose={() => setShowDeletePassword(false)}
         onVerify={async (password) => {
           const note = await noteRepo.getById(noteId);
-          return !!note?.password && verifyPassword(password, note.password);
+          return lockPasswordService.verifyNotePassword(password, note);
         }}
         onVerified={async () => {
           setShowDeletePassword(false);
           await deleteReminder();
         }}
+        passwordLabel="LockNote password"
         title="Delete this locked reminder?"
         subtitle="Enter its password to confirm deletion. The reminder note and its scheduled notification will be removed."
         verifyLabel="Delete reminder"
@@ -404,9 +405,14 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         ]}
       />
 
-      <Modal visible={showLock} animationType="fade" transparent onRequestClose={() => setShowLock(false)}>
-        <KeyboardAwareModalContent><View style={styles.lockCard}><View style={styles.lockIcon}><Ionicons name={hasPassword ? 'lock-closed' : 'lock-open-outline'} size={26} color={colors.primary} /></View><Text style={styles.lockTitle}>{hasPassword ? 'Password Protection' : 'Set Password'}</Text>{hasPassword ? <Text style={styles.lockDescription}>This reminder is password protected. Notification content is hidden.</Text> : <TextInput style={styles.lockInput} placeholder="Enter password" placeholderTextColor={colors.textTertiary} value={lockPassword} onChangeText={setLockPassword} secureTextEntry autoFocus accessibilityLabel="Reminder password" />}<View style={styles.lockButtons}><TouchableOpacity style={[styles.lockButton, { backgroundColor: colors.inputBg }]} onPress={() => { setShowLock(false); setLockPassword(''); }}><Text style={styles.lockButtonText}>Cancel</Text></TouchableOpacity><TouchableOpacity style={[styles.lockButton, { backgroundColor: hasPassword ? colors.dangerSoft : colors.primary }]} onPress={hasPassword ? handleRemovePassword : handleSetPassword}><Text style={[styles.lockButtonText, { color: hasPassword ? colors.danger : colors.card }]}>{hasPassword ? 'Remove Lock' : 'Set Lock'}</Text></TouchableOpacity></View></View></KeyboardAwareModalContent>
-      </Modal>
+      <ManageNoteLockModal
+        visible={showLock}
+        isLocked={hasPassword}
+        itemLabel="reminder"
+        onClose={() => setShowLock(false)}
+        onLock={handleSetPassword}
+        onUnlock={handleRemovePassword}
+      />
     </KeyboardAvoidingView>
   );
 };

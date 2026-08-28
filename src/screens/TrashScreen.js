@@ -10,10 +10,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { confirmDestructiveAction } from '../utils/confirm-action';
-import { verifyPassword } from '../utils/crypto';
 import { formatTrashRemaining, TRASH_RETENTION_DAYS } from '../utils/trash.mjs';
 import { trashService } from '../services/trashService';
-import { noteRepo } from '../db/noteRepo';
+import { lockPasswordService } from '../services/lockPasswordService';
 import PasswordModal from '../components/PasswordModal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import { radius, shadow, useTheme } from '../theme';
@@ -253,15 +252,13 @@ const TrashScreen = ({ navigation }) => {
       <PasswordModal
         visible={!!passwordItem}
         onClose={() => setPasswordItem(null)}
-        onVerify={(password) => verifyPassword(password, passwordItem?.password)}
+        onVerify={(password) => lockPasswordService.verifyNotePassword(password, passwordItem)}
         onVerified={async () => {
           const pending = passwordItem;
           setPasswordItem(null);
           if (pending) await permanentlyDelete(pending);
         }}
-        onReset={passwordItem ? async () => {
-          await noteRepo.update(passwordItem.id, { password: null });
-        } : undefined}
+        passwordLabel="LockNote password"
         title="Permanently delete this locked note?"
         subtitle="Enter its password to delete it forever. This cannot be undone."
         verifyLabel="Delete forever"

@@ -51,6 +51,23 @@ export const sendPasswordReset = async (auth, configured, email, redirectTo) => 
   return await unwrap(auth.resetPasswordForEmail(normalizeEmail(email), { redirectTo }));
 };
 
+export const sendLockPasswordResetLink = async (
+  auth,
+  configured,
+  email,
+  redirectTo
+) => {
+  assertConfigured(configured);
+  assertValid(validateEmail(email));
+  return await unwrap(auth.signInWithOtp({
+    email: normalizeEmail(email),
+    options: {
+      emailRedirectTo: redirectTo,
+      shouldCreateUser: false,
+    },
+  }));
+};
+
 export const updatePassword = async (auth, configured, password) => {
   assertConfigured(configured);
   assertValid(validatePassword(password));

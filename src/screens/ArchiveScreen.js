@@ -18,10 +18,12 @@ import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
+import { lockPasswordService } from '../services/lockPasswordService';
 import FolderItem from '../components/FolderItem';
 import ItemActionsModal from '../components/ItemActionsModal';
 import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
+import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { radius, useTheme } from '../theme';
 
 const editorRouteFor = (note) => {
@@ -43,6 +45,7 @@ const ArchiveScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionItem, setActionItem] = useState(null);
+  const [lockActionNote, setLockActionNote] = useState(null);
   const [passwordState, setPasswordState] = useState({
     item: null,
     type: 'note',
@@ -180,6 +183,22 @@ const ArchiveScreen = ({ navigation }) => {
     else confirmMoveNoteToTrash(item);
   };
 
+  const lockSelectedNote = async (password) => {
+    if (!lockActionNote) return;
+    await lockPasswordService.lockNote(lockActionNote.id, password);
+    await loadArchive();
+  };
+
+  const unlockSelectedNote = async (password) => {
+    if (!lockActionNote) return;
+    const note = await noteRepo.getById(lockActionNote.id);
+    if (!await lockPasswordService.verifyNotePassword(password, note)) {
+      throw new Error('Incorrect LockNote password.');
+    }
+    await noteRepo.update(lockActionNote.id, { password: null });
+    await loadArchive();
+  };
+
   const totalItems = folders.length + notes.length;
   const sections = useMemo(() => [
     {
@@ -267,10 +286,22 @@ const ArchiveScreen = ({ navigation }) => {
       <ItemActionsModal
         visible={!!actionItem}
         itemType={actionItem?.type || 'note'}
+        isLocked={!!actionItem?.item?.password}
         archiveMode
         onClose={() => setActionItem(null)}
         onRestore={() => actionItem && restoreItem(actionItem.item, actionItem.type)}
+        onToggleLock={actionItem?.type === 'note'
+          ? () => setLockActionNote(actionItem.item)
+          : undefined}
         onDelete={() => actionItem && requestMoveToTrash(actionItem.item, actionItem.type)}
+      />
+
+      <ManageNoteLockModal
+        visible={!!lockActionNote}
+        isLocked={!!lockActionNote?.password}
+        onClose={() => setLockActionNote(null)}
+        onLock={lockSelectedNote}
+        onUnlock={unlockSelectedNote}
       />
 
       <PasswordModal
@@ -278,6 +309,9 @@ const ArchiveScreen = ({ navigation }) => {
         onClose={() => setPasswordState({ item: null, type: 'note', action: 'open' })}
         onVerify={async (password) => {
           if (!passwordItem) return false;
+          if (passwordState.type === 'note') {
+            return lockPasswordService.verifyNotePassword(password, passwordItem);
+          }
           return await hashPassword(password) === passwordItem.password;
         }}
         onVerified={async () => {
@@ -291,14 +325,10 @@ const ArchiveScreen = ({ navigation }) => {
             navigateToItem(pending.item, pending.type);
           }
         }}
-        onReset={passwordState.action === 'open' && passwordItem ? async () => {
-          if (passwordState.type === 'folder') {
-            await folderRepo.update(passwordItem.id, { password: null });
-          } else {
-            await noteRepo.update(passwordItem.id, { password: null });
-          }
-          await loadArchive();
-        } : undefined}
+        allowLockPasswordRecovery={
+          passwordState.type === 'note' && passwordState.action === 'open'
+        }
+        passwordLabel={passwordState.type === 'note' ? 'LockNote password' : 'Folder password'}
         title={passwordState.action === 'delete'
           ? `Move this locked ${passwordState.type} to Trash?`
           : 'Locked'}

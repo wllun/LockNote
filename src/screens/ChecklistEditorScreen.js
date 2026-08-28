@@ -23,9 +23,10 @@ import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
 import NoteColorModal from '../components/note-color-modal';
+import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { collaborationService } from '../services/collaborationService';
+import { lockPasswordService } from '../services/lockPasswordService';
 import PasswordModal from '../components/PasswordModal';
-import { verifyPassword } from '../utils/crypto';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
 import { useDragAutoScroll } from '../utils/use-drag-auto-scroll';
@@ -252,7 +253,6 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
-  const [lockPassword, setLockPassword] = useState('');
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
   const [activeDrag, setActiveDrag] = useState(null);
@@ -702,32 +702,20 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     updateDraft(snapshot.title, snapshot.items);
   };
 
-  const handleSetPassword = async () => {
-    if (!lockPassword.trim()) {
-      Alert.alert('Error', 'Please enter a password');
-      return;
-    }
-    try {
-      await noteRepo.update(noteId, { password: lockPassword });
-      setHasPassword(true);
-      latest.current.hasPassword = true;
-      setShowLockModal(false);
-      setLockPassword('');
-    } catch {
-      Alert.alert('Error', 'Failed to set password');
-    }
+  const handleSetPassword = async (password) => {
+    await lockPasswordService.lockNote(noteId, password);
+    setHasPassword(true);
+    latest.current.hasPassword = true;
   };
 
-  const handleRemovePassword = async () => {
-    try {
-      await noteRepo.update(noteId, { password: null });
-      setHasPassword(false);
-      latest.current.hasPassword = false;
-      setShowLockModal(false);
-      setLockPassword('');
-    } catch {
-      Alert.alert('Error', 'Failed to remove password');
+  const handleRemovePassword = async (password) => {
+    const note = await noteRepo.getById(noteId);
+    if (!await lockPasswordService.verifyNotePassword(password, note)) {
+      throw new Error('Incorrect LockNote password.');
     }
+    await noteRepo.update(noteId, { password: null });
+    setHasPassword(false);
+    latest.current.hasPassword = false;
   };
 
   const handleTogglePin = async () => {
@@ -1167,14 +1155,14 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                 setShowLockModal(true);
               }}
               accessibilityRole="button"
-              accessibilityLabel={hasPassword ? 'Manage checklist password' : 'Set checklist password'}
+              accessibilityLabel={hasPassword ? 'Unlock checklist' : 'Lock checklist'}
             >
               <Ionicons
-                name={hasPassword ? 'lock-closed' : 'lock-open-outline'}
+                name={hasPassword ? 'lock-open-outline' : 'lock-closed-outline'}
                 size={20}
                 color={hasPassword ? colors.folder : colors.textSecondary}
               />
-              <Text style={styles.actionsMenuText}>{hasPassword ? 'Password protection' : 'Lock'}</Text>
+              <Text style={styles.actionsMenuText}>{hasPassword ? 'Unlock' : 'Lock'}</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [
@@ -1211,12 +1199,13 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         onClose={() => setShowDeletePasswordModal(false)}
         onVerify={async (password) => {
           const note = await noteRepo.getById(noteId);
-          return !!note?.password && verifyPassword(password, note.password);
+          return lockPasswordService.verifyNotePassword(password, note);
         }}
         onVerified={async () => {
           setShowDeletePasswordModal(false);
           await deleteChecklist();
         }}
+        passwordLabel="LockNote password"
         title="Delete this locked checklist?"
         subtitle="Enter its password to confirm deletion. This checklist and all its items will be removed."
         verifyLabel="Delete checklist"
@@ -1230,71 +1219,14 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         ]}
       />
 
-      <Modal
+      <ManageNoteLockModal
         visible={showLockModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => {
-          setShowLockModal(false);
-          setLockPassword('');
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIconCircle}>
-              <Ionicons
-                name={hasPassword ? 'lock-closed' : 'lock-open-outline'}
-                size={26}
-                color={colors.primary}
-              />
-            </View>
-            <Text style={styles.modalTitle}>{hasPassword ? 'Password Protection' : 'Set Password'}</Text>
-            {hasPassword ? (
-              <Text style={styles.modalDescription}>This checklist is password protected.</Text>
-            ) : (
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Enter password"
-                placeholderTextColor={colors.textTertiary}
-                value={lockPassword}
-                onChangeText={setLockPassword}
-                secureTextEntry
-                autoFocus
-                accessibilityLabel="Checklist password"
-              />
-            )}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                activeOpacity={0.7}
-                onPress={() => {
-                  setShowLockModal(false);
-                  setLockPassword('');
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              {hasPassword ? (
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.removeButton]}
-                  activeOpacity={0.7}
-                  onPress={handleRemovePassword}
-                >
-                  <Text style={[styles.modalButtonText, styles.removeButtonText]}>Remove Lock</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.setButton]}
-                  activeOpacity={0.7}
-                  onPress={handleSetPassword}
-                >
-                  <Text style={[styles.modalButtonText, styles.setButtonText]}>Set Lock</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
+        isLocked={hasPassword}
+        itemLabel="checklist"
+        onClose={() => setShowLockModal(false)}
+        onLock={handleSetPassword}
+        onUnlock={handleRemovePassword}
+      />
     </KeyboardAvoidingView>
   );
 };

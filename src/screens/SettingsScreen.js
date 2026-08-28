@@ -4,19 +4,17 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
-  Modal,
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { radius, shadow, useTheme, useThemeMode } from '../theme';
-import { recovery } from '../utils/recovery';
-import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import ExpenseCurrencyModal from '../components/expense-currency-modal';
+import LockPasswordSettingsModal from '../components/lock-password-settings-modal';
 import { backupService } from '../services/backupService';
 import { expenseCurrencyService } from '../services/expenseCurrencyService';
+import { lockPasswordService } from '../services/lockPasswordService';
 import { expenseCurrencyPreference } from '../utils/expense-currency-preference';
 import {
   DEFAULT_EXPENSE_CURRENCY,
@@ -34,11 +32,9 @@ const SettingsScreen = ({ navigation }) => {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { mode, setMode } = useThemeMode();
 
-  const [hasRecovery, setHasRecovery] = useState(false);
-  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [pin, setPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [recoveryError, setRecoveryError] = useState('');
+  const [lockPasswordStatus, setLockPasswordStatus] = useState(null);
+  const [showLockPasswordModal, setShowLockPasswordModal] = useState(false);
+  const [lockPasswordBusy, setLockPasswordBusy] = useState(false);
   const [backupBusy, setBackupBusy] = useState(null);
   const [expenseCurrency, setExpenseCurrency] = useState(
     DEFAULT_EXPENSE_CURRENCY
@@ -47,14 +43,19 @@ const SettingsScreen = ({ navigation }) => {
   const [currencyBusy, setCurrencyBusy] = useState(false);
   const selectedExpenseCurrency = getExpenseCurrency(expenseCurrency);
 
-  const refreshRecoveryStatus = useCallback(() => {
-    recovery.hasPin().then(setHasRecovery);
+  const refreshLockPasswordStatus = useCallback(async () => {
+    await lockPasswordService.removeUnsafeLegacyRecoveryPin();
+    const status = await lockPasswordService.getStatus();
+    setLockPasswordStatus(status);
+    return status;
   }, []);
 
   useEffect(() => {
-    refreshRecoveryStatus();
+    refreshLockPasswordStatus();
     expenseCurrencyPreference.load().then(setExpenseCurrency);
-  }, [refreshRecoveryStatus]);
+    const unsubscribe = navigation.addListener('focus', refreshLockPasswordStatus);
+    return unsubscribe;
+  }, [navigation, refreshLockPasswordStatus]);
 
   const updateDefaultExpenseCurrency = async (nextCurrency, applyToExisting) => {
     setCurrencyBusy(true);
@@ -140,48 +141,53 @@ const SettingsScreen = ({ navigation }) => {
     );
   };
 
-  const openRecoveryModal = () => {
-    setPin('');
-    setConfirmPin('');
-    setRecoveryError('');
-    setShowRecoveryModal(true);
-  };
-
-  const handleSaveRecoveryPin = async () => {
-    if (!pin.trim()) {
-      setRecoveryError('Enter a PIN');
-      return;
-    }
-    if (pin !== confirmPin) {
-      setRecoveryError('PINs do not match');
-      return;
-    }
-    await recovery.setPin(pin);
-    setShowRecoveryModal(false);
-    refreshRecoveryStatus();
-  };
-
-  const handleRemoveRecoveryPin = () => {
+  const handleLockPasswordSaved = async (result) => {
+    setShowLockPasswordModal(false);
+    await refreshLockPasswordStatus();
     Alert.alert(
-      'Remove Recovery PIN',
-      'Without a recovery PIN, a forgotten password on a folder or note cannot be reset.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            await recovery.clearPin();
-            refreshRecoveryStatus();
-          },
-        },
-      ],
+      'LockNote password saved',
+      result.recoveryEnabled
+        ? `Email recovery is linked to ${result.recoveryEmail}.`
+        : 'The password is saved locally. Sign in and change it again to link email recovery.',
+      [{ text: 'OK' }],
       {
-        variant: 'danger',
-        iconName: 'key-outline',
-        details: [{ label: 'Recovery PIN', value: 'Currently enabled' }],
+        variant: 'success',
+        iconName: 'checkmark-circle-outline',
+        details: [
+          { label: 'Locked notes updated', value: String(result.updatedCount) },
+          ...(result.legacyLockedCount
+            ? [{
+                label: 'Older passwords remaining',
+                value: String(result.legacyLockedCount),
+              }]
+            : []),
+        ],
       }
     );
+  };
+
+  const handleForgotLockPassword = async () => {
+    if (lockPasswordBusy) return;
+    setLockPasswordBusy(true);
+    try {
+      await lockPasswordService.requestResetEmail();
+      const refreshed = await refreshLockPasswordStatus();
+      Alert.alert(
+        'Check your email',
+        `A one-time reset link was sent to ${refreshed.maskedRecoveryEmail}.`,
+        [{ text: 'OK' }],
+        { variant: 'info', iconName: 'mail-outline' }
+      );
+    } catch (error) {
+      Alert.alert(
+        'Email reset unavailable',
+        error?.message || 'The reset email could not be sent.',
+        [{ text: 'OK' }],
+        { variant: 'error', iconName: 'alert-circle-outline' }
+      );
+    } finally {
+      setLockPasswordBusy(false);
+    }
   };
 
   const showBackupError = (error) => {
@@ -324,39 +330,52 @@ const SettingsScreen = ({ navigation }) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Security</Text>
         <View style={styles.card}>
-          <TouchableOpacity style={styles.item} activeOpacity={0.7} onPress={openRecoveryModal}>
+          <TouchableOpacity
+            style={[styles.item, !lockPasswordStatus && styles.itemDisabled]}
+            activeOpacity={0.7}
+            onPress={() => setShowLockPasswordModal(true)}
+            disabled={!lockPasswordStatus}
+          >
             <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
               <Ionicons name="key-outline" size={19} color={colors.primary} />
             </View>
             <View style={styles.itemContent}>
-              <Text style={styles.itemLabel}>Recovery PIN</Text>
+              <Text style={styles.itemLabel}>
+                {lockPasswordStatus?.configured ? 'Change Password' : 'Set Password'}
+              </Text>
               <Text style={styles.itemDescription}>
-                {hasRecovery
-                  ? 'Enabled · Tap to change'
-                  : 'Reset forgotten passwords'}
+                One password for all locked notes
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
           </TouchableOpacity>
-          {hasRecovery && (
-            <>
-              <View style={styles.separator} />
-              <TouchableOpacity
-                style={styles.item}
-                activeOpacity={0.7}
-                onPress={handleRemoveRecoveryPin}
-              >
-                <View style={[styles.iconCircle, { backgroundColor: colors.dangerSoft }]}>
-                  <Ionicons name="trash-outline" size={19} color={colors.danger} />
-                </View>
-                <View style={styles.itemContent}>
-                  <Text style={[styles.itemLabel, { color: colors.danger }]}>
-                    Remove Recovery PIN
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </>
-          )}
+          <View style={styles.separator} />
+          <TouchableOpacity
+            style={[
+              styles.item,
+              (lockPasswordBusy || !lockPasswordStatus) && styles.itemDisabled,
+            ]}
+            activeOpacity={0.7}
+            onPress={handleForgotLockPassword}
+            disabled={lockPasswordBusy || !lockPasswordStatus}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: colors.folderSoft }]}>
+              <Ionicons name="mail-outline" size={19} color={colors.folder} />
+            </View>
+            <View style={styles.itemContent}>
+              <Text style={styles.itemLabel}>Forgot Password</Text>
+              <Text style={styles.itemDescription}>
+                {lockPasswordStatus?.recoveryEnabled
+                  ? `Email reset · ${lockPasswordStatus.maskedRecoveryEmail}`
+                  : 'Requires a signed-in recovery email'}
+              </Text>
+            </View>
+            {lockPasswordBusy ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -485,61 +504,12 @@ const SettingsScreen = ({ navigation }) => {
         </View>
       </View>
 
-      <Modal visible={showRecoveryModal} animationType="fade" transparent>
-        <KeyboardAwareModalContent>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIconCircle}>
-              <Ionicons name="key-outline" size={26} color={colors.primary} />
-            </View>
-            <Text style={styles.modalTitle}>
-              {hasRecovery ? 'Change Recovery PIN' : 'Set Recovery PIN'}
-            </Text>
-            <Text style={styles.modalDescription}>
-              Use this PIN to reset a forgotten folder or note password.
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="New PIN"
-              placeholderTextColor={colors.textTertiary}
-              value={pin}
-              onChangeText={(t) => {
-                setPin(t);
-                setRecoveryError('');
-              }}
-              secureTextEntry
-              autoFocus
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm PIN"
-              placeholderTextColor={colors.textTertiary}
-              value={confirmPin}
-              onChangeText={(t) => {
-                setConfirmPin(t);
-                setRecoveryError('');
-              }}
-              secureTextEntry
-            />
-            {recoveryError ? <Text style={styles.modalError}>{recoveryError}</Text> : null}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                activeOpacity={0.7}
-                onPress={() => setShowRecoveryModal(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                activeOpacity={0.7}
-                onPress={handleSaveRecoveryPin}
-              >
-                <Text style={[styles.modalButtonText, styles.saveButtonText]}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAwareModalContent>
-      </Modal>
+      <LockPasswordSettingsModal
+        visible={showLockPasswordModal}
+        status={lockPasswordStatus}
+        onClose={() => setShowLockPasswordModal(false)}
+        onSaved={handleLockPasswordSaved}
+      />
 
       <ExpenseCurrencyModal
         visible={showExpenseCurrencyModal}
@@ -674,78 +644,6 @@ const makeStyles = (colors) =>
       lineHeight: 17,
       marginHorizontal: 4,
       marginTop: 8,
-    },
-    modalContent: {
-      backgroundColor: colors.card,
-      borderRadius: radius.lg,
-      padding: 24,
-      width: '100%',
-      maxWidth: 400,
-      alignItems: 'center',
-      ...shadow.card,
-    },
-    modalIconCircle: {
-      width: 56,
-      height: 56,
-      borderRadius: radius.full,
-      backgroundColor: colors.primarySoft,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 14,
-    },
-    modalTitle: {
-      fontSize: 19,
-      fontWeight: '700',
-      color: colors.text,
-      marginBottom: 8,
-      textAlign: 'center',
-    },
-    modalDescription: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginBottom: 18,
-      textAlign: 'center',
-    },
-    modalError: {
-      color: colors.danger,
-      fontSize: 14,
-      marginBottom: 8,
-      textAlign: 'center',
-    },
-    input: {
-      backgroundColor: colors.inputBg,
-      borderRadius: radius.md,
-      padding: 14,
-      marginBottom: 12,
-      fontSize: 16,
-      color: colors.text,
-      alignSelf: 'stretch',
-    },
-    modalButtons: {
-      flexDirection: 'row',
-      gap: 12,
-      marginTop: 8,
-      alignSelf: 'stretch',
-    },
-    modalButton: {
-      flex: 1,
-      padding: 14,
-      borderRadius: radius.md,
-      alignItems: 'center',
-    },
-    cancelButton: {
-      backgroundColor: colors.inputBg,
-    },
-    saveButton: {
-      backgroundColor: colors.primary,
-    },
-    modalButtonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    saveButtonText: {
-      color: colors.card,
     },
   });
 

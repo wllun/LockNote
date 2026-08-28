@@ -158,6 +158,27 @@ export const noteRepo = {
     });
   },
 
+  async replaceLockedPasswordHash(newPasswordHash, currentPasswordHash = null) {
+    return await mutateStorage((notes) => {
+      const timestamp = now();
+      let updatedCount = 0;
+      for (const note of notes) {
+        if (
+          note.is_deleted ||
+          note.share_origin === 'incoming' ||
+          !note.password ||
+          (currentPasswordHash && note.password !== currentPasswordHash)
+        ) {
+          continue;
+        }
+        note.password = newPasswordHash;
+        note.updated_at = timestamp;
+        updatedCount += 1;
+      }
+      return updatedCount;
+    });
+  },
+
   async move(id, folderId = null) {
     return await mutateStorage((notes) => {
       const note = notes.find((item) => item.id === id && !item.is_deleted);

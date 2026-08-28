@@ -10,17 +10,16 @@ import {
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { radius, shadow, useTheme } from '../theme';
-import { recovery } from '../utils/recovery';
+import { lockPasswordService, maskRecoveryEmail } from '../services/lockPasswordService';
 import KeyboardAwareModalContent from './keyboard-aware-modal-content';
 
-// onReset (optional): async () => void — clears the item's password after a
-// successful recovery-PIN check. Omit to disable the "Forgot password?" link.
 const PasswordModal = ({
   visible,
   onClose,
   onVerify,
   onVerified,
-  onReset,
+  allowLockPasswordRecovery = false,
+  passwordLabel = 'Password',
   title = 'Locked',
   subtitle = 'Enter the password to continue',
   verifyLabel = 'Unlock',
@@ -32,8 +31,6 @@ const PasswordModal = ({
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [verifying, setVerifying] = useState(false);
-  const [mode, setMode] = useState('password'); // 'password' | 'recovery'
-  const [recoveryPin, setRecoveryPin] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const destructive = variant === 'danger';
 
@@ -62,36 +59,19 @@ const PasswordModal = ({
   };
 
   const handleForgotPassword = async () => {
-    const has = await recovery.hasPin();
-    if (!has) {
-      Alert.alert(
-        'No recovery PIN set',
-        'Set a recovery PIN in Settings to enable password recovery for locked items.'
-      );
-      return;
-    }
-    setError('');
-    setMode('recovery');
-  };
-
-  const handleRecover = async () => {
-    if (!recoveryPin.trim()) {
-      setError('Enter your recovery PIN');
-      return;
-    }
     setVerifying(true);
     setError('');
     try {
-      const ok = await recovery.verifyPin(recoveryPin);
-      if (!ok) {
-        setError('Incorrect recovery PIN');
-        return;
-      }
-      await onReset();
-      setRecoveryPin('');
-      await onVerified();
-    } catch (err) {
-      setError('Recovery failed');
+      const result = await lockPasswordService.requestResetEmail();
+      handleClose();
+      Alert.alert(
+        'Check your email',
+        `A one-time LockNote password reset link was sent to ${maskRecoveryEmail(result.email)}.`,
+        [{ text: 'OK' }],
+        { variant: 'info', iconName: 'mail-outline' }
+      );
+    } catch (forgotError) {
+      setError(forgotError?.message || 'The reset email could not be sent.');
     } finally {
       setVerifying(false);
     }
@@ -99,15 +79,12 @@ const PasswordModal = ({
 
   const handleClose = () => {
     setPassword('');
-    setRecoveryPin('');
     setError('');
-    setMode('password');
     setShowPassword(false);
     onClose();
   };
 
-  const recovering = mode === 'recovery';
-  const submitDisabled = verifying || !(recovering ? recoveryPin : password).trim();
+  const submitDisabled = verifying || !password.trim();
 
   return (
     <Modal
@@ -124,7 +101,7 @@ const PasswordModal = ({
         >
           <View style={[styles.iconCircle, destructive && styles.dangerIconCircle]}>
             <Ionicons
-              name={recovering ? 'key-outline' : destructive ? 'trash-outline' : 'lock-closed'}
+              name={destructive ? 'trash-outline' : 'lock-closed'}
               size={26}
               color={destructive ? colors.danger : colors.primary}
             />
@@ -133,15 +110,13 @@ const PasswordModal = ({
             style={[styles.title, destructive && styles.destructiveTextAlignment]}
             accessibilityRole="header"
           >
-            {recovering ? 'Recover Access' : title}
+            {title}
           </Text>
           <Text style={[styles.subtitle, destructive && styles.destructiveTextAlignment]}>
-            {recovering
-              ? 'Enter your recovery PIN to remove this password'
-              : subtitle}
+            {subtitle}
           </Text>
 
-          {!recovering && details.length > 0 && (
+          {details.length > 0 && (
             <View style={styles.detailsCard}>
               {details.map((detail, index) => (
                 <View
@@ -169,26 +144,8 @@ const PasswordModal = ({
             </View>
           )}
 
-          <Text style={styles.inputLabel}>
-            {recovering ? 'Recovery PIN' : 'Password'}
-          </Text>
-          {recovering ? (
-            <TextInput
-              style={[styles.input, error ? styles.inputError : null]}
-              placeholder="Recovery PIN"
-              placeholderTextColor={colors.textTertiary}
-              value={recoveryPin}
-              onChangeText={(text) => {
-                setRecoveryPin(text);
-                setError('');
-              }}
-              secureTextEntry
-              autoFocus
-              accessibilityLabel="Recovery PIN"
-              onSubmitEditing={handleRecover}
-            />
-          ) : (
-            <View style={[styles.passwordField, error && styles.inputError]}>
+          <Text style={styles.inputLabel}>{passwordLabel}</Text>
+          <View style={[styles.passwordField, error && styles.inputError]}>
               <TextInput
                 style={styles.passwordInput}
                 placeholder="Enter password"
@@ -219,8 +176,7 @@ const PasswordModal = ({
                   color={colors.textSecondary}
                 />
               </Pressable>
-            </View>
-          )}
+          </View>
           {error ? (
             <Text
               style={styles.error}
@@ -230,7 +186,7 @@ const PasswordModal = ({
               {error}
             </Text>
           ) : null}
-          {!recovering && onReset && (
+          {allowLockPasswordRecovery && (
             <Pressable
               style={({ pressed }) => pressed && styles.pressed}
               onPress={handleForgotPassword}
@@ -246,11 +202,11 @@ const PasswordModal = ({
                 styles.cancelButton,
                 pressed && styles.pressed,
               ]}
-              onPress={recovering ? () => { setMode('password'); setError(''); } : handleClose}
+              onPress={handleClose}
               accessibilityRole="button"
-              accessibilityLabel={recovering ? 'Back to password entry' : 'Cancel password entry'}
+              accessibilityLabel="Cancel password entry"
             >
-              <Text style={styles.buttonText}>{recovering ? 'Back' : 'Cancel'}</Text>
+              <Text style={styles.buttonText}>Cancel</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [
@@ -259,16 +215,16 @@ const PasswordModal = ({
                 submitDisabled && styles.buttonDisabled,
                 pressed && !submitDisabled && styles.pressed,
               ]}
-              onPress={recovering ? handleRecover : handleVerify}
+              onPress={handleVerify}
               disabled={submitDisabled}
               accessibilityRole="button"
-              accessibilityLabel={recovering ? 'Verify recovery PIN' : verifyLabel}
+              accessibilityLabel={verifyLabel}
               accessibilityState={{ disabled: submitDisabled, busy: verifying }}
             >
               <Text style={[styles.buttonText, styles.verifyButtonText]}>
                 {verifying
-                  ? (recovering ? 'Recovering...' : destructive ? 'Deleting...' : 'Verifying...')
-                  : (recovering ? 'Reset Password' : verifyLabel)}
+                  ? (destructive ? 'Deleting...' : 'Verifying...')
+                  : verifyLabel}
               </Text>
             </Pressable>
           </View>

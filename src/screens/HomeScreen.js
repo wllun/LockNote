@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
 import { hashPassword } from '../utils/crypto';
+import { lockPasswordService } from '../services/lockPasswordService';
 import FolderItem from '../components/FolderItem';
 import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
@@ -23,6 +24,7 @@ import CreateNoteTypeModal from '../components/create-note-type-modal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import MoveNoteModal from '../components/MoveNoteModal';
 import NoteColorModal from '../components/note-color-modal';
+import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
@@ -86,6 +88,7 @@ const HomeScreen = ({ navigation }) => {
     folders: [],
   });
   const [colorNote, setColorNote] = useState(null);
+  const [lockActionNote, setLockActionNote] = useState(null);
   const [folderNoteCounts, setFolderNoteCounts] = useState({});
   const [folderViewMode, setFolderViewMode] = useState('list');
   const [noteViewMode, setNoteViewMode] = useState('list');
@@ -318,6 +321,22 @@ const HomeScreen = ({ navigation }) => {
     } catch (error) {
       Alert.alert('Error', 'Failed to archive note');
     }
+  };
+
+  const lockSelectedNote = async (password) => {
+    if (!lockActionNote) return;
+    await lockPasswordService.lockNote(lockActionNote.id, password);
+    await refreshCurrent();
+  };
+
+  const unlockSelectedNote = async (password) => {
+    if (!lockActionNote) return;
+    const note = await noteRepo.getById(lockActionNote.id);
+    if (!await lockPasswordService.verifyNotePassword(password, note)) {
+      throw new Error('Incorrect LockNote password.');
+    }
+    await noteRepo.update(lockActionNote.id, { password: null });
+    await refreshCurrent();
   };
 
   const openItemActions = (item, type) => {
@@ -723,6 +742,7 @@ const HomeScreen = ({ navigation }) => {
         visible={itemActions.visible}
         itemType={itemActions.type}
         isPinned={!!itemActions.item?.is_pinned}
+        isLocked={!!itemActions.item?.password}
         onClose={closeItemActions}
         onTogglePin={() => {
           if (itemActions.type === 'folder') {
@@ -739,6 +759,11 @@ const HomeScreen = ({ navigation }) => {
         onColor={
           itemActions.type === 'note'
             ? () => setColorNote(itemActions.item)
+            : undefined
+        }
+        onToggleLock={
+          itemActions.type === 'note'
+            ? () => setLockActionNote(itemActions.item)
             : undefined
         }
         onArchive={
@@ -760,6 +785,14 @@ const HomeScreen = ({ navigation }) => {
         value={colorNote?.color}
         onClose={() => setColorNote(null)}
         onSelect={handleChangeNoteColor}
+      />
+
+      <ManageNoteLockModal
+        visible={!!lockActionNote}
+        isLocked={!!lockActionNote?.password}
+        onClose={() => setLockActionNote(null)}
+        onLock={lockSelectedNote}
+        onUnlock={unlockSelectedNote}
       />
 
       <MoveNoteModal
@@ -823,6 +856,12 @@ const HomeScreen = ({ navigation }) => {
         })}
         onVerify={async (password) => {
           if (!passwordModal.item) return false;
+          if (passwordModal.type === 'note') {
+            return lockPasswordService.verifyNotePassword(
+              password,
+              passwordModal.item
+            );
+          }
           const hash = await hashPassword(password);
           return hash === passwordModal.item.password;
         }}
@@ -831,12 +870,10 @@ const HomeScreen = ({ navigation }) => {
           passwordModal.type,
           passwordModal.action
         )}
-        onReset={passwordModal.action === 'open' ? async () => {
-          const { item, type } = passwordModal;
-          if (type === 'folder') await folderRepo.update(item.id, { password: null });
-          else await noteRepo.update(item.id, { password: null });
-          refreshCurrent();
-        } : undefined}
+        allowLockPasswordRecovery={
+          passwordModal.type === 'note' && passwordModal.action === 'open'
+        }
+        passwordLabel={passwordModal.type === 'note' ? 'LockNote password' : 'Folder password'}
         title={passwordModal.action === 'delete' && passwordModal.type === 'note'
           ? 'Delete this locked note?'
           : passwordModal.action === 'delete'

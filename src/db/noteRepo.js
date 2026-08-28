@@ -128,6 +128,20 @@ export const noteRepo = {
     return await this.getById(id);
   },
 
+  async replaceLockedPasswordHash(newPasswordHash, currentPasswordHash = null) {
+    const db = getDB();
+    const result = await db.runAsync(
+      `UPDATE notes
+       SET password = ?, updated_at = ?
+       WHERE password IS NOT NULL
+         AND is_deleted = 0
+         AND share_origin != 'incoming'
+         AND (? IS NULL OR password = ?)`,
+      [newPasswordHash, now(), currentPasswordHash, currentPasswordHash]
+    );
+    return Number(result.changes) || 0;
+  },
+
   async move(id, folderId = null) {
     const db = getDB();
     await db.runAsync(

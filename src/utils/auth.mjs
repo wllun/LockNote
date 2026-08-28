@@ -100,6 +100,11 @@ export const parseAuthCallback = (url) => {
       : `${url.slice(0, hashIndex)}${url.includes('?') ? '&' : '?'}${url.slice(hashIndex + 1)}`;
     const parsed = new URL(normalized);
     const params = Object.fromEntries(parsed.searchParams.entries());
+    const callbackRoute = `${parsed.hostname}${parsed.pathname}`
+      .replace(/^\/+|\/+$/g, '');
+    const intent = callbackRoute.endsWith('reset-lock-password')
+      ? 'lock-password-recovery'
+      : null;
 
     if (params.error || params.error_code || params.error_description) {
       return {
@@ -107,6 +112,7 @@ export const parseAuthCallback = (url) => {
           code: params.error_code || params.error || 'auth_callback_error',
           message: params.error_description || params.error || 'The authentication link could not be opened.',
         },
+        ...(intent ? { intent } : {}),
       };
     }
 
@@ -117,6 +123,7 @@ export const parseAuthCallback = (url) => {
       accessToken: params.access_token || null,
       refreshToken: params.refresh_token || null,
       code: params.code || null,
+      ...(intent ? { intent } : {}),
     };
   } catch {
     return {

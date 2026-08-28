@@ -432,13 +432,13 @@ Trace opening a password-protected note:
 NoteItem onPress
   -> HomeScreen checks note.password
   -> PasswordModal opens
-  -> entered password is hashed
-  -> hashes are compared
+  -> lockPasswordService verifies the shared LockNote password
+  -> legacy per-note hashes migrate after a successful old-password check
   -> navigate to NoteEditor
 ```
 
-Read `PasswordModal.js` and `src/utils/crypto.js`. Remember: this gates the UI,
-but it does not encrypt note content.
+Read `PasswordModal.js`, `lockPasswordService.js`, and `src/utils/crypto.js`.
+Remember: this gates the UI, but it does not encrypt note content.
 
 ### Pass 5: compare platform implementations
 

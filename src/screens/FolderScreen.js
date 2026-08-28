@@ -25,7 +25,8 @@ import CreateNoteTypeModal from '../components/create-note-type-modal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import MoveNoteModal from '../components/MoveNoteModal';
 import NoteColorModal from '../components/note-color-modal';
-import { hashPassword } from '../utils/crypto';
+import ManageNoteLockModal from '../components/manage-note-lock-modal';
+import { lockPasswordService } from '../services/lockPasswordService';
 import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
 import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
@@ -142,6 +143,7 @@ const FolderScreen = ({ route, navigation }) => {
     folders: [],
   });
   const [colorNote, setColorNote] = useState(null);
+  const [lockActionNote, setLockActionNote] = useState(null);
 
   useEffect(() => {
     if (requestedNoteViewMode) {
@@ -272,6 +274,22 @@ const FolderScreen = ({ route, navigation }) => {
     } catch (error) {
       Alert.alert('Error', 'Failed to archive note');
     }
+  };
+
+  const lockSelectedNote = async (password) => {
+    if (!lockActionNote) return;
+    await lockPasswordService.lockNote(lockActionNote.id, password);
+    await loadNotes();
+  };
+
+  const unlockSelectedNote = async (password) => {
+    if (!lockActionNote) return;
+    const note = await noteRepo.getById(lockActionNote.id);
+    if (!await lockPasswordService.verifyNotePassword(password, note)) {
+      throw new Error('Incorrect LockNote password.');
+    }
+    await noteRepo.update(lockActionNote.id, { password: null });
+    await loadNotes();
   };
 
   const openItemActions = (note) => {
@@ -412,10 +430,12 @@ const FolderScreen = ({ route, navigation }) => {
         visible={itemActions.visible}
         itemType="note"
         isPinned={!!itemActions.note?.is_pinned}
+        isLocked={!!itemActions.note?.password}
         onClose={closeItemActions}
         onTogglePin={() => handleToggleNotePin(itemActions.note)}
         onMove={() => openMoveNote(itemActions.note)}
         onColor={() => setColorNote(itemActions.note)}
+        onToggleLock={() => setLockActionNote(itemActions.note)}
         onArchive={() => handleArchiveNote(itemActions.note)}
         onDelete={() => handleDeleteNote(itemActions.note)}
       />
@@ -425,6 +445,15 @@ const FolderScreen = ({ route, navigation }) => {
         value={colorNote?.color}
         onClose={() => setColorNote(null)}
         onSelect={handleChangeNoteColor}
+      />
+
+      <ManageNoteLockModal
+        visible={!!lockActionNote}
+        isLocked={!!lockActionNote?.password}
+        itemLabel="note"
+        onClose={() => setLockActionNote(null)}
+        onLock={lockSelectedNote}
+        onUnlock={unlockSelectedNote}
       />
 
       <MoveNoteModal
@@ -444,8 +473,7 @@ const FolderScreen = ({ route, navigation }) => {
         })}
         onVerify={async (password) => {
           if (!passwordModal.note) return false;
-          const hash = await hashPassword(password);
-          return hash === passwordModal.note.password;
+          return lockPasswordService.verifyNotePassword(password, passwordModal.note);
         }}
         onVerified={async () => {
           const { note, action } = passwordModal;
@@ -456,10 +484,8 @@ const FolderScreen = ({ route, navigation }) => {
             navigation.navigate(editorRouteFor(note), { noteId: note.id });
           }
         }}
-        onReset={passwordModal.action === 'open' ? async () => {
-          await noteRepo.update(passwordModal.note.id, { password: null });
-          loadNotes();
-        } : undefined}
+        allowLockPasswordRecovery={passwordModal.action === 'open'}
+        passwordLabel="LockNote password"
         title={passwordModal.action === 'delete' ? 'Delete this locked note?' : 'Locked'}
         subtitle={passwordModal.action === 'delete'
           ? 'Enter its password to confirm deletion. This note will be removed from this folder.'

@@ -15,8 +15,10 @@ const ItemActionsModal = ({
   visible,
   itemType,
   isPinned,
+  isLocked,
   onClose,
   onTogglePin,
+  onToggleLock,
   onColor,
   onMove,
   onArchive,
@@ -154,6 +156,24 @@ const ItemActionsModal = ({
                 />
               </View>
               <Text style={styles.actionText}>Move</Text>
+            </Pressable>
+          )}
+
+          {!trashMode && isNote && !!onToggleLock && (
+            <Pressable
+              style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+              onPress={() => runAction(onToggleLock)}
+              accessibilityRole="button"
+              accessibilityLabel={`${isLocked ? 'Unlock' : 'Lock'} note`}
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons
+                  name={isLocked ? 'lock-open-outline' : 'lock-closed-outline'}
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </View>
+              <Text style={styles.actionText}>{isLocked ? 'Unlock' : 'Lock'}</Text>
             </Pressable>
           )}
 

@@ -176,12 +176,21 @@ On native, `notes.folder_id` has `ON DELETE CASCADE`; archive indexes cover both
 
 ## Password protection
 
-`utils/crypto.js` hashes with SHA-256 (`expo-crypto`). On create/update, a plaintext password is hashed and stored in the `password` column (null = unlocked). To open a locked item, `PasswordModal` hashes the entered password and compares to the stored hash.
+`utils/crypto.js` hashes with SHA-256 (`expo-crypto`). Folder locks retain an individual hash in each folder row. Note locks use one shared LockNote credential stored locally by `lockPasswordService`; the same hash is also copied into each locked note's `password` column so existing lock flags, backups, and private sync remain compatible (`null` = unlocked). The account password and LockNote password are independent credentials, even when a user chooses identical text.
 
 The same hash verification gates every user-facing delete path for a locked
-note or folder, including list actions and note-editor actions. The recovery PIN
-can reset an access gate, but it is not offered as a substitute in the delete
-password prompt.
+note or folder, including list actions and note-editor actions. Removing a note
+lock also requires the current LockNote password. Legacy notes with older,
+different hashes remain accessible with their proven old password and are then
+migrated to the current shared verifier.
+
+Settings → Change Password requires Old Password, New Password, and Confirm
+Password. When an authenticated user sets or changes the LockNote password,
+the local credential is bound to that Supabase user ID and normalized email.
+Forgot Password emails that stored address a one-time magic link with the
+`reset-lock-password` intent. After the callback creates a valid Supabase
+session, the app verifies that the session identity matches the stored binding
+before replacing every active locked-note hash. No Recovery PIN is used.
 
 This is **gating, not encryption** — note `content` is stored in cleartext. See the security note in [README.md](../README.md).
 
@@ -212,8 +221,8 @@ Supabase provides account auth, private account sync, and the backend for notes 
 
 - `src/services/supabaseClient.js` — the client, configured with AsyncStorage as the session storage adapter so a login survives app restarts. Reads `supabaseUrl`/`supabaseAnonKey` from `Constants.expoConfig.extra` (populated from `.env` via `app.config.js`), not `process.env` directly. Missing or invalid configuration no longer crashes startup; auth actions show a support-oriented configuration message.
 - `src/services/authService.mjs` and `src/utils/auth.mjs` — testable Supabase request wrappers, callback parsing, field validation, email normalization, and user-friendly error mapping for network, credentials, rate-limit, expired-link, and configuration failures. Emails are trimmed and lowercased before requests; registration and reset passwords require at least 8 characters.
-- `src/context/AuthContext.js` — `AuthProvider` (wraps the app in `App.js`) subscribes to `supabase.auth.onAuthStateChange`, handles password-recovery and email-confirmation deep links (implicit tokens or PKCE codes), and exposes the session and recovery state via `useAuth()`.
-- `AuthScreen` handles sign-up, sign-in, forgotten-password email requests, and choosing a new password. Invalid email, short-password, and confirmation errors appear beneath their relevant fields before Supabase is called. Supabase must allow `locknote://reset-password` and `locknote://auth-confirm` in **Authentication → URL Configuration → Redirect URLs** (plus the corresponding deployed web URLs). On sign-up, if Supabase's "confirm email" setting is on, no session comes back immediately — the screen shows a "check your email" message and flips to sign-in mode; if it's off, a session comes back right away and `onAuthStateChange` flips the Profile tab over on its own.
+- `src/context/AuthContext.js` — `AuthProvider` (wraps the app in `App.js`) subscribes to `supabase.auth.onAuthStateChange`, handles account-password recovery, LockNote-password recovery, and email-confirmation deep links (implicit tokens or PKCE codes), and exposes the session and distinct recovery states via `useAuth()`.
+- `AuthScreen` handles sign-up, sign-in, forgotten-account-password email requests, and choosing a new account password. Invalid email, short-password, and confirmation errors appear beneath their relevant fields before Supabase is called. Supabase must allow `locknote://reset-password`, `locknote://reset-lock-password`, and `locknote://auth-confirm` in **Authentication → URL Configuration → Redirect URLs** (plus the corresponding deployed web URLs). On sign-up, if Supabase's "confirm email" setting is on, no session comes back immediately — the screen shows a "check your email" message and flips to sign-in mode; if it's off, a session comes back right away and `onAuthStateChange` flips the Profile tab over on its own.
 - `tests/auth.test.mjs` exercises error mapping, callback parsing, redirects, request payloads, and configuration/error propagation. It runs as part of `npm test`.
 - `react-native-url-polyfill/auto` is imported first in `index.js` — required because Hermes' native `URL` implementation is incomplete and `@supabase/supabase-js` depends on it.
 
