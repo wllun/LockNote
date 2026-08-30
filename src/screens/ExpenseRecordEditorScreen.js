@@ -26,7 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
-import EditorUndoButton from '../components/editor-undo-button';
+import EditorHistoryButtons from '../components/editor-history-buttons';
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
@@ -316,7 +316,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     cloudId: null,
     deleted: false,
   });
-  const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
+  const {
+    canRedo,
+    canUndo,
+    remember,
+    takeRedo,
+    takeUndo,
+    clearUndo,
+  } = useEditorUndo();
   const getUndoSnapshot = useCallback(() => ({
     title: latest.current.title,
     rows: latest.current.rows,
@@ -488,8 +495,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     [noteId]
   );
 
-  const handleUndo = () => {
-    const snapshot = takeUndo();
+  const restoreHistorySnapshot = (snapshot) => {
     if (!snapshot) return;
 
     setTitle(snapshot.title);
@@ -513,6 +519,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       snapshot.monthlyCommitments,
       snapshot.currency
     );
+  };
+
+  const handleUndo = () => {
+    restoreHistorySnapshot(takeUndo(getUndoSnapshot()));
+  };
+
+  const handleRedo = () => {
+    restoreHistorySnapshot(takeRedo(getUndoSnapshot()));
   };
 
   const updateDraft = (nextTitle, nextRows) => {
@@ -1392,10 +1406,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           />
         </View>
 
-        <EditorUndoButton
+        <EditorHistoryButtons
+          canRedo={canRedo}
           canUndo={canUndo}
           colors={colors}
           disabledStyle={styles.headerButtonDisabled}
+          onRedo={handleRedo}
           onUndo={handleUndo}
           style={styles.headerButton}
         />

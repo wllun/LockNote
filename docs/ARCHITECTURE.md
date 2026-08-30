@@ -208,12 +208,13 @@ fallback for non-navigation teardown. Normal note bodies are limited to 100,000
 characters; checklist items are limited to 500 characters and 500 items; see
 [Note Character Limits](NOTE_LIMITS.md).
 
-All four editors also keep a bounded, in-memory undo history for the current
-editing session. Consecutive typing is grouped into short bursts, while add,
-delete, checkbox, monthly-commitment, and reorder operations create individual
-undo steps. Restoring a snapshot goes back through the same debounced auto-save
-path; the history is cleared when the note is loaded and is not persisted after
-leaving the editor.
+All four editors also keep bounded, in-memory undo and redo history for the
+current editing session. Consecutive typing is grouped into short bursts, while
+add, delete, checkbox, monthly-commitment, and reorder operations create
+individual undo steps. Undo stores the current snapshot for Redo; making a new
+edit after Undo clears the redo stack. Restoring either snapshot goes back
+through the same debounced auto-save path. History is cleared when the note is
+loaded and is not persisted after leaving the editor.
 
 ## Auth
 

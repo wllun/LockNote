@@ -7,23 +7,42 @@ export const useEditorUndo = (options) => {
     historyRef.current = createEditorUndoHistory(options);
   }
 
-  const [canUndo, setCanUndo] = useState(false);
+  const [availability, setAvailability] = useState({ canUndo: false, canRedo: false });
+
+  const syncAvailability = useCallback(() => {
+    setAvailability({
+      canUndo: historyRef.current.canUndo(),
+      canRedo: historyRef.current.canRedo(),
+    });
+  }, []);
 
   const remember = useCallback((snapshot, groupKey = null) => {
     historyRef.current.record(snapshot, { groupKey });
-    setCanUndo(historyRef.current.canUndo());
-  }, []);
+    syncAvailability();
+  }, [syncAvailability]);
 
-  const takeUndo = useCallback(() => {
-    const snapshot = historyRef.current.undo();
-    setCanUndo(historyRef.current.canUndo());
+  const takeUndo = useCallback((currentSnapshot) => {
+    const snapshot = historyRef.current.undo(currentSnapshot);
+    syncAvailability();
     return snapshot;
-  }, []);
+  }, [syncAvailability]);
+
+  const takeRedo = useCallback((currentSnapshot) => {
+    const snapshot = historyRef.current.redo(currentSnapshot);
+    syncAvailability();
+    return snapshot;
+  }, [syncAvailability]);
 
   const clearUndo = useCallback(() => {
     historyRef.current.clear();
-    setCanUndo(false);
-  }, []);
+    syncAvailability();
+  }, [syncAvailability]);
 
-  return { canUndo, remember, takeUndo, clearUndo };
+  return {
+    ...availability,
+    remember,
+    takeUndo,
+    takeRedo,
+    clearUndo,
+  };
 };

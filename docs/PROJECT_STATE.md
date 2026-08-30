@@ -14,7 +14,7 @@ _Snapshot: 2026-08-28. Check off items as they land._
 - [X] Home folder cards show a soft-delete-aware note count badge
 - [X] Folder names can be renamed from Home actions or by tapping the editable title inside an open folder.
 - [X] Expense-note cards show the grand total of daily entries plus checked monthly commitments on Home, search results, and inside folders.
-- [X] Note, checklist, expense, and reminder editors provide session-based undo for grouped text edits and individual editing actions, with restored state auto-saved normally.
+- [X] Note, checklist, expense, and reminder editors provide session-based undo and redo for grouped text edits and individual editing actions, with restored state auto-saved normally and new edits clearing the redo stack.
 
 ## To do
 

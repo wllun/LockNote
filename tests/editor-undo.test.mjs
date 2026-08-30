@@ -39,3 +39,33 @@ test('caps history and returns snapshots without shared references', () => {
   assert.deepEqual(history.undo(), { items: [{ text: 'Two' }] });
   assert.equal(history.undo(), null);
 });
+
+test('moves current snapshots between undo and redo history', () => {
+  const history = createEditorUndoHistory();
+
+  history.record({ text: '' });
+  history.record({ text: 'Hello' });
+
+  assert.deepEqual(history.undo({ text: 'Hello world' }), { text: 'Hello' });
+  assert.deepEqual(history.undo({ text: 'Hello' }), { text: '' });
+  assert.equal(history.canUndo(), false);
+  assert.equal(history.canRedo(), true);
+  assert.equal(history.redoSize(), 2);
+
+  assert.deepEqual(history.redo({ text: '' }), { text: 'Hello' });
+  assert.deepEqual(history.redo({ text: 'Hello' }), { text: 'Hello world' });
+  assert.equal(history.canUndo(), true);
+  assert.equal(history.canRedo(), false);
+});
+
+test('clears redo history when a new change is recorded after undo', () => {
+  const history = createEditorUndoHistory();
+
+  history.record({ text: '' });
+  assert.deepEqual(history.undo({ text: 'A' }), { text: '' });
+  assert.equal(history.canRedo(), true);
+
+  history.record({ text: '' });
+  assert.equal(history.canRedo(), false);
+  assert.equal(history.redo({ text: 'B' }), null);
+});

@@ -14,7 +14,7 @@ import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
-import EditorUndoButton from '../components/editor-undo-button';
+import EditorHistoryButtons from '../components/editor-history-buttons';
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
@@ -60,7 +60,14 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const contentLimitDialogShown = useRef(false);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
   const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, cloudId: null, deleted: false });
-  const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
+  const {
+    canRedo,
+    canUndo,
+    remember,
+    takeRedo,
+    takeUndo,
+    clearUndo,
+  } = useEditorUndo();
   const insets = useSafeAreaInsets();
 
   const loadNote = async () => {
@@ -138,8 +145,12 @@ const NoteEditorScreen = ({ route, navigation }) => {
     autoSave(title, limited.value);
   };
 
-  const handleUndo = () => {
-    const snapshot = takeUndo();
+  const getHistorySnapshot = () => ({
+    title: latest.current.title,
+    content: latest.current.content,
+  });
+
+  const restoreHistorySnapshot = (snapshot) => {
     if (!snapshot) return;
 
     setTitle(snapshot.title);
@@ -147,6 +158,14 @@ const NoteEditorScreen = ({ route, navigation }) => {
     latest.current.title = snapshot.title;
     latest.current.content = snapshot.content;
     autoSave(snapshot.title, snapshot.content);
+  };
+
+  const handleUndo = () => {
+    restoreHistorySnapshot(takeUndo(getHistorySnapshot()));
+  };
+
+  const handleRedo = () => {
+    restoreHistorySnapshot(takeRedo(getHistorySnapshot()));
   };
 
   const handleSetPassword = async (password) => {
@@ -295,10 +314,12 @@ const NoteEditorScreen = ({ route, navigation }) => {
           />
         </View>
 
-        <EditorUndoButton
+        <EditorHistoryButtons
+          canRedo={canRedo}
           canUndo={canUndo}
           colors={colors}
           disabledStyle={styles.headerButtonDisabled}
+          onRedo={handleRedo}
           onUndo={handleUndo}
           style={styles.headerButton}
         />

@@ -7,7 +7,7 @@ import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
-import EditorUndoButton from '../components/editor-undo-button';
+import EditorHistoryButtons from '../components/editor-history-buttons';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
@@ -59,7 +59,14 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const bodyRef = useRef(null);
   const bodyLimitDialogShown = useRef(false);
   const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, cloudId: null, deleted: false });
-  const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
+  const {
+    canRedo,
+    canUndo,
+    remember,
+    takeRedo,
+    takeUndo,
+    clearUndo,
+  } = useEditorUndo();
 
   const contentFor = (nextBody, nextReminder) => serializeReminderNote({ body: nextBody, reminder: nextReminder });
 
@@ -219,8 +226,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     latest.current.reminder = next; setReminder(next); await flushSave(latest.current);
   };
 
-  const handleUndo = async () => {
-    const previous = takeUndo();
+  const restoreHistorySnapshot = async (previous) => {
     if (!previous) return;
     const currentIds = latest.current.reminder.notificationIds;
     await cancelReminderNotifications(currentIds);
@@ -230,6 +236,14 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     setTitle(previous.title); setBody(previous.body); setReminder(nextReminder);
     if (nextReminder.enabled) await scheduleAndSave(nextReminder, { recordUndo: false });
     else await flushSave(latest.current);
+  };
+
+  const handleUndo = async () => {
+    await restoreHistorySnapshot(takeUndo(snapshot()));
+  };
+
+  const handleRedo = async () => {
+    await restoreHistorySnapshot(takeRedo(snapshot()));
   };
 
   const rescheduleForPrivacy = async (nextHasPassword) => {
@@ -337,7 +351,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
           <Ionicons name="alarm-outline" size={18} color={colors.primary} />
           <TextInput style={styles.titleInput} placeholder="Reminder title" placeholderTextColor={colors.textTertiary} value={title} onChangeText={handleTitleChange} onFocus={() => setIsTitleFocused(true)} onBlur={() => setIsTitleFocused(false)} onSubmitEditing={() => bodyRef.current?.focus()} accessibilityLabel="Reminder title" />
         </View>
-        <EditorUndoButton canUndo={canUndo} colors={colors} disabledStyle={styles.disabled} onUndo={handleUndo} style={styles.headerButton} />
+        <EditorHistoryButtons canRedo={canRedo} canUndo={canUndo} colors={colors} disabledStyle={styles.disabled} onRedo={handleRedo} onUndo={handleUndo} style={styles.headerButton} />
         <TouchableOpacity onPress={() => setShowActions(true)} style={styles.headerButton} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="More reminder actions"><Ionicons name="ellipsis-vertical" size={22} color={colors.text} /></TouchableOpacity>
       </View>
 

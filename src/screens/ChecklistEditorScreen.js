@@ -18,7 +18,7 @@ import { FlatList, Gesture, GestureDetector } from 'react-native-gesture-handler
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
-import EditorUndoButton from '../components/editor-undo-button';
+import EditorHistoryButtons from '../components/editor-history-buttons';
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
@@ -285,7 +285,14 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     cloudId: null,
     deleted: false,
   });
-  const { canUndo, remember, takeUndo, clearUndo } = useEditorUndo();
+  const {
+    canRedo,
+    canUndo,
+    remember,
+    takeRedo,
+    takeUndo,
+    clearUndo,
+  } = useEditorUndo();
   const getUndoSnapshot = useCallback(() => ({
     title: latest.current.title,
     items: latest.current.items,
@@ -691,8 +698,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     latest.current.newItemText = nextValue;
   };
 
-  const handleUndo = () => {
-    const snapshot = takeUndo();
+  const restoreHistorySnapshot = (snapshot) => {
     if (!snapshot) return;
 
     setTitle(snapshot.title);
@@ -700,6 +706,14 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     setNewItemText(snapshot.newItemText);
     latest.current.newItemText = snapshot.newItemText;
     updateDraft(snapshot.title, snapshot.items);
+  };
+
+  const handleUndo = () => {
+    restoreHistorySnapshot(takeUndo(getUndoSnapshot()));
+  };
+
+  const handleRedo = () => {
+    restoreHistorySnapshot(takeRedo(getUndoSnapshot()));
   };
 
   const handleSetPassword = async (password) => {
@@ -906,10 +920,12 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
           />
         </View>
 
-        <EditorUndoButton
+        <EditorHistoryButtons
+          canRedo={canRedo}
           canUndo={canUndo}
           colors={colors}
           disabledStyle={styles.headerButtonDisabled}
+          onRedo={handleRedo}
           onUndo={handleUndo}
           style={styles.headerButton}
         />
