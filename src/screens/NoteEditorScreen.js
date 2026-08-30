@@ -339,7 +339,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
 
       <Modal
         visible={showActionsMenu}
-        animationType="fade"
+        animationType={showActionsMenu ? 'fade' : 'none'}
         transparent
         onRequestClose={() => setShowActionsMenu(false)}
       >

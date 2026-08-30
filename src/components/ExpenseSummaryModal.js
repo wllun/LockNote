@@ -493,7 +493,7 @@ const ExpenseSummaryModal = ({
 
     <Modal
       visible={!!activeCategory}
-      animationType="fade"
+      animationType={activeCategory ? 'fade' : 'none'}
       transparent
       statusBarTranslucent
       onRequestClose={closeCategoryActions}

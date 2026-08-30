@@ -90,7 +90,12 @@ const ManageNoteLockModal = ({
         : 'Enter a password already used by one of your locked notes.';
 
   return (
-    <Modal visible={!!visible} animationType="fade" transparent onRequestClose={close}>
+    <Modal
+      visible={!!visible}
+      animationType={visible ? 'fade' : 'none'}
+      transparent
+      onRequestClose={close}
+    >
       <KeyboardAwareModalContent>
         <View style={styles.card} accessibilityViewIsModal>
           <View style={styles.iconCircle}>

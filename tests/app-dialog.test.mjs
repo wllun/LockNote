@@ -3,11 +3,18 @@ import assert from 'node:assert/strict';
 
 import {
   inferDialogVariant,
+  normalizeActiveDialogButtons,
   normalizeDialogButtons,
 } from '../src/utils/app-dialog.mjs';
 
 test('normalizes an empty message dialog to one OK action', () => {
   assert.deepEqual(normalizeDialogButtons(), [{ text: 'OK', style: 'default' }]);
+});
+
+test('does not create a transient OK action when there is no active dialog', () => {
+  assert.deepEqual(normalizeActiveDialogButtons(null), []);
+  assert.deepEqual(normalizeActiveDialogButtons(undefined), []);
+  assert.deepEqual(normalizeActiveDialogButtons({}), [{ text: 'OK', style: 'default' }]);
 });
 
 test('uses the destructive presentation when a destructive action is present', () => {

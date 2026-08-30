@@ -79,7 +79,7 @@ const LockPasswordResetModal = ({ visible }) => {
   return (
     <Modal
       visible={!!visible}
-      animationType="fade"
+      animationType={visible ? 'fade' : 'none'}
       transparent
       onRequestClose={close}
     >

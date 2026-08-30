@@ -89,7 +89,7 @@ const PasswordModal = ({
   return (
     <Modal
       visible={visible}
-      animationType="fade"
+      animationType={visible ? 'fade' : 'none'}
       transparent
       onRequestClose={handleClose}
     >

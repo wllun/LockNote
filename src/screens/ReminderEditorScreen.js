@@ -363,7 +363,12 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
       <CollaborationFooter noteId={noteId} onRemoteNote={applyLoadedNote} />
 
-      <Modal visible={showActions} animationType="fade" transparent onRequestClose={() => setShowActions(false)}>
+      <Modal
+        visible={showActions}
+        animationType={showActions ? 'fade' : 'none'}
+        transparent
+        onRequestClose={() => setShowActions(false)}
+      >
         <View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setShowActions(false)} accessible={false} /><View style={[styles.actionMenu, { top: insets.top + 60 }]}>
           {[
             { icon: 'people-outline', text: 'Share with people', action: () => setShowShare(true) },

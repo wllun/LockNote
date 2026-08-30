@@ -40,125 +40,127 @@ const AppDialogModal = ({
   return (
     <Modal
       visible={visible}
-      animationType="fade"
+      animationType={visible ? 'fade' : 'none'}
       transparent
       statusBarTranslucent
       onRequestClose={onRequestClose}
     >
-      <View
-        style={[
-          styles.overlay,
-          {
-            paddingTop: Math.max(insets.top, 16),
-            paddingBottom: Math.max(insets.bottom, 16),
-          },
-        ]}
-      >
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onRequestClose}
-          accessible={false}
-        />
-
+      {visible ? (
         <View
-          style={styles.panel}
-          accessibilityViewIsModal
-          accessibilityRole="alert"
-          testID={testID}
+          style={[
+            styles.overlay,
+            {
+              paddingTop: Math.max(insets.top, 16),
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
         >
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
-            bounces={false}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={onRequestClose}
+            accessible={false}
+          />
+
+          <View
+            style={styles.panel}
+            accessibilityViewIsModal
+            accessibilityRole="alert"
+            testID={testID}
           >
-            <View style={[styles.iconBox, { backgroundColor: iconBackground }]}>
-              <Ionicons
-                name={iconName || config.icon}
-                size={25}
-                color={iconColor}
-                accessibilityElementsHidden
-                importantForAccessibility="no"
-              />
-            </View>
-
-            <Text style={styles.title} accessibilityRole="header">
-              {title}
-            </Text>
-            {!!message && <Text style={styles.message}>{message}</Text>}
-
-            {details.length > 0 && (
-              <View style={styles.detailsCard}>
-                {details.map((detail, index) => (
-                  <View
-                    key={`${detail.label}-${index}`}
-                    style={[styles.detailRow, index > 0 && styles.detailRowBorder]}
-                  >
-                    {!!detail.iconName && (
-                      <Ionicons
-                        name={detail.iconName}
-                        size={18}
-                        color={colors.primary}
-                        style={styles.detailIcon}
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                      />
-                    )}
-                    <View style={styles.detailText}>
-                      {!!detail.label && (
-                        <Text style={styles.detailLabel}>{detail.label}</Text>
-                      )}
-                      <Text style={styles.detailValue} numberOfLines={detail.numberOfLines}>
-                        {detail.value}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+            <ScrollView
+              style={styles.content}
+              contentContainerStyle={styles.contentContainer}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <View style={[styles.iconBox, { backgroundColor: iconBackground }]}>
+                <Ionicons
+                  name={iconName || config.icon}
+                  size={25}
+                  color={iconColor}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                />
               </View>
-            )}
-          </ScrollView>
 
-          <View style={[styles.actions, stackActions && styles.actionsStacked]}>
-            {actions.map((action, index) => {
-              const destructive = action.style === 'destructive';
-              const cancel = action.style === 'cancel';
-              return (
-                <Pressable
-                  key={`${action.label}-${index}`}
-                  style={({ pressed, focused }) => [
-                    styles.action,
-                    stackActions && styles.actionStacked,
-                    destructive
-                      ? styles.destructiveAction
-                      : cancel
-                        ? styles.cancelAction
-                        : styles.primaryAction,
-                    focused && styles.actionFocused,
-                    pressed && styles.actionPressed,
-                  ]}
-                  onPress={action.onPress}
-                  accessibilityRole="button"
-                  accessibilityLabel={action.accessibilityLabel || action.label}
-                  accessibilityHint={action.accessibilityHint}
-                >
-                  <Text
-                    style={[
-                      styles.actionText,
+              <Text style={styles.title} accessibilityRole="header">
+                {title}
+              </Text>
+              {!!message && <Text style={styles.message}>{message}</Text>}
+
+              {details.length > 0 && (
+                <View style={styles.detailsCard}>
+                  {details.map((detail, index) => (
+                    <View
+                      key={`${detail.label}-${index}`}
+                      style={[styles.detailRow, index > 0 && styles.detailRowBorder]}
+                    >
+                      {!!detail.iconName && (
+                        <Ionicons
+                          name={detail.iconName}
+                          size={18}
+                          color={colors.primary}
+                          style={styles.detailIcon}
+                          accessibilityElementsHidden
+                          importantForAccessibility="no"
+                        />
+                      )}
+                      <View style={styles.detailText}>
+                        {!!detail.label && (
+                          <Text style={styles.detailLabel}>{detail.label}</Text>
+                        )}
+                        <Text style={styles.detailValue} numberOfLines={detail.numberOfLines}>
+                          {detail.value}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={[styles.actions, stackActions && styles.actionsStacked]}>
+              {actions.map((action, index) => {
+                const destructive = action.style === 'destructive';
+                const cancel = action.style === 'cancel';
+                return (
+                  <Pressable
+                    key={`${action.label}-${index}`}
+                    style={({ pressed, focused }) => [
+                      styles.action,
+                      stackActions && styles.actionStacked,
                       destructive
-                        ? styles.destructiveActionText
+                        ? styles.destructiveAction
                         : cancel
-                          ? styles.cancelActionText
-                          : styles.primaryActionText,
+                          ? styles.cancelAction
+                          : styles.primaryAction,
+                      focused && styles.actionFocused,
+                      pressed && styles.actionPressed,
                     ]}
+                    onPress={action.onPress}
+                    accessibilityRole="button"
+                    accessibilityLabel={action.accessibilityLabel || action.label}
+                    accessibilityHint={action.accessibilityHint}
                   >
-                    {action.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.actionText,
+                        destructive
+                          ? styles.destructiveActionText
+                          : cancel
+                            ? styles.cancelActionText
+                            : styles.primaryActionText,
+                      ]}
+                    >
+                      {action.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         </View>
-      </View>
+      ) : null}
     </Modal>
   );
 };

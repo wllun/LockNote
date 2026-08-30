@@ -75,7 +75,7 @@ const ExpenseCurrencyModal = ({
   return (
     <Modal
       visible={visible}
-      animationType="fade"
+      animationType={visible ? 'fade' : 'none'}
       transparent
       statusBarTranslucent
       onRequestClose={onClose}

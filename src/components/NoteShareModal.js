@@ -61,7 +61,12 @@ const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
 
   const incoming = note?.share_origin === 'incoming';
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType={visible ? 'fade' : 'none'}
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAwareModalContent
         overlayStyle={styles.overlay}
         contentContainerStyle={styles.modalContent}

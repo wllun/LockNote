@@ -13,6 +13,11 @@ export const normalizeDialogButtons = (buttons) => {
   }));
 };
 
+export const normalizeActiveDialogButtons = (dialog) => {
+  if (!dialog) return [];
+  return normalizeDialogButtons(dialog.buttons);
+};
+
 export const inferDialogVariant = (title, buttons, requestedVariant) => {
   if (requestedVariant) return requestedVariant;
   if (normalizeDialogButtons(buttons).some((button) => button.style === 'destructive')) {

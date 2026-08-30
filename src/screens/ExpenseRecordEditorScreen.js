@@ -2047,7 +2047,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       <Modal
         visible={showActionsMenu}
-        animationType="fade"
+        animationType={showActionsMenu ? 'fade' : 'none'}
         transparent
         onRequestClose={() => setShowActionsMenu(false)}
       >
@@ -2237,7 +2237,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       <Modal
         visible={!!commitmentDraft}
-        animationType="fade"
+        animationType={commitmentDraft ? 'fade' : 'none'}
         transparent
         onRequestClose={() => setCommitmentDraft(null)}
       >

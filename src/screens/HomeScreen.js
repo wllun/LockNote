@@ -827,7 +827,11 @@ const HomeScreen = ({ navigation }) => {
         onSelect={handleMoveNote}
       />
 
-      <Modal visible={showFolderModal} animationType="fade" transparent>
+      <Modal
+        visible={showFolderModal}
+        animationType={showFolderModal ? 'fade' : 'none'}
+        transparent
+      >
         <KeyboardAwareModalContent>
           <View style={styles.modalContent}>
             <View style={styles.modalIconCircle}>

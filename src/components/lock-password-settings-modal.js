@@ -96,7 +96,12 @@ const LockPasswordSettingsModal = ({ visible, status, onClose, onSaved }) => {
   );
 
   return (
-    <Modal visible={!!visible} animationType="fade" transparent onRequestClose={close}>
+    <Modal
+      visible={!!visible}
+      animationType={visible ? 'fade' : 'none'}
+      transparent
+      onRequestClose={close}
+    >
       <KeyboardAwareModalContent>
         <View style={styles.card} accessibilityViewIsModal>
           <View style={styles.iconCircle}>

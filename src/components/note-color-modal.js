@@ -16,7 +16,12 @@ const NoteColorModal = ({ visible, value, onClose, onSelect }) => {
   const selectedColor = normalizeNoteColor(value);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={visible ? 'fade' : 'none'}
+      onRequestClose={onClose}
+    >
       <View style={[styles.overlay, Platform.OS === 'web' ? styles.overlayWeb : styles.overlayPhone]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
         <View

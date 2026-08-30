@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import AppDialogModal from './AppDialogModal';
 import { registerAppAlertHandler } from '../utils/app-alert';
-import { inferDialogVariant, normalizeDialogButtons } from '../utils/app-dialog.mjs';
+import {
+  inferDialogVariant,
+  normalizeActiveDialogButtons,
+} from '../utils/app-dialog.mjs';
 
 const AppDialogHost = () => {
   const [queue, setQueue] = useState([]);
@@ -20,7 +23,7 @@ const AppDialogHost = () => {
 
   const actions = useMemo(
     () =>
-      normalizeDialogButtons(activeDialog?.buttons).map((button) => ({
+      normalizeActiveDialogButtons(activeDialog).map((button) => ({
         label: button.text,
         style: button.style,
         onPress: () => {
