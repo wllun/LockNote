@@ -5,7 +5,7 @@ export default {
     name: "LockNote",
     slug: "LockNote",
     scheme: "locknote",
-    version: "1.0.0",
+    version: "1.1.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "automatic",
@@ -21,6 +21,7 @@ export default {
     },
     android: {
       package: "com.locknote.app",
+      versionCode: 2,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#4F46E5",

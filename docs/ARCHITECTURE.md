@@ -31,6 +31,13 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 3. Runs best-effort Trash cleanup for soft-deleted records that reached 30 days.
 4. Once ready, renders `AppNavigator`; a spinner shows until then.
 
+In parallel with local database startup, Android release builds perform a
+best-effort public Supabase read of `app_update_config`. A valid forced minimum
+build shows `AppUpdateGate` before navigation. The most recent valid policy is
+cached locally for up to 72 hours; missing configuration, Expo Go, unsupported
+platforms, and expired offline cache entries fail open so a backend outage does
+not permanently block access to locally stored notes.
+
 ## Navigation
 
 `AppNavigator` = bottom tab navigator with four tabs:

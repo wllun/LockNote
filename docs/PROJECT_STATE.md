@@ -33,6 +33,10 @@ _Snapshot: 2026-08-28. Check off items as they land._
 - [X] Add stronger email and password validation — normalized lowercase emails, format checks, 8-character minimum for new passwords, confirmation matching, and field-level messages.
 - [X] Add user-friendly network and Supabase configuration error handling.
 - [X] Add automated authentication tests covering validation, errors, account and LockNote-password callbacks, redirects, and Supabase request wrappers.
+- [X] Android forced-update baseline — release builds compare their native build
+  code with a public read-only Supabase policy at startup/foreground, cache valid
+  policy for up to 72 hours, and show a password-independent blocking update
+  screen only when the remote kill switch and minimum build both require it.
 - [ ] Verify registration, email confirmation, login persistence, password reset, and sign-out end-to-end on Android, iOS, and web. Android and iOS simulator binaries compile successfully on EAS; web production export and local HTTP runtime pass. Interactive cloud-device verification is blocked until EAS Simulator is enabled for the Expo account.
 - [X] Email confirmation returns to `locknote://auth-confirm` on native and the corresponding app URL on web.
 - [X] Sync Notes — manual two-way folder/note sync through the authenticated `sync_private_data` RPC, with RLS, last-write-wins timestamps, soft-delete tombstones, native/web repository parity, and per-account last-sync status. The migration still requires deployment and live multi-device verification; premium gating is not implemented.

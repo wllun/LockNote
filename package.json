@@ -1,6 +1,6 @@
 {
   "name": "locknote",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "index.js",
   "scripts": {
     "test": "node scripts/verify.mjs && node --test tests/*.test.mjs",
@@ -19,6 +19,7 @@
     "@supabase/supabase-js": "^2.106.2",
     "dotenv": "^17.4.2",
     "expo": "~54.0.34",
+    "expo-application": "~7.0.8",
     "expo-constants": "~18.0.13",
     "expo-crypto": "~15.0.9",
     "expo-dev-client": "~6.0.21",
