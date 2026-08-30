@@ -56,6 +56,7 @@ export const scheduleReminderNotification = async ({
   body,
   hasPassword = false,
   reminder,
+  previousIds = [],
 }) => {
   const allowed = await ensureReminderNotificationPermission();
   if (!allowed) return { supported: true, permissionDenied: true, notificationIds: previousIds };

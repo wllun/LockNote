@@ -30,6 +30,15 @@ export const normalizeReminder = (value, fallbackDate) => {
   };
 };
 
+export const getReminderScheduleError = (reminder, now = Date.now()) => {
+  const scheduledAt = new Date(reminder?.scheduledAt).getTime();
+  if (!Number.isFinite(scheduledAt)) return 'Choose a valid date and time.';
+  if (cleanRepeat(reminder?.repeat) === 'none' && scheduledAt <= now) {
+    return 'This reminder time has already passed. Choose a future date and time.';
+  }
+  return '';
+};
+
 export const parseReminderNote = (content = '') => {
   if (typeof content !== 'string' || !content.trim()) {
     return { version: 1, body: '', reminder: createDefaultReminder() };

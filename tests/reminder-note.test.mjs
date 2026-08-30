@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatReminderSchedule,
   getReminderPreview,
+  getReminderScheduleError,
   getReminderSchedulePreview,
   isReminderNoteEmpty,
   parseReminderNote,
@@ -47,6 +48,20 @@ test('only treats a reminder as empty when it has no meaningful state', () => {
   assert.equal(isReminderNoteEmpty({ reminder: { enabled: true, scheduledAt } }), false);
   assert.equal(isReminderNoteEmpty({ body: 'Text' }), false);
   assert.equal(isReminderNoteEmpty({ hasPassword: true }), false);
+});
+
+test('rejects past one-time reminders and allows future or recurring schedules', () => {
+  const now = Date.parse('2026-08-30T10:00:00.000Z');
+  assert.match(getReminderScheduleError({
+    scheduledAt: '2026-08-30T09:59:00.000Z', repeat: 'none',
+  }, now), /already passed/);
+  assert.equal(getReminderScheduleError({
+    scheduledAt: '2026-08-30T10:01:00.000Z', repeat: 'none',
+  }, now), '');
+  assert.equal(getReminderScheduleError({
+    scheduledAt: '2026-08-29T10:00:00.000Z', repeat: 'daily',
+  }, now), '');
+  assert.match(getReminderScheduleError({ scheduledAt: 'not-a-date', repeat: 'none' }, now), /valid date/);
 });
 
 test('renders reminder schedule and escaped body in PDF HTML', () => {

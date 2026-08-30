@@ -4,7 +4,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { normalizeReminder } from '../utils/reminder-note.mjs';
+import { AppAlert as Alert } from '../utils/app-alert';
+import { getReminderScheduleError, normalizeReminder } from '../utils/reminder-note.mjs';
 import { radius, shadow, useTheme } from '../theme';
 import ReminderDateTimePicker from './reminder-date-time-picker';
 
@@ -42,11 +43,24 @@ const ReminderScheduleModal = ({ visible, reminder, onClose, onSave, saving = fa
   };
 
   const save = () => {
-    if (repeat === 'none' && date.getTime() <= Date.now()) {
-      setError('Choose a future date and time.');
+    const nextReminder = {
+      ...normalizeReminder(reminder),
+      enabled: true,
+      scheduledAt: date.toISOString(),
+      repeat,
+    };
+    const validationError = getReminderScheduleError(nextReminder);
+    if (validationError) {
+      setError(validationError);
+      Alert.alert(
+        'Reminder time has passed',
+        validationError,
+        [{ text: 'OK' }],
+        { variant: 'warning', iconName: 'time-outline' }
+      );
       return;
     }
-    onSave({ ...normalizeReminder(reminder), enabled: true, scheduledAt: date.toISOString(), repeat });
+    onSave(nextReminder);
   };
 
   return (

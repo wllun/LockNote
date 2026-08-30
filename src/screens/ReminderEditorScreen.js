@@ -24,7 +24,7 @@ import {
   NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
 } from '../utils/note-limits.mjs';
 import {
-  formatReminderSchedule, isReminderNoteEmpty, normalizeReminder,
+  formatReminderSchedule, getReminderScheduleError, isReminderNoteEmpty, normalizeReminder,
   parseReminderNote, serializeReminderNote,
 } from '../utils/reminder-note.mjs';
 import {
@@ -167,6 +167,16 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   };
 
   const scheduleAndSave = async (nextReminder, { recordUndo = true } = {}) => {
+    const validationError = getReminderScheduleError(nextReminder);
+    if (validationError) {
+      Alert.alert(
+        'Reminder time has passed',
+        validationError,
+        [{ text: 'OK' }],
+        { variant: 'warning', iconName: 'time-outline' }
+      );
+      return false;
+    }
     if (scheduling) return false;
     setScheduling(true);
     let createdIds = [];
