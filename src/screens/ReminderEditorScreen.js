@@ -365,7 +365,15 @@ const ReminderEditorScreen = ({ route, navigation }) => {
               <Text style={styles.reminderLabel}>Reminder</Text>
               <Text style={styles.reminderSchedule}>{reminder.enabled ? formatReminderSchedule(reminder) : 'No notification scheduled'}</Text>
             </View>
-            <Switch value={reminder.enabled} onValueChange={handleToggleReminder} disabled={scheduling} trackColor={{ false: colors.border, true: colors.primarySoft }} thumbColor={reminder.enabled ? colors.primary : colors.textTertiary} accessibilityLabel="Enable reminder notification" />
+            <Switch
+              value={reminder.enabled}
+              onValueChange={handleToggleReminder}
+              disabled={scheduling}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={reminder.enabled ? colors.card : colors.textTertiary}
+              ios_backgroundColor={colors.border}
+              accessibilityLabel="Enable reminder notification"
+            />
           </View>
           <Pressable style={({ pressed }) => [styles.editReminder, pressed && styles.pressed]} onPress={() => setShowSchedule(true)} accessibilityRole="button" accessibilityLabel="Edit reminder date and repeat">
             <Ionicons name="calendar-outline" size={18} color={colors.primary} />
