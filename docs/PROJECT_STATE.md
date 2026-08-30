@@ -93,7 +93,7 @@ When the user presses the Add button, let them choose one of these note types:
 - [X] Expense Record monthly commitments checklist — Option C paid-status section with progress, remaining amount, add/edit/reset, drag reorder, recycle-bin delete, version 6 persistence, and exports. See [MONTHLY_EXPENSE_CHECKLIST.md](MONTHLY_EXPENSE_CHECKLIST.md)
 - [X] Expense Record reusable monthly commitments — save a local bill template and apply it to an empty expense note with fresh IDs and every bill unpaid
 - [X] Expense Record currency selection — Settings provides a searchable selector containing all 178 current ISO 4217 Currency & Funds codes, stores the default for new notes (USD/$ initially), and prompts whether a change should also update all existing private/owned expense notes without converting amounts. Each note keeps its own currency code, which can also be changed from the amount-column header and is consistently applied to summaries, Home/Folder cards, and exports.
-- [X] Reminder — plaintext note body with one-time/daily/weekly/monthly local notification settings, list previews, Undo, pin/password/delete handling, and PDF/image export
+- [X] Reminder — plaintext note body with one-time/daily/weekly/monthly local notification settings, list previews, Undo, pin/password/delete handling, notification-tap navigation with password gating, and PDF/image export
 
 ### Additional / backlog (unphased)
 

@@ -9,6 +9,11 @@ import {
   serializeReminderNote,
 } from '../src/utils/reminder-note.mjs';
 import { buildNoteExportHtml, getExportTitle } from '../src/utils/note-export.mjs';
+import {
+  getNotificationResponseKey,
+  getReminderNavigationTarget,
+  getReminderNoteIdFromResponse,
+} from '../src/utils/reminder-notification-response.mjs';
 
 const scheduledAt = '2026-08-14T01:30:00.000Z';
 
@@ -53,4 +58,49 @@ test('renders reminder schedule and escaped body in PDF HTML', () => {
   assert.match(html, /Reminder scheduled/);
   assert.match(html, /Monthly on day/);
   assert.match(html, /&lt;Bring ID&gt;/);
+});
+
+test('reads reminder navigation data from a notification response', () => {
+  const response = {
+    actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+    notification: {
+      date: 1786671000000,
+      request: {
+        identifier: 'notification-123',
+        content: { data: { noteId: 'note-123', noteType: 'reminder' } },
+      },
+    },
+  };
+
+  assert.equal(getReminderNoteIdFromResponse(response), 'note-123');
+  assert.equal(
+    getNotificationResponseKey(response),
+    'notification-123:1786671000000:expo.modules.notifications.actions.DEFAULT'
+  );
+  assert.deepEqual(getReminderNavigationTarget('note-123'), {
+    name: 'Home',
+    params: {
+      screen: 'ReminderEditor',
+      params: { noteId: 'note-123' },
+      initial: false,
+    },
+  });
+});
+
+test('ignores malformed and non-reminder notification responses', () => {
+  assert.equal(getReminderNoteIdFromResponse(null), null);
+  assert.equal(getReminderNoteIdFromResponse({
+    notification: {
+      request: {
+        content: { data: { noteId: 'note-123', noteType: 'checklist' } },
+      },
+    },
+  }), null);
+  assert.equal(getReminderNoteIdFromResponse({
+    notification: {
+      request: {
+        content: { data: { noteId: '   ', noteType: 'reminder' } },
+      },
+    },
+  }), null);
 });
