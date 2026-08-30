@@ -4,9 +4,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppAlert as Alert } from '../utils/app-alert';
 import { getReminderScheduleError, normalizeReminder } from '../utils/reminder-note.mjs';
 import { radius, shadow, useTheme } from '../theme';
+import AppDialogModal from './AppDialogModal';
 import ReminderDateTimePicker from './reminder-date-time-picker';
 
 const REPEATS = [
@@ -24,6 +24,7 @@ const ReminderScheduleModal = ({ visible, reminder, onClose, onSave, saving = fa
   const [repeat, setRepeat] = useState('none');
   const [picker, setPicker] = useState(null);
   const [error, setError] = useState('');
+  const [showPastTimePrompt, setShowPastTimePrompt] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -32,6 +33,7 @@ const ReminderScheduleModal = ({ visible, reminder, onClose, onSave, saving = fa
     setRepeat(normalized.repeat);
     setPicker(null);
     setError('');
+    setShowPastTimePrompt(false);
   }, [visible, reminder]);
 
   const chooseDay = (offset) => {
@@ -52,12 +54,7 @@ const ReminderScheduleModal = ({ visible, reminder, onClose, onSave, saving = fa
     const validationError = getReminderScheduleError(nextReminder);
     if (validationError) {
       setError(validationError);
-      Alert.alert(
-        'Reminder time has passed',
-        validationError,
-        [{ text: 'OK' }],
-        { variant: 'warning', iconName: 'time-outline' }
-      );
+      setShowPastTimePrompt(true);
       return;
     }
     onSave(nextReminder);
@@ -119,6 +116,17 @@ const ReminderScheduleModal = ({ visible, reminder, onClose, onSave, saving = fa
             <Text style={styles.saveText}>{saving ? 'Scheduling...' : 'Set reminder'}</Text>
           </Pressable>
         </View>
+        <AppDialogModal
+          contained
+          visible={showPastTimePrompt}
+          title="Reminder time has passed"
+          message={error}
+          variant="warning"
+          iconName="time-outline"
+          actions={[{ label: 'OK', onPress: () => setShowPastTimePrompt(false) }]}
+          onRequestClose={() => setShowPastTimePrompt(false)}
+          testID="reminder-past-time-dialog"
+        />
       </View>
     </Modal>
   );

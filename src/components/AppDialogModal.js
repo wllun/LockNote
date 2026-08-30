@@ -28,6 +28,7 @@ const AppDialogModal = ({
   actions = [],
   onRequestClose,
   testID = 'app-dialog',
+  contained = false,
 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -37,18 +38,11 @@ const AppDialogModal = ({
   const iconBackground = colors[config.softColorKey];
   const stackActions = actions.length > 2;
 
-  return (
-    <Modal
-      visible={visible}
-      animationType={visible ? 'fade' : 'none'}
-      transparent
-      statusBarTranslucent
-      onRequestClose={onRequestClose}
-    >
-      {visible ? (
+  const dialogContent = visible ? (
         <View
           style={[
             styles.overlay,
+            contained && styles.containedOverlay,
             {
               paddingTop: Math.max(insets.top, 16),
               paddingBottom: Math.max(insets.bottom, 16),
@@ -160,7 +154,19 @@ const AppDialogModal = ({
             </View>
           </View>
         </View>
-      ) : null}
+  ) : null;
+
+  if (contained) return dialogContent;
+
+  return (
+    <Modal
+      visible={visible}
+      animationType={visible ? 'fade' : 'none'}
+      transparent
+      statusBarTranslucent
+      onRequestClose={onRequestClose}
+    >
+      {dialogContent}
     </Modal>
   );
 };
@@ -173,6 +179,11 @@ const makeStyles = (colors) =>
       justifyContent: 'center',
       paddingHorizontal: 18,
       backgroundColor: colors.backdropStrong,
+    },
+    containedOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 50,
+      elevation: 50,
     },
     panel: {
       width: '100%',
