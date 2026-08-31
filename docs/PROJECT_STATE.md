@@ -1,6 +1,6 @@
 # Project State — TODO
 
-_Snapshot: 2026-08-28. Check off items as they land._
+_Snapshot: 2026-08-31. Check off items as they land._
 
 ## Done
 
@@ -39,6 +39,13 @@ _Snapshot: 2026-08-28. Check off items as they land._
   screen only when the remote kill switch and minimum build both require it.
 - [ ] Verify registration, email confirmation, login persistence, password reset, and sign-out end-to-end on Android, iOS, and web. Android and iOS simulator binaries compile successfully on EAS; web production export and local HTTP runtime pass. Interactive cloud-device verification is blocked until EAS Simulator is enabled for the Expo account.
 - [X] Email confirmation returns to `locknote://auth-confirm` on native and the corresponding app URL on web.
+- [ ] Configure production authentication email branding before public release:
+  - Supabase's default email service is acceptable during development, but its sender or content may expose Supabase branding.
+  - Recommended setup: connect the hosted Supabase project to Resend using Custom SMTP. As checked on 2026-08-31, Resend Free includes 3,000 transactional emails per month, a 100-email daily limit, SMTP relay, and one custom domain; confirm current limits before launch.
+  - A domain is required for the email sender identity and deliverability, not to host the mobile app or a website. Use a dedicated sending subdomain such as `auth.example.com` and a sender such as `LockNote <no-reply@auth.example.com>`.
+  - Add the SPF and DKIM DNS records supplied by the SMTP provider. Add DMARC when the sending domain is ready for production.
+  - In Supabase Dashboard, customize the Confirm signup, account-password recovery, LockNote-password recovery, and email-change templates so their subjects and content say LockNote. Preserve Supabase template variables such as `{{ .ConfirmationURL }}` so existing deep-link callbacks continue to work.
+  - Custom SMTP controls the sender name, sender address, and delivery provider; Email Templates control the subject and message design. A custom SMTP provider may be required before Supabase permits fully customized templates.
 - [X] Sync Notes — manual two-way folder/note sync through the authenticated `sync_private_data` RPC, with RLS, last-write-wins timestamps, soft-delete tombstones, native/web repository parity, and per-account last-sync status. The migration still requires deployment and live multi-device verification; premium gating is not implemented.
 - [ ] Automatic/background sync — serialize with manual sync and the editors' pending 800 ms saves; trigger a foreground sync after session restoration, app launch/resume, and connectivity recovery, then add best-effort OS background execution where supported. Queue retries while offline, avoid duplicate concurrent runs, surface the last successful sync/error, and never let a stale cloud snapshot overwrite a newer local edit.
 - [X] Collaboration Release 1 — explicit per-note sharing by registered account email, Shared tab/local cache, owner share indicators, collaborator management, realtime refresh, last-editor footer, RLS, and revision-protected saves. Backend migration/function deployment and live two-account verification still require configured Supabase credentials.
@@ -105,7 +112,6 @@ When the user presses the Add button, let them choose one of these note types:
 - [X] Coloring note — notes can use Default, Rose, Orange, Yellow, Green, Blue, or Purple from list actions and every editor. Semantic colors adapt to light/dark mode and are saved only as a per-device AsyncStorage preference; they are excluded from note rows, backup, private sync, and collaboration.
 - [ ] Custom note background images — allow users to select, change, or remove a background image per note while preserving text readability and local-only storage
 - [X] View controls — Home independently persists Folder List/Strip and Note List/Grid choices. Search results follow their section setting, notes inside folders inherit the Notes choice, and the former combined preference migrates automatically. Mobile contextual actions use long-press, while web retains visible three-dot controls.
-- [ ] Sort
 - [X] Trash — Settings lists soft-deleted notes only, with Restore and password-gated Delete forever inside each row's three-dots menu. Folders are deleted permanently while their notes move to Trash as Home notes. Empty Trash safely removes unlocked notes, and local note content is purged after 30 days at startup or when Trash opens.
 - [X] Archive — Settings module for folders and notes with open, restore, and Move to Trash actions; folder archiving preserves each child note's independent archive state.
 
