@@ -7,7 +7,7 @@ export default {
     scheme: "locknote",
     version: "1.1.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./assets/locknote-icon-v2.png",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
     splash: {
@@ -23,14 +23,14 @@ export default {
       package: "com.locknote.app",
       versionCode: 2,
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
+        foregroundImage: "./assets/locknote-adaptive-foreground-v2.png",
         backgroundColor: "#4F46E5",
       },
       edgeToEdgeEnabled: true,
       permissions: ["SCHEDULE_EXACT_ALARM"],
     },
     web: {
-      favicon: "./assets/favicon.png",
+      favicon: "./assets/locknote-favicon-v2.png",
     },
     extra: {
       supabaseUrl: process.env.SUPABASE_URL,
