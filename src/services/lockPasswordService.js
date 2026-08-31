@@ -5,8 +5,8 @@ import { hashPassword } from '../utils/crypto';
 import {
   getAuthErrorMessage,
   normalizeEmail,
-  validatePassword,
 } from '../utils/auth.mjs';
+import { validateLockPassword } from '../utils/lock-password.mjs';
 import { sendLockPasswordResetLink } from './authService.mjs';
 import {
   isSupabaseConfigured,
@@ -129,7 +129,7 @@ const linkRecoveryIdentity = async (credential) => {
 };
 
 const assertNewPassword = (password) => {
-  const message = validatePassword(password);
+  const message = validateLockPassword(password);
   if (message) throw createError(message, 'LOCK_PASSWORD_VALIDATION');
 };
 

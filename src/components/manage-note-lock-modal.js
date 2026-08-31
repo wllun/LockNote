@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { lockPasswordService } from '../services/lockPasswordService';
 import { radius, shadow, useTheme } from '../theme';
+import { validateLockPassword } from '../utils/lock-password.mjs';
 import KeyboardAwareModalContent from './keyboard-aware-modal-content';
 
 const ManageNoteLockModal = ({
@@ -57,6 +58,13 @@ const ManageNoteLockModal = ({
     if (!password) {
       setError('Enter your LockNote password.');
       return;
+    }
+    if (creatingPassword) {
+      const validationError = validateLockPassword(password);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
     }
     if (creatingPassword && password !== confirmation) {
       setError('Passwords do not match.');
@@ -121,7 +129,7 @@ const ManageNoteLockModal = ({
                     setPassword(value);
                     setError('');
                   }}
-                  placeholder={creatingPassword ? 'At least 8 characters' : 'Enter password'}
+                  placeholder={creatingPassword ? 'At least 6 characters' : 'Enter password'}
                   placeholderTextColor={colors.textTertiary}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"

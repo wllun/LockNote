@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { lockPasswordService } from '../services/lockPasswordService';
 import { radius, shadow, useTheme } from '../theme';
-import { validatePassword } from '../utils/auth.mjs';
+import { validateLockPassword } from '../utils/lock-password.mjs';
 import KeyboardAwareModalContent from './keyboard-aware-modal-content';
 
 const LockPasswordSettingsModal = ({ visible, status, onClose, onSaved }) => {
@@ -47,7 +47,7 @@ const LockPasswordSettingsModal = ({ visible, status, onClose, onSaved }) => {
         : 'Enter one existing note password.');
       return;
     }
-    const validationError = validatePassword(newPassword);
+    const validationError = validateLockPassword(newPassword);
     if (validationError) {
       setError(validationError);
       return;
@@ -127,7 +127,7 @@ const LockPasswordSettingsModal = ({ visible, status, onClose, onSaved }) => {
             label: 'New password',
             value: newPassword,
             onChangeText: setNewPassword,
-            placeholder: 'At least 8 characters',
+            placeholder: 'At least 6 characters',
             autoFocus: !oldPasswordRequired,
           })}
           {renderInput({

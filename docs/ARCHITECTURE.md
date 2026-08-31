@@ -183,7 +183,7 @@ On native, `notes.folder_id` has `ON DELETE CASCADE`; archive indexes cover both
 
 ## Password protection
 
-`utils/crypto.js` hashes with SHA-256 (`expo-crypto`). Folder locks retain an individual hash in each folder row. Note locks use one shared LockNote credential stored locally by `lockPasswordService`; the same hash is also copied into each locked note's `password` column so existing lock flags, backups, and private sync remain compatible (`null` = unlocked). The account password and LockNote password are independent credentials, even when a user chooses identical text.
+`utils/crypto.js` hashes with SHA-256 (`expo-crypto`). Folder locks retain an individual hash in each folder row. Note locks use one shared LockNote credential stored locally by `lockPasswordService`; the same hash is also copied into each locked note's `password` column so existing lock flags, backups, and private sync remain compatible (`null` = unlocked). The account password and LockNote password are independent credentials, even when a user chooses identical text. New LockNote passwords require at least 6 characters; account registration and reset passwords retain their separate 8-character minimum.
 
 The same hash verification gates every user-facing delete path for a locked
 note or folder, including list actions and note-editor actions. Removing a note

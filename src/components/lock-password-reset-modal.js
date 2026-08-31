@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { lockPasswordService } from '../services/lockPasswordService';
 import { radius, shadow, useTheme } from '../theme';
 import { AppAlert as Alert } from '../utils/app-alert';
-import { validatePassword } from '../utils/auth.mjs';
+import { validateLockPassword } from '../utils/lock-password.mjs';
 import KeyboardAwareModalContent from './keyboard-aware-modal-content';
 
 const LockPasswordResetModal = ({ visible }) => {
@@ -36,7 +36,7 @@ const LockPasswordResetModal = ({ visible }) => {
   };
 
   const resetPassword = async () => {
-    const validationError = validatePassword(password);
+    const validationError = validateLockPassword(password);
     if (validationError) {
       setError(validationError);
       return;
@@ -102,7 +102,7 @@ const LockPasswordResetModal = ({ visible }) => {
                 setPassword(value);
                 setError('');
               }}
-              placeholder="At least 8 characters"
+              placeholder="At least 6 characters"
               placeholderTextColor={colors.textTertiary}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
