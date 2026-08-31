@@ -373,7 +373,14 @@ const FolderScreen = ({ route, navigation }) => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item, index }) => (
-          <View style={noteViewMode === 'grid' ? styles.gridItem : undefined}>
+          <View
+            style={noteViewMode === 'grid' ? [
+              styles.gridItem,
+              notes.length % 2 === 1 && index === notes.length - 1
+                ? styles.gridItemUnpaired
+                : undefined,
+            ] : undefined}
+          >
             <NoteItem
               note={item}
               index={index}
@@ -546,7 +553,12 @@ const makeStyles = (colors) =>
     },
     gridItem: {
       flex: 1,
-      maxWidth: '48.5%',
+      minWidth: 0,
+    },
+    gridItemUnpaired: {
+      flex: 0,
+      width: '50%',
+      paddingRight: 5,
     },
     emptyState: {
       flex: 1,
