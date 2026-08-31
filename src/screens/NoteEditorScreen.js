@@ -37,6 +37,7 @@ import {
   normalizeNoteColor,
 } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 
 const NoteEditorScreen = ({ route, navigation }) => {
   const colors = useTheme();
@@ -225,15 +226,8 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const confirmDelete = () => {
     confirmDestructiveAction({
       title: 'Delete this note?',
-      message: 'This note and its content will be removed from your notes.',
-      details: [
-        {
-          label: 'Note',
-          value: title.trim() || 'Untitled note',
-          iconName: 'document-text-outline',
-        },
-      ],
-      confirmLabel: 'Delete note',
+      details: [createNoteDeleteDetail('note', title)],
+      confirmLabel: 'Delete',
       onConfirm: deleteNote,
     });
   };
@@ -502,16 +496,12 @@ const NoteEditorScreen = ({ route, navigation }) => {
           await deleteNote();
         }}
         passwordLabel="LockNote password"
-        title="Delete this locked note?"
-        subtitle="Enter its password to confirm deletion. This note and its content will be removed from your notes."
-        verifyLabel="Delete note"
+        title="Delete this note?"
+        subtitle="Enter its password to confirm deletion. This note will be removed from your notes."
+        verifyLabel="Delete"
         variant="danger"
         details={[
-          {
-            label: 'Note',
-            value: title.trim() || 'Untitled note',
-            iconName: 'document-text-outline',
-          },
+          createNoteDeleteDetail('note', title),
         ]}
       />
 

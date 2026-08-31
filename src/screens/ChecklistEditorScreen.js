@@ -46,6 +46,7 @@ import { radius, shadow, useTheme } from '../theme';
 import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
 import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 
 const CHECKLIST_ITEM_MIN_HEIGHT = 60;
 const CHECKLIST_ITEM_GAP = 10;
@@ -426,7 +427,6 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
     confirmDestructiveAction({
       title: 'Delete this checklist item?',
-      message: 'This item will be removed from the checklist.',
       details: [
         {
           label: 'Item',
@@ -773,16 +773,9 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
   const confirmDelete = () => {
     confirmDestructiveAction({
-      title: 'Delete this checklist?',
-      message: 'This checklist and all its items will be removed from your notes.',
-      details: [
-        {
-          label: 'Checklist',
-          value: title.trim() || 'Untitled checklist',
-          iconName: 'checkbox-outline',
-        },
-      ],
-      confirmLabel: 'Delete checklist',
+      title: 'Delete this note?',
+      details: [createNoteDeleteDetail('checklist', title)],
+      confirmLabel: 'Delete',
       onConfirm: deleteChecklist,
     });
   };
@@ -1222,16 +1215,12 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
           await deleteChecklist();
         }}
         passwordLabel="LockNote password"
-        title="Delete this locked checklist?"
-        subtitle="Enter its password to confirm deletion. This checklist and all its items will be removed."
-        verifyLabel="Delete checklist"
+        title="Delete this note?"
+        subtitle="Enter its password to confirm deletion. This note will be removed from your notes."
+        verifyLabel="Delete"
         variant="danger"
         details={[
-          {
-            label: 'Checklist',
-            value: title.trim() || 'Untitled checklist',
-            iconName: 'checkbox-outline',
-          },
+          createNoteDeleteDetail('checklist', title),
         ]}
       />
 

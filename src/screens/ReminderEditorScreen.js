@@ -34,6 +34,7 @@ import { radius, shadow, useTheme } from '../theme';
 import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
 import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 
 const ReminderEditorScreen = ({ route, navigation }) => {
   const { noteId } = route.params;
@@ -337,16 +338,9 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   };
 
   const confirmDelete = () => confirmDestructiveAction({
-    title: 'Delete this reminder?',
-    message: 'The reminder note will be removed and its scheduled notification will be cancelled.',
-    details: [
-      {
-        label: 'Reminder',
-        value: title.trim() || 'Untitled reminder',
-        iconName: 'notifications-outline',
-      },
-    ],
-    confirmLabel: 'Delete reminder',
+    title: 'Delete this note?',
+    details: [createNoteDeleteDetail('reminder', title)],
+    confirmLabel: 'Delete',
     onConfirm: deleteReminder,
   });
 
@@ -429,16 +423,12 @@ const ReminderEditorScreen = ({ route, navigation }) => {
           await deleteReminder();
         }}
         passwordLabel="LockNote password"
-        title="Delete this locked reminder?"
-        subtitle="Enter its password to confirm deletion. The reminder note and its scheduled notification will be removed."
-        verifyLabel="Delete reminder"
+        title="Delete this note?"
+        subtitle="Enter its password to confirm deletion. This note will be removed from your notes."
+        verifyLabel="Delete"
         variant="danger"
         details={[
-          {
-            label: 'Reminder',
-            value: title.trim() || 'Untitled reminder',
-            iconName: 'notifications-outline',
-          },
+          createNoteDeleteDetail('reminder', title),
         ]}
       />
 

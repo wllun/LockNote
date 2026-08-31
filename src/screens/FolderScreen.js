@@ -33,8 +33,8 @@ import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
-import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import {
   LEGACY_HOME_VIEW_MODE_STORAGE_KEY,
   NOTE_VIEW_MODE_STORAGE_KEY,
@@ -312,19 +312,8 @@ const FolderScreen = ({ route, navigation }) => {
   const confirmDeleteNote = (note) => {
     confirmDestructiveAction({
       title: 'Delete this note?',
-      message: 'This note will be removed from this folder.',
-      details: [
-        {
-          label: 'Note',
-          value: note.title?.trim() || 'Untitled note',
-          iconName: 'document-text-outline',
-        },
-        {
-          label: 'Last updated',
-          value: formatNoteUpdatedAt(note.updated_at).replace(/^Updated /, ''),
-        },
-      ],
-      confirmLabel: 'Delete note',
+      details: [createNoteDeleteDetail(note.note_type, note.title)],
+      confirmLabel: 'Delete',
       onConfirm: () => deleteNote(note),
     });
   };
@@ -486,22 +475,14 @@ const FolderScreen = ({ route, navigation }) => {
         }}
         allowLockPasswordRecovery={passwordModal.action === 'open'}
         passwordLabel="LockNote password"
-        title={passwordModal.action === 'delete' ? 'Delete this locked note?' : 'Locked'}
+        title={passwordModal.action === 'delete' ? 'Delete this note?' : 'Locked'}
         subtitle={passwordModal.action === 'delete'
           ? 'Enter its password to confirm deletion. This note will be removed from this folder.'
           : 'Enter the password to continue'}
-        verifyLabel={passwordModal.action === 'delete' ? 'Delete note' : 'Unlock'}
+        verifyLabel={passwordModal.action === 'delete' ? 'Delete' : 'Unlock'}
         variant={passwordModal.action === 'delete' ? 'danger' : 'default'}
         details={passwordModal.action === 'delete' && passwordModal.note ? [
-          {
-            label: 'Note',
-            value: passwordModal.note.title?.trim() || 'Untitled note',
-            iconName: 'document-text-outline',
-          },
-          {
-            label: 'Last updated',
-            value: formatNoteUpdatedAt(passwordModal.note.updated_at).replace(/^Updated /, ''),
-          },
+          createNoteDeleteDetail(passwordModal.note.note_type, passwordModal.note.title),
         ] : []}
       />
     </View>

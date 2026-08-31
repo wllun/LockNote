@@ -43,6 +43,7 @@ import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
 import { useDragAutoScroll } from '../utils/use-drag-auto-scroll';
 import { monthlyCommitmentTemplate } from '../utils/monthly-commitment-template';
+import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import {
   EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS,
   EXPENSE_REMARK_MAX_CHARACTERS,
@@ -791,7 +792,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       kind: 'commitment',
       itemId: commitmentId,
       title: 'Delete monthly bill?',
-      description: 'Review the bill below before removing it from your checklist.',
       details: [
         {
           label: 'Bill',
@@ -888,7 +888,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       kind: 'row',
       itemId: rowId,
       title: `Delete expense row ${rowIndex + 1}?`,
-      description: 'Review the details below before removing this row from the expense note.',
       details: [
         { label: 'Day', value: row.date.trim() || 'Not entered' },
         {
@@ -1275,16 +1274,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   const confirmDelete = () => {
     confirmDestructiveAction({
-      title: 'Delete this expense record?',
-      message: 'The daily expenses, monthly bills, total, and summary will be removed.',
-      details: [
-        {
-          label: 'Expense record',
-          value: title.trim() || 'Untitled expense record',
-          iconName: 'receipt-outline',
-        },
-      ],
-      confirmLabel: 'Delete record',
+      title: 'Delete this note?',
+      details: [createNoteDeleteDetail('expense', title)],
+      confirmLabel: 'Delete',
       onConfirm: deleteExpenseRecord,
     });
   };
@@ -2238,16 +2230,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           await deleteExpenseRecord();
         }}
         passwordLabel="LockNote password"
-        title="Delete this locked expense record?"
-        subtitle="Enter its password to confirm deletion. Daily expenses, monthly bills, total, and summary will be removed."
-        verifyLabel="Delete record"
+        title="Delete this note?"
+        subtitle="Enter its password to confirm deletion. This note will be removed from your notes."
+        verifyLabel="Delete"
         variant="danger"
         details={[
-          {
-            label: 'Expense record',
-            value: title.trim() || 'Untitled expense record',
-            iconName: 'receipt-outline',
-          },
+          createNoteDeleteDetail('expense', title),
         ]}
       />
 

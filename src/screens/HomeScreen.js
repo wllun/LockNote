@@ -32,8 +32,8 @@ import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
-import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import {
   FOLDER_VIEW_MODES,
   FOLDER_VIEW_MODE_STORAGE_KEY,
@@ -357,18 +357,10 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const confirmDeleteNote = (note) => {
-    const noteTitle = note.title?.trim() || 'Untitled note';
     confirmDestructiveAction({
       title: 'Delete this note?',
-      message: 'This note will be removed from your notes.',
-      details: [
-        { label: 'Note', value: noteTitle, iconName: 'document-text-outline' },
-        {
-          label: 'Last updated',
-          value: formatNoteUpdatedAt(note.updated_at).replace(/^Updated /, ''),
-        },
-      ],
-      confirmLabel: 'Delete note',
+      details: [createNoteDeleteDetail(note.note_type, note.title)],
+      confirmLabel: 'Delete',
       onConfirm: () => deleteNote(note),
     });
   };
@@ -390,16 +382,9 @@ const HomeScreen = ({ navigation }) => {
     try {
       const folderNotes = await noteRepo.getActiveByFolderId(folder.id);
       const noteCount = folderNotes.length;
-      const detail =
-        noteCount === 0
-          ? 'The folder will be permanently deleted.'
-          : `The folder will be permanently deleted. ${noteCount} ${
-              noteCount === 1 ? 'note' : 'notes'
-            } inside will move to Trash.`;
 
       confirmDestructiveAction({
         title: 'Delete this folder?',
-        message: detail,
         details: [
           { label: 'Folder', value: folder.name, iconName: 'folder-outline' },
           {
@@ -903,7 +888,7 @@ const HomeScreen = ({ navigation }) => {
         }
         passwordLabel={passwordModal.type === 'note' ? 'LockNote password' : 'Folder password'}
         title={passwordModal.action === 'delete' && passwordModal.type === 'note'
-          ? 'Delete this locked note?'
+          ? 'Delete this note?'
           : passwordModal.action === 'delete'
             ? 'Password required'
             : 'Locked'}
@@ -913,7 +898,7 @@ const HomeScreen = ({ navigation }) => {
             : `Enter this ${passwordModal.type}'s password before deleting it.`
           : 'Enter the password to continue'}
         verifyLabel={passwordModal.action === 'delete' && passwordModal.type === 'note'
-          ? 'Delete note'
+          ? 'Delete'
           : passwordModal.action === 'delete'
             ? 'Continue'
             : 'Unlock'}
@@ -923,15 +908,10 @@ const HomeScreen = ({ navigation }) => {
         details={passwordModal.action === 'delete' &&
           passwordModal.type === 'note' &&
           passwordModal.item ? [
-            {
-              label: 'Note',
-              value: passwordModal.item.title?.trim() || 'Untitled note',
-              iconName: 'document-text-outline',
-            },
-            {
-              label: 'Last updated',
-              value: formatNoteUpdatedAt(passwordModal.item.updated_at).replace(/^Updated /, ''),
-            },
+            createNoteDeleteDetail(
+              passwordModal.item.note_type,
+              passwordModal.item.title
+            ),
           ] : []}
       />
     </View>

@@ -94,7 +94,6 @@ const TrashScreen = ({ navigation }) => {
   const confirmPermanentDelete = (item) => {
     confirmDestructiveAction({
       title: 'Permanently delete this note?',
-      message: 'This cannot be undone.',
       confirmLabel: 'Delete forever',
       details: [{
         label: 'Note',
