@@ -503,18 +503,20 @@ const HomeScreen = ({ navigation }) => {
         return (
           <TouchableOpacity
             key={mode}
-            style={[styles.sectionViewButton, selected && styles.viewButtonSelected]}
+            style={styles.sectionViewButton}
             onPress={() => onChange(mode)}
             activeOpacity={0.7}
             accessibilityRole="tab"
             accessibilityLabel={`${scope} ${label.toLowerCase()} view`}
             accessibilityState={{ selected }}
           >
-            <Ionicons
-              name={iconName}
-              size={19}
-              color={selected ? colors.primary : colors.textSecondary}
-            />
+            <View style={[styles.viewButtonIndicator, selected && styles.viewButtonSelected]}>
+              <Ionicons
+                name={iconName}
+                size={19}
+                color={selected ? colors.primary : colors.textSecondary}
+              />
+            </View>
           </TouchableOpacity>
         );
       })}
@@ -959,11 +961,19 @@ const makeStyles = (colors) =>
     sectionViewButton: {
       width: 44,
       height: 44,
-      borderRadius: radius.sm,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    viewButtonIndicator: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
       justifyContent: 'center',
       alignItems: 'center',
     },
     viewButtonSelected: {
+      borderWidth: 1,
+      borderColor: colors.primary,
       backgroundColor: colors.primarySoft,
     },
     searchInput: {
