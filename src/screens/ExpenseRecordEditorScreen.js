@@ -2083,7 +2083,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               accessibilityRole="button"
             >
               <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Share with people</Text>
+              <Text style={styles.actionsMenuText}>Share</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
@@ -2108,7 +2108,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               accessibilityLabel="Export expense note"
             >
               <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Export PDF or image</Text>
+              <Text style={styles.actionsMenuText}>Export</Text>
             </Pressable>
 
             <Pressable

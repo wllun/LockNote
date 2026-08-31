@@ -403,9 +403,9 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       >
         <View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setShowActions(false)} accessible={false} /><View style={[styles.actionMenu, { top: insets.top + 60 }]}>
           {[
-            { icon: 'people-outline', text: 'Share with people', action: () => setShowShare(true) },
+            { icon: 'people-outline', text: 'Share', action: () => setShowShare(true) },
             { icon: 'color-palette-outline', text: 'Color', action: () => setShowColor(true) },
-            { icon: 'share-outline', text: 'Export PDF or image', action: () => setShowExport(true) },
+            { icon: 'share-outline', text: 'Export', action: () => setShowExport(true) },
             { icon: isPinned ? 'pin' : 'pin-outline', text: isPinned ? 'Unpin' : 'Pin', action: handleTogglePin },
             { icon: hasPassword ? 'lock-open-outline' : 'lock-closed-outline', text: hasPassword ? 'Unlock' : 'Lock', action: () => setShowLock(true) },
             { icon: 'trash-outline', text: 'Delete', danger: true, action: handleDelete },
