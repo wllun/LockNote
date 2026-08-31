@@ -972,15 +972,17 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                 style={[styles.progressFill, { width: `${progress.percent}%` }]}
               />
             </View>
-            <Text
-              style={[
-                styles.saveStatus,
-                saveStatus === 'Could not save' && styles.saveStatusError,
-              ]}
-              accessibilityLiveRegion="polite"
-            >
-              {saveStatus || 'Changes save automatically'}
-            </Text>
+            {!!saveStatus && (
+              <Text
+                style={[
+                  styles.saveStatus,
+                  saveStatus === 'Could not save' && styles.saveStatusError,
+                ]}
+                accessibilityLiveRegion="polite"
+              >
+                {saveStatus}
+              </Text>
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -1031,9 +1033,6 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                   <Ionicons name="add" size={22} color={colors.card} />
                 </Pressable>
               </View>
-              <Text style={styles.itemLimit}>
-                {items.length} / {CHECKLIST_MAX_ITEMS} items
-              </Text>
             </View>
           </>
         }
@@ -1473,7 +1472,6 @@ const makeStyles = (colors) =>
     },
     addButton: { width: 48, height: 48, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
     addButtonDisabled: { opacity: 0.4 },
-    itemLimit: { color: colors.textTertiary, fontSize: 11, fontVariant: ['tabular-nums'] },
     actionsMenuOverlay: { flex: 1, backgroundColor: colors.backdropSoft },
     actionsMenu: {
       position: 'absolute',
