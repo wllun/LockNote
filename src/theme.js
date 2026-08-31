@@ -41,7 +41,7 @@ const lightColors = {
 const darkColors = {
   primary: '#8B93FF',
   primarySoft: '#2C2F5E',
-  background: '#0A0C12',
+  background: '#151923',
   card: '#1C2233',
   text: '#F5F7FC',
   textSecondary: '#ACB4C8',
