@@ -952,7 +952,7 @@ const makeStyles = (colors) =>
       flexDirection: 'row',
       alignItems: 'center',
       padding: 2,
-      borderRadius: radius.full,
+      borderRadius: 8,
       borderCurve: 'continuous',
       borderWidth: 1,
       borderColor: colors.border,
