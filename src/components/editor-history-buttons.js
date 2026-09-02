@@ -67,7 +67,7 @@ const EditorHistoryButtons = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 0,
   },
 });
 

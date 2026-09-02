@@ -350,13 +350,13 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   return (
     <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top, backgroundColor: noteColorTheme.surface }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={colors.text} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton} activeOpacity={0.7} hitSlop={4} accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={colors.text} /></TouchableOpacity>
         <View style={[styles.titleField, isTitleFocused && styles.titleFieldFocused]}>
           <Ionicons name="alarm-outline" size={18} color={colors.primary} />
           <TextInput style={styles.titleInput} placeholder="Reminder title" placeholderTextColor={colors.textTertiary} value={title} onChangeText={handleTitleChange} onFocus={() => setIsTitleFocused(true)} onBlur={() => setIsTitleFocused(false)} onSubmitEditing={() => bodyRef.current?.focus()} accessibilityLabel="Reminder title" />
         </View>
         <EditorHistoryButtons canRedo={canRedo} canUndo={canUndo} colors={colors} disabledStyle={styles.disabled} onRedo={handleRedo} onUndo={handleUndo} style={styles.headerButton} />
-        <TouchableOpacity onPress={() => setShowActions(true)} style={styles.headerButton} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="More reminder actions"><Ionicons name="ellipsis-vertical" size={22} color={colors.text} /></TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowActions(true)} style={styles.headerButton} activeOpacity={0.7} hitSlop={4} accessibilityRole="button" accessibilityLabel="More reminder actions"><Ionicons name="ellipsis-vertical" size={22} color={colors.text} /></TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(20, insets.bottom + 12) }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
@@ -446,8 +446,8 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
 const makeStyles = (colors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.card },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
-  headerButton: { width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }, disabled: { opacity: 0.38 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 0, paddingHorizontal: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+  headerButton: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' }, disabled: { opacity: 0.38 },
   titleField: { flex: 1, minWidth: 0, height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBg },
   titleFieldFocused: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   titleInput: { flex: 1, minWidth: 0, height: 42, paddingVertical: 0, fontSize: 16, fontWeight: '700', color: colors.text, outlineStyle: 'none' },

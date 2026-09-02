@@ -279,6 +279,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
           style={styles.headerButton}
           activeOpacity={0.7}
+          hitSlop={4}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
@@ -322,6 +323,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           onPress={() => setShowActionsMenu(true)}
           style={styles.headerButton}
           activeOpacity={0.7}
+          hitSlop={4}
           accessibilityRole="button"
           accessibilityLabel="More note actions"
           accessibilityHint="Shows pin, password, export, and delete actions"
@@ -525,18 +527,16 @@ const makeStyles = (colors) =>
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
-      paddingHorizontal: 12,
+      gap: 0,
+      paddingHorizontal: 8,
       paddingVertical: 8,
       backgroundColor: colors.card,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
     headerButton: {
-      width: 44,
+      width: 36,
       height: 44,
-      borderRadius: radius.full,
-      backgroundColor: colors.background,
       justifyContent: 'center',
       alignItems: 'center',
     },
