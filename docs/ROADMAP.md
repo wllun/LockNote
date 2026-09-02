@@ -22,7 +22,7 @@ This file describes the product direction and major delivery phases. For detaile
   - Use a dedicated sender subdomain such as `auth.example.com` and `LockNote <no-reply@auth.example.com>`. The domain identifies the email sender; it does not require LockNote to have a website.
   - Configure SPF and DKIM, then add DMARC for production.
   - Brand the signup-confirmation, account-password recovery, LockNote-password recovery, and email-change templates while preserving variables such as `{{ .ConfirmationURL }}`.
-- [ ] Test the Android forced-update policy with an older production-signed build before relying on it for a public rollout.
+- [ ] Test the Android and iOS forced-update policies with older store builds before relying on them for a public rollout.
 - [ ] Decide the final free/Cloud/Pro feature boundaries and implement subscription entitlement before charging users.
 
 ## Phase 1 — Offline core (free) — shipped
@@ -46,7 +46,7 @@ This file describes the product direction and major delivery phases. For detaile
 - [X] Manual two-way private folder/note sync with row-level security, last-write-wins timestamps, root-note preservation, and deletion tombstones.
 - [X] Multi-device data transfer through an explicit Sync Notes action after signing in.
 - [X] Collaboration Release 1: share individual notes by registered email, manage collaborators, display Shared-with-me notes, refresh through Realtime, and reject stale-revision saves.
-- [X] Android forced-update baseline driven by a public read-only Supabase policy.
+- [X] Android/iOS forced-update baseline driven by platform-specific public read-only Supabase policies; web remains exempt.
 
 ### Remaining
 

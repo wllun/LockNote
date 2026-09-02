@@ -17,6 +17,7 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.locknote.app",
+      buildNumber: "2",
       supportsTablet: true,
     },
     android: {

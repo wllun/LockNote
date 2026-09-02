@@ -2,6 +2,8 @@ export const APP_UPDATE_CACHE_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 export const DEFAULT_APP_UPDATE_MESSAGE =
   'A newer version of LockNote is required to continue.';
 
+const SUPPORTED_PLATFORMS = new Set(['android', 'ios']);
+
 export const parseBuildVersion = (value) => {
   const text = String(value ?? '').trim();
   if (!/^\d+$/.test(text)) return null;
@@ -9,22 +11,25 @@ export const parseBuildVersion = (value) => {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
-const normalizeUpdateUrl = (value) => {
+const normalizeUpdateUrl = (value, platform) => {
   if (typeof value !== 'string' || !value.trim()) return null;
   try {
     const url = new URL(value.trim());
-    return ['https:', 'market:'].includes(url.protocol) ? url.toString() : null;
+    const allowedProtocols = platform === 'android'
+      ? ['https:', 'market:']
+      : ['https:'];
+    return allowedProtocols.includes(url.protocol) ? url.toString() : null;
   } catch {
     return null;
   }
 };
 
 export const normalizeAppUpdateConfig = (value) => {
-  if (!value || value.platform !== 'android') return null;
+  if (!value || !SUPPORTED_PLATFORMS.has(value.platform)) return null;
 
   const latestVersionCode = parseBuildVersion(value.latest_version_code);
   const minimumVersionCode = parseBuildVersion(value.minimum_version_code);
-  const updateUrl = normalizeUpdateUrl(value.update_url);
+  const updateUrl = normalizeUpdateUrl(value.update_url, value.platform);
   if (
     !latestVersionCode ||
     !minimumVersionCode ||
@@ -39,7 +44,7 @@ export const normalizeAppUpdateConfig = (value) => {
     : '';
 
   return {
-    platform: 'android',
+    platform: value.platform,
     latestVersionCode,
     minimumVersionCode,
     forceUpdateEnabled: value.force_update_enabled === true,
@@ -95,6 +100,7 @@ export const evaluateAppUpdate = ({
     updateAvailable,
     reason: required ? 'below-minimum' : updateAvailable ? 'update-available' : 'current',
     source,
+    platform: normalized.platform,
     currentBuildVersion: currentBuild,
     latestVersionCode: normalized.latestVersionCode,
     minimumVersionCode: normalized.minimumVersionCode,

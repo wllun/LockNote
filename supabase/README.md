@@ -15,5 +15,5 @@ client session. LockNote does not end-to-end encrypt note content before upload.
 
 The service-role key is read only inside the Edge Function. Never add it to the Expo environment or app bundle.
 
-See [../FORCE_UPDATE.md](../FORCE_UPDATE.md) for the Android release and emergency
-rollback procedure.
+See [../FORCE_UPDATE.md](../FORCE_UPDATE.md) for the Android/iOS release and
+emergency rollback procedure.

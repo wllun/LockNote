@@ -1,8 +1,9 @@
-# LockNote forced Android updates
+# LockNote forced mobile updates
 
-LockNote 1.1.0 is the update-capable baseline. It checks the public
-`app_update_config` row when the app starts and when it returns to the
-foreground. Enforcement is disabled by default.
+LockNote 1.1.0 is the update-capable baseline. Android and iOS each check their
+own public `app_update_config` row when the app starts and when it returns to the
+foreground. Web is intentionally excluded because a deployed web app already
+serves its current bundle. Enforcement is disabled by default.
 
 An installed 1.0.0 build does not contain this check and cannot be remotely
 blocked. Existing users must install this baseline once before later releases
@@ -22,11 +23,42 @@ give either role permission to insert, update, or delete the configuration.
 Manage the row through the Supabase SQL editor, dashboard, or another trusted
 administrator environment. Never put the service-role key in the app.
 
-## 2. Release the baseline without forcing it
+## 2. Configure each platform
 
-Build 1.1.0 and first release it through Google Play internal testing. The app
-config starts at Android `versionCode: 2`; the EAS production profile also uses
-`autoIncrement`, so confirm the actual build code shown by EAS or Play Console.
+The migration creates the Android row. Before shipping iOS, add its row with the
+real App Store listing URL and numeric iOS build number. Do not use a placeholder
+App Store ID in production.
+
+```sql
+insert into public.app_update_config (
+  platform,
+  latest_version_code,
+  minimum_version_code,
+  force_update_enabled,
+  update_url,
+  message
+) values (
+  'ios',
+  2,
+  1,
+  false,
+  'https://apps.apple.com/app/idYOUR_APP_STORE_ID',
+  'A newer version of LockNote is required to continue.'
+)
+on conflict (platform) do update
+set update_url = excluded.update_url,
+    updated_at = now();
+```
+
+The app accepts HTTPS links for both platforms and additionally accepts
+`market://` links on Android. iOS policies reject Android market links.
+
+## 3. Release the baseline without forcing it
+
+Build 1.1.0 and first release it through store testing. The app config starts at
+Android `versionCode: 2` and iOS `buildNumber: "2"`; the EAS production profile
+also uses `autoIncrement`, so confirm the actual build number shown by EAS and
+the relevant store console.
 
 ```powershell
 npx.cmd eas-cli@latest build -p android --profile production
@@ -45,11 +77,15 @@ where platform = 'android';
 
 Replace `2` with the actual baseline build code if EAS incremented it.
 
-## 3. Release a newer build
+Use the same disabled policy for iOS, replacing the platform and actual build
+number as needed.
 
-Increase `expo.version` and `expo.android.versionCode` in `app.config.js`, test
-the new release, and make it fully available before enabling enforcement. Never
-set the minimum to a build that users cannot download yet.
+## 4. Release a newer build
+
+Increase `expo.version` and the relevant `expo.android.versionCode` or
+`expo.ios.buildNumber` in `app.config.js`, test the new release, and make it fully
+available before enabling enforcement. Never set the minimum to a build that
+users cannot download yet.
 
 For example, after build 3 is available:
 
@@ -65,8 +101,9 @@ where platform = 'android';
 ```
 
 Update-capable builds below code 3 will then show the non-dismissible update
-screen. Returning from Google Play causes another check, and the app opens after
-the installed build satisfies the minimum.
+screen. Returning from the store causes another check, and the app opens after
+the installed build satisfies the minimum. Apply the equivalent update to the
+`ios` row only after the App Store release is available.
 
 ## Sideloaded APK users
 
@@ -90,7 +127,7 @@ Disable the gate immediately without releasing another APK:
 update public.app_update_config
 set force_update_enabled = false,
     updated_at = now()
-where platform = 'android';
+where platform in ('android', 'ios');
 ```
 
 Devices cache the last valid policy for offline launches. A cached force policy
@@ -100,7 +137,7 @@ only by a Supabase or network outage.
 ## Release checklist
 
 - Verify the new build preserves all local notes after an update install.
-- Test Play-installed and sideloaded upgrade paths separately.
+- Test Play-installed, App Store-installed, and sideloaded Android upgrade paths separately.
 - Test with the update configuration enabled, disabled, missing, and malformed.
 - Test offline with fresh and expired cached policies.
 - Confirm the download is public before raising `minimum_version_code`.

@@ -16,12 +16,24 @@ const config = {
   message: 'Install the latest LockNote release.',
 };
 
-test('parses only positive integer Android build versions', () => {
+test('parses only positive integer native build versions', () => {
   assert.equal(parseBuildVersion('42'), 42);
   assert.equal(parseBuildVersion(7), 7);
   assert.equal(parseBuildVersion('2.1'), null);
   assert.equal(parseBuildVersion('2beta'), null);
   assert.equal(parseBuildVersion(0), null);
+});
+
+test('supports an iOS force-update policy with an HTTPS App Store URL', () => {
+  const iosConfig = {
+    ...config,
+    platform: 'ios',
+    update_url: 'https://apps.apple.com/app/locknote/id1234567890',
+  };
+  const result = evaluateAppUpdate({ currentBuildVersion: '3', config: iosConfig });
+  assert.equal(result.supported, true);
+  assert.equal(result.platform, 'ios');
+  assert.equal(result.required, true);
 });
 
 test('requires an update when an enabled minimum exceeds the installed build', () => {
@@ -73,5 +85,14 @@ test('rejects unsafe links and inconsistent version configuration', () => {
     ...config,
     latest_version_code: 3,
     minimum_version_code: 4,
+  }), null);
+  assert.equal(normalizeAppUpdateConfig({
+    ...config,
+    platform: 'ios',
+    update_url: 'market://details?id=com.locknote.app',
+  }), null);
+  assert.equal(normalizeAppUpdateConfig({
+    ...config,
+    platform: 'web',
   }), null);
 });
