@@ -34,7 +34,7 @@ export const useAwaitedEditorExit = ({ navigation, needsCleanup, cleanup }) => {
   }, [navigation, removalAllowed]);
 
   useEffect(() => () => {
-    if (cleanupSettledRef.current) return;
+    if (cleanupSettledRef.current || !needsCleanupRef.current()) return;
     Promise.resolve(cleanupRef.current())
       .catch((error) => console.error('Editor unmount cleanup failed:', error));
   }, []);

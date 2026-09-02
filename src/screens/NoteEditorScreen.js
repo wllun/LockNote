@@ -27,6 +27,7 @@ import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
 import { radius, shadow, useTheme } from '../theme';
 import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
+import { getEditorExitDisposition } from '../utils/editor-exit-disposition.mjs';
 import {
   constrainNormalNoteContent,
   NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
@@ -43,7 +44,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const { noteId } = route.params;
+  const { noteId, isNewDraft = false } = route.params;
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
@@ -57,6 +58,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const saveTimeout = useRef(null);
+  const loadCompletedRef = useRef(false);
   const contentRef = useRef(null);
   const contentLimitDialogShown = useRef(false);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
@@ -90,6 +92,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           color: localColor,
           cloudId: note.cloud_id,
         };
+        loadCompletedRef.current = true;
         clearUndo();
       }
     } catch (error) {
@@ -247,23 +250,36 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const needsExitCleanup = useCallback(() => {
     const { title, content, hasPassword, isPinned, color, cloudId, deleted } = latest.current;
     const empty = !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR;
-    return !deleted && (empty || !!saveTimeout.current);
-  }, []);
+    return getEditorExitDisposition({
+      loadCompleted: loadCompletedRef.current,
+      isNewDraft,
+      isEmpty: empty,
+      isDeleted: deleted,
+      hasPendingSave: !!saveTimeout.current,
+    }) !== 'none';
+  }, [isNewDraft]);
 
   const finalizeExit = useCallback(async () => {
     const pending = saveTimeout.current;
+    const { title, content, hasPassword, isPinned, color, cloudId, deleted } = latest.current;
+    const disposition = getEditorExitDisposition({
+      loadCompleted: loadCompletedRef.current,
+      isNewDraft,
+      isEmpty: !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR,
+      isDeleted: deleted,
+      hasPendingSave: !!pending,
+    });
+    if (disposition === 'none') return;
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
-    const { title, content, hasPassword, isPinned, color, cloudId, deleted } = latest.current;
-    if (deleted) return;
-    if (!cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR) {
+    if (disposition === 'delete') {
       await noteRepo.hardDelete(noteId);
       await noteColorPreference.remove(noteId);
-    } else if (pending) {
+    } else {
       await collaborationService.save(noteId, { title, content });
     }
-  }, [noteId]);
+  }, [isNewDraft, noteId]);
 
   useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 

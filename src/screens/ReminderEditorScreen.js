@@ -32,12 +32,13 @@ import {
 } from '../utils/reminder-notifications';
 import { radius, shadow, useTheme } from '../theme';
 import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
+import { getEditorExitDisposition } from '../utils/editor-exit-disposition.mjs';
 import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 
 const ReminderEditorScreen = ({ route, navigation }) => {
-  const { noteId } = route.params;
+  const { noteId, isNewDraft = false } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -57,6 +58,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const saveTimeout = useRef(null);
+  const loadCompletedRef = useRef(false);
   const bodyRef = useRef(null);
   const bodyLimitDialogShown = useRef(false);
   const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, cloudId: null, deleted: false });
@@ -107,6 +109,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         cloudId: note.cloud_id,
       };
       latest.current = next;
+      loadCompletedRef.current = true;
       setTitle(next.title); setBody(next.body); setReminder(next.reminder);
       setHasPassword(next.hasPassword); setIsPinned(next.isPinned); setNoteColor(next.color); clearUndo();
   }, [clearUndo, noteId]);
@@ -119,27 +122,40 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const needsExitCleanup = useCallback(() => {
     const draft = latest.current;
     const empty = !draft.cloudId && isReminderNoteEmpty(draft) && draft.color === DEFAULT_NOTE_COLOR;
-    return !draft.deleted && (empty || !!saveTimeout.current);
-  }, []);
+    return getEditorExitDisposition({
+      loadCompleted: loadCompletedRef.current,
+      isNewDraft,
+      isEmpty: empty,
+      isDeleted: draft.deleted,
+      hasPendingSave: !!saveTimeout.current,
+    }) !== 'none';
+  }, [isNewDraft]);
 
   const finalizeExit = useCallback(async () => {
     const pending = saveTimeout.current;
+    const draft = latest.current;
+    const disposition = getEditorExitDisposition({
+      loadCompleted: loadCompletedRef.current,
+      isNewDraft,
+      isEmpty: !draft.cloudId && isReminderNoteEmpty(draft) && draft.color === DEFAULT_NOTE_COLOR,
+      isDeleted: draft.deleted,
+      hasPendingSave: !!pending,
+    });
+    if (disposition === 'none') return;
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
-    const draft = latest.current;
-    if (draft.deleted) return;
-    if (!draft.cloudId && isReminderNoteEmpty(draft) && draft.color === DEFAULT_NOTE_COLOR) {
+    if (disposition === 'delete') {
       await cancelReminderNotifications(draft.reminder.notificationIds);
       await noteRepo.hardDelete(noteId);
       await noteColorPreference.remove(noteId);
-    } else if (pending) {
+    } else {
       await collaborationService.save(noteId, {
         title: draft.title,
         content: contentFor(draft.body, draft.reminder),
       });
     }
-  }, [noteId]);
+  }, [isNewDraft, noteId]);
 
   useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 

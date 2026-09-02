@@ -223,7 +223,7 @@ const FolderScreen = ({ route, navigation }) => {
   const handleCreateNote = async (type = 'note') => {
     try {
       const note = await noteRepo.create(folderId, '', '', null, type);
-      navigation.navigate(editorRouteFor(note), { noteId: note.id });
+      navigation.navigate(editorRouteFor(note), { noteId: note.id, isNewDraft: true });
     } catch (error) {
       Alert.alert(
         'Error',

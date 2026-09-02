@@ -221,7 +221,7 @@ const HomeScreen = ({ navigation }) => {
   const handleCreateRootNote = async (type = 'note') => {
     try {
       const note = await noteRepo.create(null, '', '', null, type);
-      navigation.navigate(editorRouteFor(note), { noteId: note.id });
+      navigation.navigate(editorRouteFor(note), { noteId: note.id, isNewDraft: true });
     } catch (error) {
       Alert.alert(
         'Error',

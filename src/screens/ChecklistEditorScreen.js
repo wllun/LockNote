@@ -44,6 +44,7 @@ import {
 } from '../utils/checklist-note.mjs';
 import { radius, shadow, useTheme } from '../theme';
 import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
+import { getEditorExitDisposition } from '../utils/editor-exit-disposition.mjs';
 import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
@@ -236,7 +237,7 @@ const ChecklistItemRow = React.memo(({
 });
 
 const ChecklistEditorScreen = ({ route, navigation }) => {
-  const { noteId } = route.params;
+  const { noteId, isNewDraft = false } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
@@ -265,6 +266,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   });
 
   const saveTimeout = useRef(null);
+  const loadCompletedRef = useRef(false);
   const newItemInputRef = useRef(null);
   const listRef = useRef(null);
   const dragAreaRef = useRef(null);
@@ -355,6 +357,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         color: localColor,
         cloudId: note.cloud_id,
       };
+      loadCompletedRef.current = true;
       clearUndo();
     } catch {
       Alert.alert('Error', 'Failed to load checklist');
@@ -799,32 +802,44 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       !draft.hasPassword &&
       !draft.isPinned &&
       draft.color === DEFAULT_NOTE_COLOR;
-    return !draft.deleted && (empty || !!saveTimeout.current);
-  }, []);
+    return getEditorExitDisposition({
+      loadCompleted: loadCompletedRef.current,
+      isNewDraft,
+      isEmpty: empty,
+      isDeleted: draft.deleted,
+      hasPendingSave: !!saveTimeout.current,
+    }) !== 'none';
+  }, [isNewDraft]);
 
   const finalizeExit = useCallback(async () => {
     const pending = saveTimeout.current;
-    if (pending) clearTimeout(pending);
-    saveTimeout.current = null;
-
     const draft = latest.current;
-    if (draft.deleted) return;
-    if (
-      !draft.cloudId &&
+    const empty = !draft.cloudId &&
       isChecklistNoteEmpty(draft.title, draft.items) &&
       !draft.hasPassword &&
       !draft.isPinned &&
-      draft.color === DEFAULT_NOTE_COLOR
-    ) {
+      draft.color === DEFAULT_NOTE_COLOR;
+    const disposition = getEditorExitDisposition({
+      loadCompleted: loadCompletedRef.current,
+      isNewDraft,
+      isEmpty: empty,
+      isDeleted: draft.deleted,
+      hasPendingSave: !!pending,
+    });
+    if (disposition === 'none') return;
+    if (pending) clearTimeout(pending);
+    saveTimeout.current = null;
+
+    if (disposition === 'delete') {
       await noteRepo.hardDelete(noteId);
       await noteColorPreference.remove(noteId);
-    } else if (pending) {
+    } else {
       await collaborationService.save(noteId, {
         title: draft.title,
         content: serializeChecklistNote(draft.items),
       });
     }
-  }, [noteId]);
+  }, [isNewDraft, noteId]);
 
   useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 

@@ -79,6 +79,7 @@ import {
 import { expenseCurrencyPreference } from '../utils/expense-currency-preference';
 import { radius, shadow, useTheme } from '../theme';
 import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
+import { getEditorExitDisposition } from '../utils/editor-exit-disposition.mjs';
 import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
 
@@ -247,7 +248,7 @@ const ExpenseRowDragHandle = ({
 };
 
 const ExpenseRecordEditorScreen = ({ route, navigation }) => {
-  const { noteId } = route.params;
+  const { noteId, isNewDraft = false } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
@@ -289,6 +290,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   });
 
   const saveTimeout = useRef(null);
+  const loadCompletedRef = useRef(false);
   const inputRefs = useRef({});
   const scrollRef = useRef(null);
   const dragAreaRef = useRef(null);
@@ -447,6 +449,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         color: localColor,
         cloudId: note.cloud_id,
       };
+      loadCompletedRef.current = true;
       clearUndo();
     } catch {
       Alert.alert('Error', 'Failed to load expense record');
@@ -1327,20 +1330,33 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   const needsExitCleanup = useCallback(() => {
     const draft = latest.current;
-    return !draft.deleted && (isEmptyDraft(draft) || !!saveTimeout.current);
-  }, [isEmptyDraft]);
+    return getEditorExitDisposition({
+      loadCompleted: loadCompletedRef.current,
+      isNewDraft,
+      isEmpty: isEmptyDraft(draft),
+      isDeleted: draft.deleted,
+      hasPendingSave: !!saveTimeout.current,
+    }) !== 'none';
+  }, [isEmptyDraft, isNewDraft]);
 
   const finalizeExit = useCallback(async () => {
     const pending = saveTimeout.current;
+    const draft = latest.current;
+    const disposition = getEditorExitDisposition({
+      loadCompleted: loadCompletedRef.current,
+      isNewDraft,
+      isEmpty: isEmptyDraft(draft),
+      isDeleted: draft.deleted,
+      hasPendingSave: !!pending,
+    });
+    if (disposition === 'none') return;
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
-    const draft = latest.current;
-    if (draft.deleted) return;
-    if (isEmptyDraft(draft)) {
+    if (disposition === 'delete') {
       await noteRepo.hardDelete(noteId);
       await noteColorPreference.remove(noteId);
-    } else if (pending) {
+    } else {
       await collaborationService.save(noteId, {
         title: draft.title.trim(),
         content: serializeExpenseNote(
@@ -1352,7 +1368,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         ),
       });
     }
-  }, [isEmptyDraft, noteId]);
+  }, [isEmptyDraft, isNewDraft, noteId]);
 
   useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 
