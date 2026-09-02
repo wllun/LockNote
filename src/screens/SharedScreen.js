@@ -19,10 +19,19 @@ const SharedScreen = ({ navigation }) => {
   const { session, loading: authLoading } = useAuth();
   const [notes, setNotes] = useState([]); const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [message, setMessage] = useState('');
   const load = useCallback(async ({ refresh = true } = {}) => {
-    const cached = await noteRepo.getSharedWithMe(); setNotes(await noteColorPreference.applyToNotes(cached)); setLoading(false);
-    if (!refresh || !session || !isSupabaseConfigured) return;
-    try { const next = await collaborationService.refreshSharedWithMe(); setNotes(await noteColorPreference.applyToNotes(next)); setMessage(''); }
-    catch (error) { setMessage(cached.length ? 'Offline · showing saved shared notes' : (error.message || 'Could not load shared notes.')); }
+    let cached = [];
+    try {
+      cached = await noteRepo.getSharedWithMe();
+      setNotes(await noteColorPreference.applyToNotes(cached));
+      if (!refresh || !session || !isSupabaseConfigured) return;
+      const next = await collaborationService.refreshSharedWithMe();
+      setNotes(await noteColorPreference.applyToNotes(next.filter(Boolean)));
+      setMessage('');
+    } catch (error) {
+      setMessage(cached.length ? 'Offline · showing saved shared notes' : (error.message || 'Could not load shared notes.'));
+    } finally {
+      setLoading(false);
+    }
   }, [session?.user?.id]);
   useEffect(() => { load(); const unsubscribeFocus = navigation.addListener('focus', load); const unsubscribeCloud = collaborationService.subscribe(load); return () => { unsubscribeFocus(); unsubscribeCloud(); }; }, [load, navigation]);
   const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };

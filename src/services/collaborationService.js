@@ -46,6 +46,49 @@ const cacheRemote = async (remote) => {
 
 const saveQueues = new Map();
 
+// SharedScreen stays mounted while an editor is pushed on top of it. Supabase
+// returns the existing channel when the same topic is requested again, so
+// subscribing/removing that channel independently from both components makes
+// their lifecycles interfere with each other. Keep one realtime channel and
+// fan its events out to the active consumers instead.
+const realtimeListeners = new Set();
+let realtimeChannel = null;
+let realtimeChannelRemoval = null;
+
+const notifyRealtimeListeners = (payload) => {
+  for (const listener of [...realtimeListeners]) {
+    try {
+      Promise.resolve(listener(payload)).catch((error) => {
+        console.warn('Shared-note refresh listener failed:', error);
+      });
+    } catch (error) {
+      console.warn('Shared-note refresh listener failed:', error);
+    }
+  }
+};
+
+const ensureRealtimeChannel = () => {
+  if (!isSupabaseConfigured || realtimeChannel || realtimeChannelRemoval) return;
+  try {
+    realtimeChannel = supabase
+      .channel('locknote-shared-notes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shared_notes' },
+        notifyRealtimeListeners
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'note_members' },
+        notifyRealtimeListeners
+      )
+      .subscribe();
+  } catch (error) {
+    realtimeChannel = null;
+    console.warn('Failed to start shared-note subscription:', error);
+  }
+};
+
 const enqueueSave = (noteId, operation) => {
   const previous = saveQueues.get(noteId) || Promise.resolve();
   const next = previous.catch(() => {}).then(operation);
@@ -225,12 +268,22 @@ export const collaborationService = {
   },
 
   subscribe(onChange) {
-    if (!isSupabaseConfigured) return () => {};
-    const channel = supabase
-      .channel('locknote-shared-notes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shared_notes' }, onChange)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'note_members' }, onChange)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    if (!isSupabaseConfigured || typeof onChange !== 'function') return () => {};
+    realtimeListeners.add(onChange);
+    ensureRealtimeChannel();
+    return () => {
+      realtimeListeners.delete(onChange);
+      if (realtimeListeners.size || !realtimeChannel) return;
+      const channel = realtimeChannel;
+      realtimeChannel = null;
+      realtimeChannelRemoval = supabase.removeChannel(channel)
+        .catch((error) => {
+          console.warn('Failed to close shared-note subscription:', error);
+        })
+        .finally(() => {
+          realtimeChannelRemoval = null;
+          if (realtimeListeners.size) ensureRealtimeChannel();
+        });
+    };
   },
 };
