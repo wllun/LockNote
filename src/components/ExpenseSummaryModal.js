@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
@@ -42,6 +43,7 @@ const ExpenseSummaryModal = ({
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const [mode, setMode] = useState('list');
   const [categoryId, setCategoryId] = useState(null);
   const [categoryName, setCategoryName] = useState('');
@@ -76,6 +78,19 @@ const ExpenseSummaryModal = ({
     : null;
   const activeCategory = liveCategories.find(
     (category) => category.id === categoryActionId
+  );
+  const activeCategoryMatches = useMemo(
+    () => activeCategory
+      ? calculateExpenseCategory(rows, activeCategory.keywords).matches
+      : [],
+    [activeCategory, rows]
+  );
+  const transactionListMaxHeight = Math.max(
+    96,
+    Math.min(
+      420,
+      windowHeight - insets.top - Math.max(insets.bottom, 16) - 230
+    )
   );
   const isUpdating = !!categoryId || !!categoryWithSameName;
   const summaryNoteCharacterCount = String(summaryNote ?? '').length;
@@ -533,7 +548,8 @@ const ExpenseSummaryModal = ({
                   </Text>
                   <Text style={styles.categoryActionAmount}>
                     {formatExpenseMoney(activeCategory?.amount ?? 0, currency)} ·{' '}
-                    {activeCategory?.match_count ?? 0} matching
+                    {activeCategory?.match_count ?? 0}{' '}
+                    {(activeCategory?.match_count ?? 0) === 1 ? 'transaction' : 'transactions'}
                   </Text>
                 </View>
                 <Pressable
@@ -552,6 +568,28 @@ const ExpenseSummaryModal = ({
               <Pressable
                 style={({ pressed }) => [
                   styles.categoryActionItem,
+                  pressed && styles.categoryActionItemPressed,
+                ]}
+                onPress={() => setCategoryActionMode('view')}
+                accessibilityRole="button"
+                accessibilityLabel={`View transactions for ${activeCategory?.name ?? ''} category`}
+              >
+                <View style={styles.categoryActionItemIcon}>
+                  <Ionicons name="eye-outline" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.categoryActionItemText}>
+                  <Text style={styles.categoryActionItemTitle}>View transactions</Text>
+                  <Text style={styles.categoryActionItemDescription}>
+                    See all matching daily expenses
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.categoryActionItem,
+                  styles.categoryActionItemBorder,
                   pressed && styles.categoryActionItemPressed,
                 ]}
                 onPress={editActiveCategory}
@@ -593,6 +631,96 @@ const ExpenseSummaryModal = ({
                 </View>
               </Pressable>
             </>
+          ) : categoryActionMode === 'view' ? (
+            <View style={styles.categoryTransactions}>
+              <View style={styles.categoryActionHeader}>
+                <View style={styles.categoryActionHeading}>
+                  <Text style={styles.categoryActionTitle} numberOfLines={1}>
+                    {activeCategory?.name}
+                  </Text>
+                  <Text style={styles.categoryActionAmount}>
+                    {formatExpenseMoney(activeCategory?.amount ?? 0, currency)} ·{' '}
+                    {activeCategoryMatches.length}{' '}
+                    {activeCategoryMatches.length === 1 ? 'transaction' : 'transactions'}
+                  </Text>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.categoryActionClose,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={closeCategoryActions}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close related transactions"
+                >
+                  <Ionicons name="close" size={21} color={colors.textSecondary} />
+                </Pressable>
+              </View>
+
+              <View style={styles.categoryTransactionsHeading}>
+                <Text style={styles.categoryTransactionsTitle}>RELATED TRANSACTIONS</Text>
+                <Text style={styles.categoryTransactionsCount}>
+                  {activeCategoryMatches.length}{' '}
+                  {activeCategoryMatches.length === 1 ? 'transaction' : 'transactions'}
+                </Text>
+              </View>
+
+              <ScrollView
+                style={{ maxHeight: transactionListMaxHeight }}
+                contentContainerStyle={styles.categoryTransactionList}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={activeCategoryMatches.length > 4}
+              >
+                {activeCategoryMatches.length ? (
+                  activeCategoryMatches.map((row, index) => (
+                    <View
+                      key={row.id || `matching-transaction-${index}`}
+                      style={styles.categoryTransactionRow}
+                      accessible
+                      accessibilityLabel={`${row.date ? `Day ${row.date}` : 'No day'}, ${String(row.remark ?? '').trim() || 'No remark'}, ${formatExpenseMoney(row.amount, currency)}`}
+                    >
+                      <View style={styles.categoryTransactionDay}>
+                        <Text style={styles.categoryTransactionDayLabel}>DAY</Text>
+                        <Text style={styles.categoryTransactionDayValue} numberOfLines={1}>
+                          {row.date || '—'}
+                        </Text>
+                      </View>
+                      <Text style={styles.categoryTransactionRemark} numberOfLines={2}>
+                        {String(row.remark ?? '').trim() || 'No remark'}
+                      </Text>
+                      <Text style={styles.categoryTransactionAmount}>
+                        {formatExpenseMoney(row.amount, currency)}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.categoryTransactionsEmpty}>
+                    <Ionicons name="receipt-outline" size={28} color={colors.textTertiary} />
+                    <Text style={styles.categoryTransactionsEmptyTitle}>
+                      No matching transactions
+                    </Text>
+                    <Text style={styles.categoryTransactionsEmptyText}>
+                      Transactions will appear here when their remarks match this category's keywords.
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+
+              <View style={styles.categoryTransactionsFooter}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.categoryTransactionsBackButton,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => setCategoryActionMode('actions')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Back to category actions"
+                >
+                  <Ionicons name="arrow-back" size={18} color={colors.primary} />
+                  <Text style={styles.categoryTransactionsBackText}>Back to actions</Text>
+                </Pressable>
+              </View>
+            </View>
           ) : (
             <View style={styles.categoryDeleteConfirmation}>
               <View style={styles.categoryDeleteConfirmationIcon}>
@@ -727,9 +855,27 @@ const makeStyles = (colors) =>
     categoryActionItemText: { flex: 1, minWidth: 0 },
     categoryActionItemTitle: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '700' },
     categoryActionItemDescription: { marginTop: 2, color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
+    categoryActionItemBorder: { borderTopWidth: 1, borderTopColor: colors.border },
     categoryDeleteItem: { borderTopWidth: 1, borderTopColor: colors.border },
     categoryDeleteIcon: { backgroundColor: colors.dangerSoft },
     categoryDeleteText: { color: colors.danger },
+    categoryTransactions: { flexShrink: 1 },
+    categoryTransactionsHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 8 },
+    categoryTransactionsTitle: { flex: 1, color: colors.textTertiary, fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 0.8 },
+    categoryTransactionsCount: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
+    categoryTransactionList: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
+    categoryTransactionRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg },
+    categoryTransactionDay: { width: 38, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.primarySoft },
+    categoryTransactionDayLabel: { color: colors.textTertiary, fontSize: 8, lineHeight: 10, fontWeight: '800', letterSpacing: 0.5 },
+    categoryTransactionDayValue: { maxWidth: 32, marginTop: 1, color: colors.primary, fontSize: 13, lineHeight: 17, fontWeight: '800', fontVariant: ['tabular-nums'] },
+    categoryTransactionRemark: { flex: 1, minWidth: 0, color: colors.text, fontSize: 14, lineHeight: 19, fontWeight: '600' },
+    categoryTransactionAmount: { color: colors.text, fontSize: 13, lineHeight: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
+    categoryTransactionsEmpty: { alignItems: 'center', paddingHorizontal: 20, paddingVertical: 28, gap: 7, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, borderRadius: radius.md },
+    categoryTransactionsEmptyTitle: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
+    categoryTransactionsEmptyText: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+    categoryTransactionsFooter: { padding: 12, borderTopWidth: 1, borderTopColor: colors.border },
+    categoryTransactionsBackButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, backgroundColor: colors.card },
+    categoryTransactionsBackText: { color: colors.primary, fontSize: 14, lineHeight: 19, fontWeight: '800' },
     categoryDeleteConfirmation: { alignItems: 'center', padding: 24 },
     categoryDeleteConfirmationIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full, backgroundColor: colors.dangerSoft },
     categoryDeleteConfirmationTitle: { marginTop: 16, color: colors.text, fontSize: 20, lineHeight: 26, fontWeight: '800', textAlign: 'center' },
