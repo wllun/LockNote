@@ -215,7 +215,7 @@ const makeStyles = (colors) =>
     trailingGrid: {
       position: 'absolute',
       right: -4,
-      top: -4,
+      top: 0,
     },
     pinBadge: {
       width: 24,
