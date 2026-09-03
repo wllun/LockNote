@@ -556,8 +556,7 @@ const makeStyles = (colors) =>
       minWidth: 0,
     },
     gridItemUnpaired: {
-      flex: 0,
-      width: '50%',
+      maxWidth: '50%',
       paddingRight: 5,
     },
     emptyState: {
