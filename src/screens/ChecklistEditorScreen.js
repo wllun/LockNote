@@ -256,7 +256,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
-  const [saveStatus, setSaveStatus] = useState('');
+  const [saveError, setSaveError] = useState('');
   const [activeDrag, setActiveDrag] = useState(null);
   const [dragAreaBounds, setDragAreaBounds] = useState({
     x: 0,
@@ -367,7 +367,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const scheduleSave = useCallback(
     (nextTitle, nextItems) => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
-      setSaveStatus('Saving...');
+      setSaveError('');
       saveTimeout.current = setTimeout(async () => {
         saveTimeout.current = null;
         try {
@@ -375,10 +375,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
             title: nextTitle,
             content: serializeChecklistNote(nextItems),
           });
-          setSaveStatus('Saved');
+          setSaveError('');
         } catch (error) {
           console.error('Checklist auto-save failed:', error);
-          setSaveStatus('Could not save');
+          setSaveError('Could not save changes');
         }
       }, 800);
     },
@@ -989,15 +989,12 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                 style={[styles.progressFill, { width: `${progress.percent}%` }]}
               />
             </View>
-            {!!saveStatus && (
+            {!!saveError && (
               <Text
-                style={[
-                  styles.saveStatus,
-                  saveStatus === 'Could not save' && styles.saveStatusError,
-                ]}
+                style={styles.saveError}
                 accessibilityLiveRegion="polite"
               >
-                {saveStatus}
+                {saveError}
               </Text>
             )}
           </View>
@@ -1313,8 +1310,7 @@ const makeStyles = (colors) =>
     progressPercent: { color: colors.primary, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
     progressTrack: { height: 8, borderRadius: radius.full, overflow: 'hidden', backgroundColor: colors.inputBg },
     progressFill: { height: '100%', borderRadius: radius.full, backgroundColor: colors.primary },
-    saveStatus: { color: colors.textTertiary, fontSize: 12 },
-    saveStatusError: { color: colors.danger, fontWeight: '600' },
+    saveError: { color: colors.danger, fontSize: 12, fontWeight: '600' },
     itemShell: {
       position: 'relative',
       zIndex: 1,
