@@ -292,6 +292,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const saveTimeout = useRef(null);
   const loadCompletedRef = useRef(false);
   const inputRefs = useRef({});
+  const remarkLimitDialogRowsRef = useRef(new Set());
+  const commitmentNameLimitDialogShownRef = useRef(false);
   const scrollRef = useRef(null);
   const dragAreaRef = useRef(null);
   const dragAreaBoundsRef = useRef(dragAreaBounds);
@@ -351,13 +353,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const invalidAmountCount = rows.filter(
     (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
   ).length;
-  const focusedRemarkRow = rows.find(
-    (row) => focusedCell === `${row.id}:remark`
-  );
-  const focusedRemarkCharacterCount = focusedRemarkRow?.remark.length ?? 0;
-  const isFocusedRemarkNearLimit =
-    !!focusedRemarkRow &&
-    focusedRemarkCharacterCount >= EXPENSE_REMARK_MAX_CHARACTERS * 0.9;
   const deleteTargetBottom = Math.max(16, insets.bottom + 8);
   const dragPreviewWidth = Math.min(
     DRAG_PREVIEW_MAX_WIDTH,
@@ -662,16 +657,37 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const openNewCommitment = () => {
+    commitmentNameLimitDialogShownRef.current = false;
     setCommitmentDraft(createMonthlyCommitment());
   };
 
   const openCommitment = (commitment) => {
+    commitmentNameLimitDialogShownRef.current = false;
     setCommitmentDraft({ ...commitment });
   };
 
   const handleCommitmentDraftChange = (field, value) => {
+    const nextValue = field === 'remark'
+      ? String(value ?? '').slice(0, EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS)
+      : value;
+    if (field === 'remark') {
+      const limitReached = String(value ?? '').length >= EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS;
+      if (limitReached && !commitmentNameLimitDialogShownRef.current) {
+        commitmentNameLimitDialogShownRef.current = true;
+        Alert.alert(
+          'Character limit reached',
+          `A monthly bill name can contain up to ${EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS} characters. Additional typed or pasted text cannot be added.`,
+          [{ text: 'OK' }],
+          { variant: 'warning', iconName: 'text-outline' }
+        );
+      } else if (!limitReached) {
+        commitmentNameLimitDialogShownRef.current = false;
+      }
+    }
     setCommitmentDraft((current) =>
-      current ? { ...current, [field]: value } : current
+      current && current[field] !== nextValue
+        ? { ...current, [field]: nextValue }
+        : current
     );
   };
 
@@ -845,6 +861,26 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     );
     setRows(nextRows);
     updateDraft(latest.current.title, nextRows);
+  };
+
+  const handleRemarkChange = (rowId, value) => {
+    const rawValue = String(value ?? '');
+    const nextValue = rawValue.slice(0, EXPENSE_REMARK_MAX_CHARACTERS);
+    const limitReached = rawValue.length >= EXPENSE_REMARK_MAX_CHARACTERS;
+    if (limitReached && !remarkLimitDialogRowsRef.current.has(rowId)) {
+      remarkLimitDialogRowsRef.current.add(rowId);
+      Alert.alert(
+        'Character limit reached',
+        `An expense remark can contain up to ${EXPENSE_REMARK_MAX_CHARACTERS} characters. Additional typed or pasted text cannot be added.`,
+        [{ text: 'OK' }],
+        { variant: 'warning', iconName: 'text-outline' }
+      );
+    } else if (!limitReached) {
+      remarkLimitDialogRowsRef.current.delete(rowId);
+    }
+    const currentValue = latest.current.rows.find((row) => row.id === rowId)?.remark;
+    if (currentValue === nextValue) return;
+    handleRowChange(rowId, 'remark', nextValue);
   };
 
   const handleRemarkContentSizeChange = (rowId, contentHeight) => {
@@ -1861,8 +1897,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                         focusedCell === `${row.id}:remark` && styles.focusedInput,
                       ]}
                       value={row.remark}
-                      onChangeText={(value) => handleRowChange(row.id, 'remark', value)}
-                      maxLength={EXPENSE_REMARK_MAX_CHARACTERS}
+                      onChangeText={(value) => handleRemarkChange(row.id, value)}
                       placeholder={showPlaceholder ? 'Enter remark' : undefined}
                       placeholderTextColor={colors.textTertiary}
                       multiline
@@ -1953,55 +1988,28 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.expenseInputLimitRow}>
-            <Text
-              style={[
-                styles.expenseInputLimitText,
-                isFocusedRemarkNearLimit && styles.expenseInputLimitWarning,
-              ]}
-              accessibilityLiveRegion="polite"
-            >
-              {focusedRemarkRow
-                ? focusedRemarkCharacterCount >= EXPENSE_REMARK_MAX_CHARACTERS
-                  ? 'Remark character limit reached'
-                  : isFocusedRemarkNearLimit
-                    ? `${EXPENSE_REMARK_MAX_CHARACTERS - focusedRemarkCharacterCount} remark characters remaining`
-                    : `Remark limit: ${EXPENSE_REMARK_MAX_CHARACTERS} characters`
-                : `Each expense remark allows up to ${EXPENSE_REMARK_MAX_CHARACTERS} characters.`}
-            </Text>
-            {!!focusedRemarkRow && (
-              <Text
-                style={[
-                  styles.expenseInputLimitCount,
-                  isFocusedRemarkNearLimit && styles.expenseInputLimitWarning,
-                ]}
-                accessibilityLabel={`${focusedRemarkCharacterCount} of ${EXPENSE_REMARK_MAX_CHARACTERS} remark characters used`}
-              >
-                {focusedRemarkCharacterCount} / {EXPENSE_REMARK_MAX_CHARACTERS}
-              </Text>
-            )}
-          </View>
-
           <View style={styles.statusRow}>
-            <View style={styles.saveStatus}>
-              <Ionicons
-                name={
-                  saveStatus === 'Could not save'
-                    ? 'alert-circle-outline'
-                    : 'cloud-done-outline'
-                }
-                size={15}
-                color={saveStatus === 'Could not save' ? colors.danger : colors.textTertiary}
-              />
-              <Text
-                style={[
-                  styles.saveStatusText,
-                  saveStatus === 'Could not save' && { color: colors.danger },
-                ]}
-              >
-                {saveStatus || 'Changes save automatically'}
-              </Text>
-            </View>
+            {saveStatus ? (
+              <View style={styles.saveStatus}>
+                <Ionicons
+                  name={
+                    saveStatus === 'Could not save'
+                      ? 'alert-circle-outline'
+                      : 'cloud-done-outline'
+                  }
+                  size={15}
+                  color={saveStatus === 'Could not save' ? colors.danger : colors.textTertiary}
+                />
+                <Text
+                  style={[
+                    styles.saveStatusText,
+                    saveStatus === 'Could not save' && { color: colors.danger },
+                  ]}
+                >
+                  {saveStatus}
+                </Text>
+              </View>
+            ) : null}
             {invalidAmountCount > 0 && (
               <Text style={styles.validationText}>
                 Check {invalidAmountCount} amount
@@ -2289,19 +2297,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             </View>
 
             <View style={styles.commitmentForm}>
-              <View style={styles.commitmentInputLabelRow}>
-                <Text style={styles.commitmentInputLabel}>Bill name</Text>
-                <Text style={styles.commitmentInputLimit}>
-                  Maximum {EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS} characters
-                </Text>
-              </View>
+              <Text style={styles.commitmentInputLabel}>Bill name</Text>
               <TextInput
                 style={styles.commitmentInput}
                 value={commitmentDraft?.remark ?? ''}
                 onChangeText={(value) => handleCommitmentDraftChange('remark', value)}
                 placeholder="e.g. Internet subscription"
                 placeholderTextColor={colors.textTertiary}
-                maxLength={EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS}
                 autoFocus
                 returnKeyType="next"
                 accessibilityLabel="Monthly bill name"
@@ -3161,29 +3163,6 @@ const makeStyles = (colors) =>
       fontSize: 14,
       fontWeight: '800',
     },
-    expenseInputLimitRow: {
-      minHeight: 24,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      paddingHorizontal: 4,
-    },
-    expenseInputLimitText: {
-      flex: 1,
-      color: colors.textTertiary,
-      fontSize: 11,
-      lineHeight: 16,
-    },
-    expenseInputLimitCount: {
-      color: colors.textTertiary,
-      fontSize: 11,
-      fontVariant: ['tabular-nums'],
-    },
-    expenseInputLimitWarning: {
-      color: colors.danger,
-      fontWeight: '700',
-    },
     statusRow: {
       minHeight: 24,
       flexDirection: 'row',
@@ -3254,23 +3233,11 @@ const makeStyles = (colors) =>
       flex: 1,
       minWidth: 0,
     },
-    commitmentInputLabelRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-    },
     commitmentInputLabel: {
       color: colors.textSecondary,
       fontSize: 12,
       lineHeight: 18,
       fontWeight: '700',
-    },
-    commitmentInputLimit: {
-      color: colors.textTertiary,
-      fontSize: 10,
-      lineHeight: 14,
-      textAlign: 'right',
     },
     commitmentInput: {
       minHeight: 50,

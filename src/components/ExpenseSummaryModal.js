@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -53,6 +53,7 @@ const ExpenseSummaryModal = ({
   const [categoryActionId, setCategoryActionId] = useState(null);
   const [categoryActionMode, setCategoryActionMode] = useState('actions');
   const [deletingCategory, setDeletingCategory] = useState(false);
+  const summaryNoteLimitDialogShownRef = useRef(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -65,6 +66,7 @@ const ExpenseSummaryModal = ({
     setCategoryActionId(null);
     setCategoryActionMode('actions');
     setDeletingCategory(false);
+    summaryNoteLimitDialogShownRef.current = false;
   }, [visible]);
 
   const liveCategories = useMemo(
@@ -93,9 +95,23 @@ const ExpenseSummaryModal = ({
     )
   );
   const isUpdating = !!categoryId || !!categoryWithSameName;
-  const summaryNoteCharacterCount = String(summaryNote ?? '').length;
-  const isSummaryNoteNearLimit =
-    summaryNoteCharacterCount >= EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS * 0.9;
+  const handleSummaryNoteChange = (value) => {
+    const rawValue = String(value ?? '');
+    const nextValue = rawValue.slice(0, EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS);
+    const limitReached = rawValue.length >= EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS;
+    if (limitReached && !summaryNoteLimitDialogShownRef.current) {
+      summaryNoteLimitDialogShownRef.current = true;
+      Alert.alert(
+        'Character limit reached',
+        `Monthly summary notes can contain up to ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters. Additional typed or pasted text cannot be added.`,
+        [{ text: 'OK' }],
+        { variant: 'warning', iconName: 'text-outline' }
+      );
+    } else if (!limitReached) {
+      summaryNoteLimitDialogShownRef.current = false;
+    }
+    if (nextValue !== summaryNote) onNoteChange(nextValue);
+  };
 
   const startForm = (category = null) => {
     setCategoryId(category?.id ?? null);
@@ -325,12 +341,11 @@ const ExpenseSummaryModal = ({
               <TextInput
                 style={styles.notesInput}
                 value={summaryNote}
-                onChangeText={onNoteChange}
+                onChangeText={handleSummaryNoteChange}
                 placeholder="Add notes about this monthly summary..."
                 placeholderTextColor={colors.textTertiary}
                 multiline
                 textAlignVertical="top"
-                maxLength={EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS}
                 accessibilityLabel="Monthly summary notes"
                 accessibilityHint={`Maximum ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters`}
               />
@@ -354,30 +369,7 @@ const ExpenseSummaryModal = ({
                         : 'Notes saved automatically'}
                   </Text>
                 </View>
-                <Text
-                  style={[
-                    styles.notesCharacterCount,
-                    isSummaryNoteNearLimit && styles.notesCharacterCountWarning,
-                  ]}
-                  accessibilityLiveRegion="polite"
-                  accessibilityLabel={`${summaryNoteCharacterCount.toLocaleString()} of ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} summary note characters used`}
-                >
-                  {summaryNoteCharacterCount.toLocaleString()} /{' '}
-                  {EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()}
-                </Text>
               </View>
-              <Text
-                style={[
-                  styles.notesLimitMessage,
-                  isSummaryNoteNearLimit && styles.notesCharacterCountWarning,
-                ]}
-              >
-                {summaryNoteCharacterCount >= EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS
-                  ? 'Summary note character limit reached'
-                  : isSummaryNoteNearLimit
-                    ? `${(EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS - summaryNoteCharacterCount).toLocaleString()} characters remaining`
-                    : `Maximum ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters`}
-              </Text>
             </ScrollView>
           ) : (
             <ScrollView
@@ -806,12 +798,9 @@ const makeStyles = (colors) =>
     emptyText: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center' },
     notesHeading: { marginTop: 8 },
     notesInput: { minHeight: 100, color: colors.text, fontSize: 15, lineHeight: 21, padding: 13, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg, outlineStyle: 'none' },
-    notesStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: -6 },
+    notesStatus: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: -6 },
     notesSaveStatus: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     notesStatusText: { color: colors.textTertiary, fontSize: 11 },
-    notesCharacterCount: { color: colors.textTertiary, fontSize: 11, fontVariant: ['tabular-nums'] },
-    notesCharacterCountWarning: { color: colors.danger, fontWeight: '700' },
-    notesLimitMessage: { color: colors.textTertiary, fontSize: 11, lineHeight: 16, marginTop: -8, textAlign: 'right' },
     footerHint: { color: colors.textTertiary, fontSize: 12, lineHeight: 18, textAlign: 'center' },
     inputLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: '700' },
     formInput: { minHeight: 50, color: colors.text, fontSize: 16, paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg, outlineStyle: 'none' },
