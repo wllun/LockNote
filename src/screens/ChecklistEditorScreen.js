@@ -437,7 +437,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
           iconName: 'checkbox-outline',
         },
       ],
-      confirmLabel: 'Delete item',
+      confirmLabel: 'Delete',
       onConfirm: () => removeItem(itemId),
     });
   }, [removeItem]);

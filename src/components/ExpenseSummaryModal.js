@@ -349,27 +349,25 @@ const ExpenseSummaryModal = ({
                 accessibilityLabel="Monthly summary notes"
                 accessibilityHint={`Maximum ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters`}
               />
-              <View style={styles.notesStatus}>
-                <View style={styles.notesSaveStatus}>
-                  <Ionicons
-                    name={saveStatus === 'Could not save' ? 'alert-circle-outline' : 'checkmark-circle-outline'}
-                    size={15}
-                    color={saveStatus === 'Could not save' ? colors.danger : colors.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.notesStatusText,
-                      saveStatus === 'Could not save' && { color: colors.danger },
-                    ]}
-                  >
-                    {saveStatus === 'Saving...'
-                      ? 'Saving notes...'
-                      : saveStatus === 'Could not save'
-                        ? 'Could not save notes'
-                        : 'Notes saved automatically'}
-                  </Text>
+              {saveStatus === 'Saving...' || saveStatus === 'Could not save' ? (
+                <View style={styles.notesStatus}>
+                  <View style={styles.notesSaveStatus}>
+                    <Ionicons
+                      name={saveStatus === 'Could not save' ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+                      size={15}
+                      color={saveStatus === 'Could not save' ? colors.danger : colors.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.notesStatusText,
+                        saveStatus === 'Could not save' && { color: colors.danger },
+                      ]}
+                    >
+                      {saveStatus === 'Saving...' ? 'Saving notes...' : 'Could not save notes'}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              ) : null}
             </ScrollView>
           ) : (
             <ScrollView
@@ -455,7 +453,7 @@ const ExpenseSummaryModal = ({
                     {formatExpenseMoney(formCalculation.amount, currency)}
                   </Text>
                   <Text style={styles.calculatedAmountMeta}>
-                    {formCalculation.matchCount} matching {formCalculation.matchCount === 1 ? 'entry' : 'entries'} · Updates automatically
+                    {formCalculation.matchCount} matching {formCalculation.matchCount === 1 ? 'entry' : 'entries'}
                   </Text>
                 </View>
                 <View style={styles.autoBadge}>
@@ -571,9 +569,6 @@ const ExpenseSummaryModal = ({
                 </View>
                 <View style={styles.categoryActionItemText}>
                   <Text style={styles.categoryActionItemTitle}>View transactions</Text>
-                  <Text style={styles.categoryActionItemDescription}>
-                    See all matching daily expenses
-                  </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
               </Pressable>
@@ -593,9 +588,6 @@ const ExpenseSummaryModal = ({
                 </View>
                 <View style={styles.categoryActionItemText}>
                   <Text style={styles.categoryActionItemTitle}>Edit category</Text>
-                  <Text style={styles.categoryActionItemDescription}>
-                    Change its name or matching keywords
-                  </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
               </Pressable>
@@ -616,9 +608,6 @@ const ExpenseSummaryModal = ({
                 <View style={styles.categoryActionItemText}>
                   <Text style={[styles.categoryActionItemTitle, styles.categoryDeleteText]}>
                     Delete category
-                  </Text>
-                  <Text style={styles.categoryActionItemDescription}>
-                    Daily expense rows will stay unchanged
                   </Text>
                 </View>
               </Pressable>
@@ -647,14 +636,6 @@ const ExpenseSummaryModal = ({
                 >
                   <Ionicons name="close" size={21} color={colors.textSecondary} />
                 </Pressable>
-              </View>
-
-              <View style={styles.categoryTransactionsHeading}>
-                <Text style={styles.categoryTransactionsTitle}>RELATED TRANSACTIONS</Text>
-                <Text style={styles.categoryTransactionsCount}>
-                  {activeCategoryMatches.length}{' '}
-                  {activeCategoryMatches.length === 1 ? 'transaction' : 'transactions'}
-                </Text>
               </View>
 
               <ScrollView
@@ -838,21 +819,17 @@ const makeStyles = (colors) =>
     categoryActionTitle: { color: colors.text, fontSize: 18, lineHeight: 23, fontWeight: '800' },
     categoryActionAmount: { marginTop: 2, color: colors.textSecondary, fontSize: 12, lineHeight: 17, fontVariant: ['tabular-nums'] },
     categoryActionClose: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full },
-    categoryActionItem: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, backgroundColor: colors.card },
+    categoryActionItem: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, backgroundColor: colors.card },
     categoryActionItemPressed: { backgroundColor: colors.inputBg },
     categoryActionItemIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.primarySoft },
     categoryActionItemText: { flex: 1, minWidth: 0 },
     categoryActionItemTitle: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '700' },
-    categoryActionItemDescription: { marginTop: 2, color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
     categoryActionItemBorder: { borderTopWidth: 1, borderTopColor: colors.border },
     categoryDeleteItem: { borderTopWidth: 1, borderTopColor: colors.border },
     categoryDeleteIcon: { backgroundColor: colors.dangerSoft },
     categoryDeleteText: { color: colors.danger },
     categoryTransactions: { flexShrink: 1 },
-    categoryTransactionsHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 8 },
-    categoryTransactionsTitle: { flex: 1, color: colors.textTertiary, fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 0.8 },
-    categoryTransactionsCount: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
-    categoryTransactionList: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
+    categoryTransactionList: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 8 },
     categoryTransactionRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg },
     categoryTransactionDay: { width: 38, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.primarySoft },
     categoryTransactionDayLabel: { color: colors.textTertiary, fontSize: 8, lineHeight: 10, fontWeight: '800', letterSpacing: 0.5 },

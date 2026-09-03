@@ -833,7 +833,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           value: item.isPaid ? 'Paid' : 'Not paid',
         },
       ],
-      confirmLabel: 'Delete bill',
+      confirmLabel: 'Delete',
     });
   };
 
@@ -926,7 +926,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     setPendingDeletion({
       kind: 'row',
       itemId: rowId,
-      title: `Delete expense row ${rowIndex + 1}?`,
+      title: 'Delete daily expense?',
       details: [
         { label: 'Day', value: row.date.trim() || 'Not entered' },
         {
@@ -942,7 +942,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               : formatExpenseMoney(amount, currency),
         },
       ],
-      confirmLabel: 'Delete row',
+      confirmLabel: 'Delete',
     });
   };
 
@@ -2371,7 +2371,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 accessibilityLabel="Save monthly bill"
               >
                 <Text style={[styles.modalButtonText, styles.setButtonText]}>
-                  Save bill
+                  Save
                 </Text>
               </TouchableOpacity>
             </View>
