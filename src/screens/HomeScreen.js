@@ -973,6 +973,8 @@ const makeStyles = (colors) =>
       alignItems: 'center',
     },
     viewButtonSelected: {
+      borderRadius: 8,
+      overflow: 'hidden',
       borderWidth: 1,
       borderColor: colors.primary,
       backgroundColor: colors.primarySoft,
