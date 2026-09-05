@@ -21,18 +21,26 @@ function AppRoot() {
   const appUpdate = useAppUpdate();
 
   useEffect(() => {
+    let mounted = true;
     initDB()
-      .then(async () => {
-        try {
-          await trashService.purgeExpired();
-        } catch (error) {
-          console.warn('Failed to clean expired trash:', error);
-        }
+      .then(() => {
+        if (!mounted) return;
         setReady(true);
+
+        // Trash retention is maintenance work, not a prerequisite for reading
+        // active notes. Run it after the navigator can render so a large Trash
+        // collection cannot delay every cold start.
+        trashService.purgeExpired().catch((error) => {
+          console.warn('Failed to clean expired trash:', error);
+        });
       })
       .catch((err) => {
         console.error('Failed to initialize database:', err);
       });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (!ready || !appUpdate.checked) {

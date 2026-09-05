@@ -76,6 +76,23 @@ const evaluateCachedConfig = async (platform, currentBuildVersion) => {
   });
 };
 
+// Startup only needs the local policy decision. The network refresh can then
+// run in the background without holding the user's offline notes behind a
+// potentially slow request.
+export const checkCachedAppUpdate = async () => {
+  const platform = Platform.OS;
+  if (!SUPPORTED_PLATFORMS.has(platform)) {
+    return unsupportedResult('unsupported-platform');
+  }
+  if (Constants.executionEnvironment === 'storeClient') {
+    return unsupportedResult('expo-go');
+  }
+
+  const currentBuildVersion = Application.nativeBuildVersion;
+  if (!currentBuildVersion) return unsupportedResult('unknown-build');
+  return evaluateCachedConfig(platform, currentBuildVersion);
+};
+
 export const checkForAppUpdate = async () => {
   const platform = Platform.OS;
   if (!SUPPORTED_PLATFORMS.has(platform)) {

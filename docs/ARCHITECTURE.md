@@ -28,15 +28,19 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 2. `App.js` calls `initDB()`:
    - **native** — opens `locknote.db`, sets WAL + foreign keys, creates `folders`/`notes` tables and indexes if absent
    - **web** — no-op (AsyncStorage is schemaless)
-3. Runs best-effort Trash cleanup for soft-deleted records that reached 30 days.
-4. Once ready, renders `AppNavigator`; a spinner shows until then.
+3. Once the database is ready, renders `AppNavigator`; a spinner shows only
+   while the local database is opening.
+4. Runs best-effort Trash cleanup for soft-deleted records that reached 30 days
+   in the background after navigation is available.
 
-In parallel with local database startup, Android and iOS builds perform a
-best-effort public Supabase read of their platform row in `app_update_config`.
-A valid forced minimum build shows `AppUpdateGate` before navigation. Policies
-are cached separately per platform for up to 72 hours; missing configuration,
-Expo Go, web, and expired offline cache entries fail open so a backend outage
-does not permanently block access to locally stored notes.
+In parallel with local database startup, Android and iOS builds first evaluate
+their cached `app_update_config` policy, then refresh the platform row from
+Supabase in the background. A valid cached forced minimum build shows
+`AppUpdateGate` before navigation; a newly fetched forced minimum replaces the
+navigator with that gate as soon as it arrives. Policies are cached separately
+per platform for up to 72 hours; missing configuration, Expo Go, web, and
+expired offline cache entries fail open so network latency or a backend outage
+does not block access to locally stored notes.
 
 ## Navigation
 

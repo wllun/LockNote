@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { checkForAppUpdate } from '../services/app-update-service';
+import {
+  checkCachedAppUpdate,
+  checkForAppUpdate,
+} from '../services/app-update-service';
 
 const FOREGROUND_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 const initialState = {
@@ -54,7 +57,30 @@ export const useAppUpdate = () => {
 
   useEffect(() => {
     mountedRef.current = true;
-    refresh({ force: true });
+    const initialize = async () => {
+      try {
+        const cachedResult = await checkCachedAppUpdate();
+        if (mountedRef.current) {
+          setState({ ...cachedResult, checking: true });
+        }
+      } catch {
+        if (mountedRef.current) {
+          setState({
+            checked: true,
+            checking: true,
+            supported: false,
+            required: false,
+            updateAvailable: false,
+            reason: 'unavailable',
+          });
+        }
+      }
+
+      // Refresh the policy after the cached decision has allowed startup.
+      // A newly required update still replaces the navigator with the gate.
+      await refresh({ force: true });
+    };
+    initialize();
 
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') refresh();
