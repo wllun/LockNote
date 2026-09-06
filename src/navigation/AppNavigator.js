@@ -18,6 +18,7 @@ import ReminderEditorScreen from '../screens/ReminderEditorScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProfileTabScreen from '../screens/ProfileTabScreen';
 import SharedScreen from '../screens/SharedScreen';
+import PremiumScreen from '../screens/PremiumScreen';
 import TrashScreen from '../screens/TrashScreen';
 import ArchiveScreen from '../screens/ArchiveScreen';
 import PasswordModal from '../components/PasswordModal';
@@ -111,6 +112,16 @@ const SharedStack = ({ screenOptions }) => (
     <Stack.Screen name="ChecklistEditor" component={ChecklistEditorScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ExpenseRecordEditor" component={ExpenseRecordEditorScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ headerShown: false }} />
+  </Stack.Navigator>
+);
+
+const PremiumStack = ({ screenOptions }) => (
+  <Stack.Navigator screenOptions={screenOptions}>
+    <Stack.Screen
+      name="PremiumMain"
+      component={PremiumScreen}
+      options={{ title: 'Premium' }}
+    />
   </Stack.Navigator>
 );
 
@@ -241,6 +252,8 @@ const AppNavigator = () => {
                 iconName = focused ? 'settings' : 'settings-outline';
               } else if (route.name === 'Shared') {
                 iconName = focused ? 'people' : 'people-outline';
+              } else if (route.name === 'Premium') {
+                iconName = focused ? 'diamond' : 'diamond-outline';
               } else if (route.name === 'Profile') {
                 iconName = focused ? 'person-circle' : 'person-circle-outline';
               }
@@ -261,6 +274,9 @@ const AppNavigator = () => {
           </Tab.Screen>
           <Tab.Screen name="Shared">
             {() => <SharedStack screenOptions={stackScreenOptions} />}
+          </Tab.Screen>
+          <Tab.Screen name="Premium">
+            {() => <PremiumStack screenOptions={stackScreenOptions} />}
           </Tab.Screen>
           <Tab.Screen name="Settings">
             {() => <SettingsStack screenOptions={stackScreenOptions} />}

@@ -44,11 +44,12 @@ does not block access to locally stored notes.
 
 ## Navigation
 
-`AppNavigator` = bottom tab navigator with four tabs:
+`AppNavigator` = bottom tab navigator with five tabs:
 
 - **Home** (native stack): `HomeScreen` → `FolderScreen` → the note-type editor (`NoteEditorScreen`, `ChecklistEditorScreen`, `ExpenseRecordEditorScreen`, or `ReminderEditorScreen`)
-- **Settings** (native stack): `SettingsScreen` → `ArchiveScreen` / `TrashScreen`; Archive can open an archived `FolderScreen` or any note-type editor
 - **Shared** (native stack): `SharedScreen` → a shared note-type editor
+- **Premium** (native stack): `PremiumScreen`, a read-only preview of the proposed Free, Premium 1, and Premium 2 tiers. Billing and entitlement are not connected yet.
+- **Settings** (native stack): `SettingsScreen` → `ArchiveScreen` / `TrashScreen`; Archive can open an archived `FolderScreen` or any note-type editor
 - **Profile** (native stack): `ProfileTabScreen` → `AuthScreen` (logged out) or `ProfileScreen` (logged in), switched via `useAuth()`
 
 Screens reload their data on the navigation `focus` event (listener registered in `useEffect`, cleaned up on unmount) rather than holding shared state — so returning from the editor reflects edits without a store.

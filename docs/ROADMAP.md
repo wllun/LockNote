@@ -24,6 +24,7 @@ This file describes the product direction and major delivery phases. For detaile
   - Brand the signup-confirmation, account-password recovery, LockNote-password recovery, and email-change templates while preserving variables such as `{{ .ConfirmationURL }}`.
 - [ ] Test the Android and iOS forced-update policies with older store builds before relying on them for a public rollout.
 - [ ] Decide the final free/Cloud/Pro feature boundaries and implement subscription entitlement before charging users.
+- [X] Add a Premium tab that previews the proposed plan prices and feature groups without activating billing or feature restrictions.
 
 ## Phase 1 — Offline core (free) — shipped
 
