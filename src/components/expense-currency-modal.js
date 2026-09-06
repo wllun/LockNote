@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -83,6 +84,7 @@ const ExpenseCurrencyModal = ({
       <View
         style={[
           styles.overlay,
+          Platform.OS === 'web' ? styles.overlayWeb : styles.overlayPhone,
           {
             paddingTop: Math.max(12, insets.top + 8),
             paddingBottom: Math.max(12, insets.bottom + 8),
@@ -94,7 +96,13 @@ const ExpenseCurrencyModal = ({
           onPress={onClose}
           accessible={false}
         />
-        <View style={styles.sheet} accessibilityViewIsModal>
+        <View
+          style={[
+            styles.sheet,
+            Platform.OS === 'web' ? styles.sheetWeb : styles.sheetPhone,
+          ]}
+          accessibilityViewIsModal
+        >
           <View style={styles.header}>
             <View style={styles.headerCopy}>
               <Text style={styles.title} accessibilityRole="header">
@@ -174,22 +182,35 @@ const makeStyles = (colors) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      paddingHorizontal: 12,
+      paddingHorizontal: 16,
       backgroundColor: colors.backdrop,
+    },
+    overlayPhone: {
+      justifyContent: 'flex-end',
+    },
+    overlayWeb: {
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     sheet: {
       width: '100%',
-      maxWidth: 480,
-      height: '82%',
-      maxHeight: 720,
       overflow: 'hidden',
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: radius.lg,
       ...shadow.card,
+    },
+    sheetPhone: {
+      maxWidth: 480,
+      height: '82%',
+      maxHeight: 720,
+      alignSelf: 'center',
+    },
+    sheetWeb: {
+      maxWidth: 480,
+      height: '72%',
+      maxHeight: 680,
     },
     header: {
       flexDirection: 'row',

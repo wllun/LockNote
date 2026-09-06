@@ -516,7 +516,7 @@ const SettingsScreen = ({ navigation }) => {
         value={expenseCurrency}
         onSelect={handleExpenseCurrencySelect}
         onClose={() => setShowExpenseCurrencyModal(false)}
-        description="Choose the default used when creating a new expense note."
+        description="This currency is used for expense records."
       />
     </ScrollView>
   );
