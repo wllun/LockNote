@@ -8,7 +8,11 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { FREE_FEATURES, PREMIUM_PLANS } from '../config/premiumPlans';
+import {
+  EXPIRED_PLAN_BEHAVIOR,
+  FREE_FEATURES,
+  PREMIUM_PLANS,
+} from '../config/premiumPlans';
 import { radius, shadow, useTheme } from '../theme';
 import { AppAlert as Alert } from '../utils/app-alert';
 
@@ -39,7 +43,7 @@ const PremiumScreen = () => {
           <Text style={styles.eyebrow}>LOCKNOTE PREMIUM</Text>
           <Text style={styles.heroTitle}>Choose what fits you</Text>
           <Text style={styles.heroText}>
-            Compare the planned tiers while LockNote prepares subscriptions.
+            Your notes stay yours. Premium plans add cloud services and storage.
           </Text>
           <View style={styles.previewNotice}>
             <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
@@ -54,7 +58,7 @@ const PremiumScreen = () => {
           </View>
           <View style={styles.currentCopy}>
             <Text style={styles.currentTitle}>Free</Text>
-            <Text style={styles.currentText}>Core offline features · RM 0</Text>
+            <Text style={styles.currentText}>Offline features, account access and backup · RM 0</Text>
           </View>
           <View style={styles.currentBadge}>
             <Text style={styles.currentBadgeText}>Current</Text>
@@ -103,13 +107,13 @@ const PremiumScreen = () => {
                 onPress={() => showComingSoon(`${plan.name} upgrades`)}
                 style={({ pressed }) => [
                   styles.planButton,
-                  plan.id === 'premium-1' ? styles.planButtonPrimary : styles.planButtonSecondary,
+                  plan.id === 'plus' ? styles.planButtonPrimary : styles.planButtonSecondary,
                   pressed && styles.pressed,
                 ]}
               >
                 <Text
                   style={
-                    plan.id === 'premium-1'
+                    plan.id === 'plus'
                       ? styles.planButtonPrimaryText
                       : styles.planButtonSecondaryText
                   }
@@ -131,6 +135,29 @@ const PremiumScreen = () => {
               <Text style={styles.featureText}>{feature}</Text>
             </View>
           ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>IF YOUR PLAN ENDS</Text>
+        <View style={styles.expiryCard}>
+          <View style={styles.expiryHeadingRow}>
+            <View style={styles.expiryIcon}>
+              <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
+            </View>
+            <View style={styles.expiryHeadingCopy}>
+              <Text style={styles.expiryTitle}>Your notes are not deleted</Text>
+              <Text style={styles.expiryText}>
+                Your account returns to Free after the paid period ends.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.expiryList}>
+            {EXPIRED_PLAN_BEHAVIOR.map((item) => (
+              <View key={item} style={styles.expiryRow}>
+                <Ionicons name="checkmark-circle-outline" size={19} color={colors.primary} />
+                <Text style={styles.expiryItemText}>{item}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         <View style={styles.subscriptionActions}>
@@ -441,6 +468,61 @@ const makeStyles = (colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
+  },
+  expiryCard: {
+    padding: 18,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  expiryHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  expiryIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.full,
+    backgroundColor: colors.primarySoft,
+    marginRight: 12,
+  },
+  expiryHeadingCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  expiryTitle: {
+    color: colors.text,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '800',
+  },
+  expiryText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 2,
+  },
+  expiryList: {
+    gap: 10,
+    paddingTop: 16,
+    marginTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  expiryRow: {
+    minHeight: 24,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+  },
+  expiryItemText: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
   },
   subscriptionActions: {
     overflow: 'hidden',

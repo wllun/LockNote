@@ -48,11 +48,27 @@ does not block access to locally stored notes.
 
 - **Home** (native stack): `HomeScreen` → `FolderScreen` → the note-type editor (`NoteEditorScreen`, `ChecklistEditorScreen`, `ExpenseRecordEditorScreen`, or `ReminderEditorScreen`)
 - **Shared** (native stack): `SharedScreen` → a shared note-type editor
-- **Premium** (native stack): `PremiumScreen`, a read-only preview of the proposed Free, Premium 1, and Premium 2 tiers. Billing and entitlement are not connected yet.
+- **Premium** (native stack): `PremiumScreen`, a read-only preview of the proposed Free, LockNote Plus, and LockNote Pro tiers. Billing and entitlement are not connected yet.
 - **Settings** (native stack): `SettingsScreen` → `ArchiveScreen` / `TrashScreen`; Archive can open an archived `FolderScreen` or any note-type editor
 - **Profile** (native stack): `ProfileTabScreen` → `AuthScreen` (logged out) or `ProfileScreen` (logged in), switched via `useAuth()`
 
 Screens reload their data on the navigation `focus` event (listener registered in `useEffect`, cleaned up on unmount) rather than holding shared state — so returning from the editor reflects edits without a store.
+
+### Planned subscription boundaries
+
+The Premium module is currently a product-policy preview; it does not enforce an
+entitlement. Account login, local portable backup, and one-way recovery of
+existing cloud data are planned Free capabilities. LockNote Plus adds active
+cloud note sync, multi-device use, and owner-funded collaboration with a 100 MB
+cloud note quota. LockNote Pro adds planned media features with a 2 GB cloud
+attachment quota.
+
+Expiry must downgrade the account to Free without deleting local or cloud note
+data. Local editing continues, while new cloud writes, two-way sync, and
+owner-funded collaboration pause. Existing cloud data remains read-only and
+downloadable, and resubscribing resumes cloud features after safe conflict
+reconciliation. Invited collaborators need a Free account, not their own paid
+plan. See [Subscription Plans](SUBSCRIPTION_PLANS.md) for the complete policy.
 
 Home has independent view preferences for its two content sections: folders can
 use a vertical list or horizontal icon strip, while notes can use a list or
@@ -258,6 +274,11 @@ stored per account in AsyncStorage.
 LockNote does not end-to-end encrypt note content before upload. Password fields
 remain SHA-256 access-gate hashes; they are never uploaded as plaintext.
 
+The current sync implementation does not yet check subscription entitlement or
+the planned 100 MB cloud-note quota. Those checks must be server-authoritative;
+an expired or over-quota account must retain one-way recovery access while new
+cloud writes are rejected.
+
 ## Portable backup and restore
 
 Settings → Export Backup builds a schema-versioned `locknote-backup` JSON file
@@ -282,6 +303,10 @@ Imported owned collaborative notes become private local notes to avoid retaining
 stale account or cloud identifiers.
 
 Backup JSON contains plaintext note content and is not encrypted.
+
+Portable backup import and export is a Free, device-local feature. Backup files
+selected by the user are not uploaded to LockNote and do not consume a cloud
+storage quota.
 
 ## Shared-note collaboration
 

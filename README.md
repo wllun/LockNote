@@ -38,13 +38,24 @@ Local storage is the primary data source:
 
 Signed-in users can run **Profile → Sync Notes** to merge folders and notes with
 their owner-scoped Supabase snapshot. Sync is manual; normal editing remains
-offline-first.
+offline-first. Sync is currently ungated while subscription enforcement is being
+designed; it is targeted for LockNote Plus and Pro.
 
 Every user can use **Settings → Export Backup** without an account, then import
 that versioned JSON file on iOS, Android, or web. Import previews the contents
 and requires choosing Merge or Replace. Replace affects private data only and
 keeps Shared-with-me notes. Reminder registrations remain device-local and are
 disabled on restore.
+
+## Planned subscriptions
+
+Account login, offline features, PDF/image export, and portable local backup
+remain Free. LockNote Plus is planned to add cloud sync and collaboration with a
+100 MB cloud-note quota. LockNote Pro adds planned image features with a 2 GB
+cloud-attachment quota. If a paid plan expires, local notes remain editable and
+existing cloud data remains read-only and downloadable; expiry never deletes
+notes. Billing and entitlement enforcement are not implemented yet. See
+[Subscription Plans](docs/SUBSCRIPTION_PLANS.md) for the complete policy.
 
 ## Security
 

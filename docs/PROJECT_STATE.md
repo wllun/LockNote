@@ -47,13 +47,13 @@ _Snapshot: 2026-08-31. Check off items as they land._
   - Add the SPF and DKIM DNS records supplied by the SMTP provider. Add DMARC when the sending domain is ready for production.
   - In Supabase Dashboard, customize the Confirm signup, account-password recovery, LockNote-password recovery, and email-change templates so their subjects and content say LockNote. Preserve Supabase template variables such as `{{ .ConfirmationURL }}` so existing deep-link callbacks continue to work.
   - Custom SMTP controls the sender name, sender address, and delivery provider; Email Templates control the subject and message design. A custom SMTP provider may be required before Supabase permits fully customized templates.
-- [X] Sync Notes — manual two-way folder/note sync through the authenticated `sync_private_data` RPC, with RLS, last-write-wins timestamps, soft-delete tombstones, native/web repository parity, and per-account last-sync status. The migration still requires deployment and live multi-device verification; premium gating is not implemented.
+- [X] Sync Notes — manual two-way folder/note sync through the authenticated `sync_private_data` RPC, with RLS, last-write-wins timestamps, soft-delete tombstones, native/web repository parity, and per-account last-sync status. The migration still requires deployment and live multi-device verification. This is targeted for LockNote Plus with a 100 MB cloud-note quota, but premium gating and quota enforcement are not implemented.
 - [ ] Automatic/background sync — serialize with manual sync and the editors' pending 800 ms saves; trigger a foreground sync after session restoration, app launch/resume, and connectivity recovery, then add best-effort OS background execution where supported. Queue retries while offline, avoid duplicate concurrent runs, surface the last successful sync/error, and never let a stale cloud snapshot overwrite a newer local edit.
-- [X] Collaboration Release 1 — explicit per-note sharing by registered account email, per-recipient Can edit/View only access, Shared tab/local cache, owner share indicators, collaborator management, realtime refresh, last-editor footer, RLS, and revision-protected saves. View-only access is enforced in every editor and by the Supabase save RPC. Backend migration/function deployment and live two-account verification still require configured Supabase credentials.
+- [X] Collaboration Release 1 — explicit per-note sharing by registered account email, per-recipient Can edit/View only access, Shared tab/local cache, owner share indicators, collaborator management, realtime refresh, last-editor footer, RLS, and revision-protected saves. View-only access is enforced in every editor and by the Supabase save RPC. Backend migration/function deployment and live two-account verification still require configured Supabase credentials. The planned policy requires Plus or Pro for the owner while invited collaborators only need a Free account; this entitlement is not enforced yet.
 - Private note content stays local unless the signed-in owner explicitly runs Sync Notes. LockNote does not end-to-end encrypt content before upload.
 
 ### Possible features
-- [X] Premium module shell — a third bottom tab previews the proposed Free, Premium 1 (RM4.90/month), and Premium 2 (RM9.99/month) plans, shows Free as the current plan, and exposes non-transactional upgrade/restore/manage placeholders. Billing, entitlement persistence, and feature gating remain unimplemented.
+- [X] Premium module shell — a third bottom tab previews Free, LockNote Plus (RM4.90/month), and LockNote Pro (RM9.99/month), including the 100 MB note quota, 2 GB attachment quota, free local backup/account access, and non-destructive expiry behavior. It shows Free as the current plan and exposes non-transactional upgrade/restore/manage placeholders. Billing, entitlement persistence, quota enforcement, and feature gating remain unimplemented. See [Subscription Plans](SUBSCRIPTION_PLANS.md).
 - [X] Dark mode — palette centralized in `src/theme.js` (`useTheme()` + `makeStyles(colors)`). Theme mode (`system` / `light` / `dark`) is set in Settings, persisted in AsyncStorage (`@locknote_theme`), shared via `ThemeProvider` context; `system` follows the OS via `useColorScheme`. `userInterfaceStyle` is `automatic`.
 - [X] Shared LockNote password and email recovery — every locked note uses one local LockNote password, separate from the Supabase account password even if the user chooses the same text. Settings supports Old/New/Confirm password changes. Forgot Password sends a one-time Supabase email link to the account identity safely bound when the LockNote password is set or changed; the callback can replace the hash on all locked notes. The former app-wide Recovery PIN is removed because someone holding an unlocked device could set it themselves. Legacy per-note passwords remain usable and migrate after successful verification.
 - [X] Cross-platform data portability — manual Sync Notes merges native SQLite and web AsyncStorage data through Supabase, while Settings can export/import a backend-independent LockNote JSON backup.
@@ -72,17 +72,17 @@ _Snapshot: 2026-08-31. Check off items as they land._
 - [X] Set password (one shared password for note locks; individual folder passwords)
 - [X] Theme mode (light/dark, plus system)
 
-### Phase 2 — Cloud — premium, RM4.90/month
+### Phase 2 — LockNote Plus — proposed RM4.90/month
 
-- [X] Login — Profile tab with real Supabase Auth (email/password sign up + sign in, session persisted via AsyncStorage). No premium gating yet — anyone can create an account.
-- [X] Sync DB — Profile screen pushes and pulls private/owned notes and folders through an account-scoped Supabase RPC. Deletions and root-note semantics are preserved.
+- [X] Login — Profile tab with real Supabase Auth (email/password sign up + sign in, session persisted via AsyncStorage). Account login remains Free.
+- [X] Sync DB — Profile screen pushes and pulls private/owned notes and folders through an account-scoped Supabase RPC. Deletions and root-note semantics are preserved. This is planned as a Plus/Pro feature with a 100 MB note-data quota; enforcement is not implemented.
 - [X] Multi-device login — after signing in, running Sync Notes merges that device with the account snapshot. Automatic background sync is not implemented.
 - [ ] Automatic/background sync — add lifecycle/network-triggered foreground sync first, followed by best-effort platform background execution with safe retry and conflict handling.
-- [X] Searchable — already shipped free in Phase 1 (Home search bar); decide whether to keep it free or gate it behind Phase 2
+- [X] Searchable — remains a Free offline feature.
 
-### Phase 3 — Attachments — premium pro, RM9.99/month
+### Phase 3 — LockNote Pro attachments — proposed RM9.99/month
 
-- [ ] Image attachment
+- [ ] Image attachments and custom note backgrounds, with a planned 2 GB cloud attachment quota and a 10 MB target maximum per uploaded image.
 
 ### Phase 4 — Export
 

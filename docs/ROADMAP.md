@@ -8,7 +8,9 @@ This file describes the product direction and major delivery phases. For detaile
 
 - LockNote remains offline-first: local storage is authoritative while editing, and core note features work without an account.
 - Cloud features are opt-in. Private data is uploaded only when a signed-in user runs Sync Notes; shared notes use the collaboration backend.
-- The proposed RM4.90/month Cloud and RM9.99/month Pro prices are planning targets, not active subscriptions. Premium entitlement, billing, and final tier boundaries are not implemented.
+- Account login, local portable backup, and recovery downloads remain Free. LockNote Plus targets active cloud sync and collaboration with 100 MB of cloud note storage; LockNote Pro adds planned media features with 2 GB of cloud attachment storage.
+- The proposed RM4.90/month LockNote Plus and RM9.99/month LockNote Pro prices are planning targets, not active subscriptions. Premium entitlement, billing, quota enforcement, and downgrade handling are not implemented.
+- Subscription expiry must not delete notes. Local editing continues while cloud writes pause and existing cloud data remains read-only and downloadable.
 - Password protection is an access gate, not encryption. Local and synchronized note content is not end-to-end encrypted.
 
 ## Current priority — production readiness
@@ -23,7 +25,8 @@ This file describes the product direction and major delivery phases. For detaile
   - Configure SPF and DKIM, then add DMARC for production.
   - Brand the signup-confirmation, account-password recovery, LockNote-password recovery, and email-change templates while preserving variables such as `{{ .ConfirmationURL }}`.
 - [ ] Test the Android and iOS forced-update policies with older store builds before relying on them for a public rollout.
-- [ ] Decide the final free/Cloud/Pro feature boundaries and implement subscription entitlement before charging users.
+- [X] Define the planned Free, LockNote Plus, and LockNote Pro boundaries and non-destructive expiry policy in [Subscription Plans](SUBSCRIPTION_PLANS.md).
+- [ ] Implement server-verified subscription entitlement, quota enforcement, and downgrade/recovery behavior before charging users.
 - [X] Add a Premium tab that previews the proposed plan prices and feature groups without activating billing or feature restrictions.
 
 ## Phase 1 — Offline core (free) — shipped
@@ -37,8 +40,9 @@ This file describes the product direction and major delivery phases. For detaile
 - [X] Independent Folder List/Strip and Note List/Grid controls.
 - [X] Context actions through long press on native and three-dot menus on web.
 - [X] Portable JSON backup export and validated Merge/Replace restore.
+- [X] Account registration, login, and recovery access remain Free.
 
-## Phase 2 — Accounts, cloud sync, and collaboration — implemented; validation remains
+## Phase 2 — Accounts, cloud sync, and collaboration — implemented; LockNote Plus target
 
 ### Implemented
 
@@ -56,13 +60,13 @@ This file describes the product direction and major delivery phases. For detaile
 - [ ] Add queued offline retries and serialize automatic sync with manual sync and pending editor saves.
 - [ ] Add best-effort OS background sync only after foreground synchronization is reliable.
 - [ ] Show clear last-success and retry/error state for automatic synchronization.
-- [ ] Implement and validate premium entitlement if Cloud remains a paid tier at the proposed RM4.90/month price.
+- [ ] Implement and validate LockNote Plus entitlement, the 100 MB note quota, read-only expiry recovery, and owner-funded collaboration.
 
-## Phase 3 — Attachments (pro) — planned
+## Phase 3 — Attachments — planned for LockNote Pro
 
 - [ ] Add image attachments to notes.
-- [ ] Define local storage limits, backup behavior, cloud-sync behavior, deletion cleanup, and collaboration behavior before implementation.
-- [ ] Decide whether attachments require the proposed RM9.99/month Pro tier and implement entitlement accordingly.
+- [X] Define the initial target as a 2 GB cloud attachment quota with a 10 MB maximum per uploaded image; local backup remains separate and Free.
+- [ ] Implement attachment storage, compression, backup behavior, deletion cleanup, collaboration behavior, and LockNote Pro entitlement.
 
 ## Phase 4 — Export and portability — shipped
 
@@ -96,7 +100,6 @@ See [NOTE_LIMITS.md](NOTE_LIMITS.md) for text limits and [MONTHLY_EXPENSE_CHECKL
 
 ## Explicitly unresolved product decisions
 
-- Whether Cloud sync and collaboration are both included in one paid tier.
-- Whether search, pinning, archive, Trash, colors, view controls, exports, and backups remain free. They are currently implemented without premium gating.
-- Whether attachment storage is local-only or synchronized through a paid storage service.
-- Final subscription prices, billing provider, trial policy, restore-purchases behavior, and account-deletion flow.
+- Final subscription prices, billing provider, trial policy, and store product identifiers.
+- Exact server schema and enforcement path for entitlements, quota usage, billing grace periods, and read-only recovery.
+- Restore-purchases behavior and the account-deletion flow.
