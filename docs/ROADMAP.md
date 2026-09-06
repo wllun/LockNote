@@ -25,9 +25,9 @@ This file describes the product direction and major delivery phases. For detaile
   - Configure SPF and DKIM, then add DMARC for production.
   - Brand the signup-confirmation, account-password recovery, LockNote-password recovery, and email-change templates while preserving variables such as `{{ .ConfirmationURL }}`.
 - [ ] Test the Android and iOS forced-update policies with older store builds before relying on them for a public rollout.
-- [X] Define the planned Free, LockNote Plus, and LockNote Pro boundaries and non-destructive expiry policy in [Subscription Plans](SUBSCRIPTION_PLANS.md).
+- [X] Define the planned Free, LockNote Plus, and LockNote Pro boundaries and non-destructive expiry policy in [Subscription Plans](decisions/SUBSCRIPTION_PLANS.md).
 - [X] Implement the client payment lifecycle: identified checkout, verified RevenueCat entitlement status, restore purchases, subscription management, foreground refresh, and localized pricing.
-- [ ] Configure and validate RevenueCat plus Apple/Google/web products by following [Subscription Payment Setup](SUBSCRIPTION_SETUP.md).
+- [ ] Configure and validate RevenueCat plus Apple/Google/web products by following [Subscription Payment Setup](decisions/SUBSCRIPTION_SETUP.md).
 - [ ] Implement server-owned entitlement persistence, quota enforcement, and downgrade/recovery behavior before gating cloud features.
 - [X] Keep premium feature restrictions disabled while payment setup and entitlement behavior are validated.
 
@@ -93,7 +93,7 @@ This file describes the product direction and major delivery phases. For detaile
 - [X] Session undo/redo and debounced auto-save across all four editors.
 - [X] PDF/image export for every note type.
 
-See [NOTE_LIMITS.md](NOTE_LIMITS.md) for text limits and [MONTHLY_EXPENSE_CHECKLIST.md](MONTHLY_EXPENSE_CHECKLIST.md) for the expense commitment design.
+See [NOTE_LIMITS.md](NOTE_LIMITS.md) for text limits and [MONTHLY_EXPENSE_CHECKLIST.md](decisions/MONTHLY_EXPENSE_CHECKLIST.md) for the expense commitment design.
 
 ## Additional backlog
 

@@ -2,9 +2,9 @@
 
 Status: implemented with approved design Option C.
 
-![Option C monthly commitments mock](../assets/design/monthly-expense-checklist-option-c.png)
+![Option C monthly commitments mock](../../assets/design/monthly-expense-checklist-option-c.png)
 
-Editable vector source: [monthly-expense-checklist-option-c.svg](../assets/design/monthly-expense-checklist-option-c.svg)
+Editable vector source: [monthly-expense-checklist-option-c.svg](../../assets/design/monthly-expense-checklist-option-c.svg)
 
 ## Decision
 

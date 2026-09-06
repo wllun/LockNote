@@ -59,8 +59,8 @@ notes.
 The Premium tab has RevenueCat checkout, restore, management, localized pricing,
 and active-plan status. Cloud features are deliberately not gated yet. Real
 payments require the external configuration in
-[Subscription Payment Setup](docs/SUBSCRIPTION_SETUP.md). See
-[Subscription Plans](docs/SUBSCRIPTION_PLANS.md) for the product policy.
+[Subscription Payment Setup](docs/decisions/SUBSCRIPTION_SETUP.md). See
+[Subscription Plans](docs/decisions/SUBSCRIPTION_PLANS.md) for the product policy.
 
 ## Security
 

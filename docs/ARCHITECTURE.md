@@ -74,8 +74,8 @@ data. Local editing continues, while new cloud writes, two-way sync, and
 owner-funded collaboration pause. Existing cloud data remains read-only and
 downloadable, and resubscribing resumes cloud features after safe conflict
 reconciliation. Invited collaborators need a Free account, not their own paid
-plan. See [Subscription Plans](SUBSCRIPTION_PLANS.md) for the complete policy and
-[Subscription Payment Setup](SUBSCRIPTION_SETUP.md) for external configuration.
+plan. See [Subscription Plans](decisions/SUBSCRIPTION_PLANS.md) for the complete policy and
+[Subscription Payment Setup](decisions/SUBSCRIPTION_SETUP.md) for external configuration.
 
 Home has independent view preferences for its two content sections: folders can
 use a vertical list or horizontal icon strip, while notes can use a list or
