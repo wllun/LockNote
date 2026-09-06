@@ -72,8 +72,8 @@ const SettingsScreen = ({ navigation }) => {
       Alert.alert(
         hasIncompleteUpdates ? 'Currency updated locally' : 'Currency updated',
         result.noteCount
-          ? `The currency display was changed for ${result.updatedCount} existing private or owned expense note${result.updatedCount === 1 ? '' : 's'}. Entered amounts were not converted.`
-          : 'There were no existing expense notes to update. New expense notes will use the selected currency.',
+          ? `The currency display was changed for ${result.updatedCount} existing private or owned expense record${result.updatedCount === 1 ? '' : 's'}. Entered amounts were not converted.`
+          : 'There were no existing expense records to update. New expense records will use the selected currency.',
         [{ text: 'OK' }],
         {
           variant: hasIncompleteUpdates ? 'warning' : 'info',
@@ -115,7 +115,7 @@ const SettingsScreen = ({ navigation }) => {
     const next = getExpenseCurrency(nextCurrency);
     Alert.alert(
       'Change default expense currency?',
-      `New expense notes will use ${next.name} (${next.code}). Would you also like to apply it to all existing private and owned expense notes? Shared-with-you notes stay unchanged. Entered amounts will not be converted or exchanged.`,
+      `New expense records will use ${next.name} (${next.code}). Would you also like to apply it to all existing private and owned expense records? Shared-with-you records stay unchanged. Entered amounts will not be converted or exchanged.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -389,7 +389,7 @@ const SettingsScreen = ({ navigation }) => {
             disabled={currencyBusy}
             accessibilityRole="button"
             accessibilityLabel={`Default expense currency ${selectedExpenseCurrency.name}, ${selectedExpenseCurrency.code}`}
-            accessibilityHint="Changes the default for new expense notes"
+            accessibilityHint="Changes the default for new expense records"
           >
             <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
               <Ionicons name="cash-outline" size={19} color={colors.primary} />
@@ -397,7 +397,7 @@ const SettingsScreen = ({ navigation }) => {
             <View style={styles.itemContent}>
               <Text style={styles.itemLabel}>Default currency</Text>
               <Text style={styles.itemDescription}>
-                For expense notes
+                For expense records
               </Text>
             </View>
             {currencyBusy ? (

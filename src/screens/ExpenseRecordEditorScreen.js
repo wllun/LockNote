@@ -807,7 +807,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       );
       setSavedCommitmentTemplate(saved);
       setCommitmentTemplateMessage(
-        `Saved ${saved.length} ${saved.length === 1 ? 'bill' : 'bills'} for your next expense note.`
+        `Saved ${saved.length} ${saved.length === 1 ? 'bill' : 'bills'} for your next expense record.`
       );
     } catch (error) {
       console.error('Monthly commitment template save failed:', error);
@@ -1339,7 +1339,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     try {
       await noteColorPreference.save(noteId, nextColor);
     } catch (error) {
-      Alert.alert('Error', 'Failed to change expense note color');
+      Alert.alert('Error', 'Failed to change expense record color');
     }
   };
 
@@ -1497,8 +1497,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             placeholderTextColor={colors.textTertiary}
             returnKeyType="next"
             onSubmitEditing={() => focusCell(rows[0].id, 'date')}
-            accessibilityLabel="Expense note title"
-            accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Edits the title of this expense note'}
+            accessibilityLabel="Expense record title"
+            accessibilityHint={isReadOnly ? 'This shared record is view only' : 'Edits the title of this expense record'}
           />
         </View>
 
@@ -1518,7 +1518,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           activeOpacity={0.7}
           hitSlop={4}
           accessibilityRole="button"
-          accessibilityLabel="More expense note actions"
+          accessibilityLabel="More expense record actions"
           accessibilityHint="Shows pin, password, export, and delete actions"
           accessibilityState={{ expanded: showActionsMenu }}
         >
@@ -1787,10 +1787,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                   accessibilityRole="button"
                   accessibilityLabel={
                     isSavingCommitmentTemplate
-                      ? 'Saving monthly bills for the next expense note'
+                      ? 'Saving monthly bills for the next expense record'
                       : currentCommitmentsMatchSavedTemplate
-                      ? 'Monthly bills saved for the next expense note'
-                      : 'Save monthly bills for the next expense note'
+                      ? 'Monthly bills saved for the next expense record'
+                      : 'Save monthly bills for the next expense record'
                   }
                   accessibilityState={{
                     disabled:
@@ -1849,7 +1849,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 disabled={isReadOnly}
                 accessibilityRole="button"
                 accessibilityLabel={`Amount currency ${selectedCurrency.name}, ${selectedCurrency.code}`}
-                accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Changes the currency for this expense note'}
+                accessibilityHint={isReadOnly ? 'This shared record is view only' : 'Changes the currency for this expense record'}
                 accessibilityState={{ disabled: isReadOnly }}
               >
                 <Text style={styles.amountHeaderText}>
@@ -2147,7 +2147,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowColorModal(true); }}
               accessibilityRole="button"
-              accessibilityLabel="Change expense note color"
+              accessibilityLabel="Change expense record color"
             >
               <Ionicons name="color-palette-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.actionsMenuText}>Color</Text>
@@ -2163,7 +2163,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 setShowExportModal(true);
               }}
               accessibilityRole="button"
-              accessibilityLabel="Export expense note"
+              accessibilityLabel="Export expense record"
             >
               <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.actionsMenuText}>Export</Text>
@@ -2179,7 +2179,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 handleTogglePin();
               }}
               accessibilityRole="button"
-              accessibilityLabel={isPinned ? 'Unpin expense note' : 'Pin expense note'}
+              accessibilityLabel={isPinned ? 'Unpin expense record' : 'Pin expense record'}
             >
               <Ionicons
                 name={isPinned ? 'pin' : 'pin-outline'}
@@ -2203,8 +2203,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               accessibilityRole="button"
               accessibilityLabel={
                 hasPassword
-                  ? 'Unlock expense note'
-                  : 'Lock expense note'
+                  ? 'Unlock expense record'
+                  : 'Lock expense record'
               }
             >
               <Ionicons
@@ -2228,7 +2228,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 handleDelete();
               }}
               accessibilityRole="button"
-              accessibilityLabel="Delete expense note"
+              accessibilityLabel="Delete expense record"
             >
               <Ionicons name="trash-outline" size={20} color={colors.danger} />
               <Text style={[styles.actionsMenuText, styles.actionsMenuDeleteText]}>
@@ -2423,7 +2423,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       <ManageNoteLockModal
         visible={showLockModal}
         isLocked={hasPassword}
-        itemLabel="expense note"
+        itemLabel="expense record"
         onClose={() => setShowLockModal(false)}
         onLock={handleSetPassword}
         onUnlock={handleRemovePassword}

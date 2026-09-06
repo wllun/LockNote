@@ -22,7 +22,7 @@ const ExpenseCurrencyModal = ({
   value,
   onSelect,
   onClose,
-  description = 'Used for this expense note, its summaries, and exports.',
+  description = 'Used for this expense record, its summaries, and exports.',
 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
