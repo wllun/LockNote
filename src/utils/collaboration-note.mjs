@@ -1,6 +1,17 @@
 export const SHARE_ORIGIN_PRIVATE = 'private';
 export const SHARE_ORIGIN_OWNED = 'owned';
 export const SHARE_ORIGIN_INCOMING = 'incoming';
+export const SHARE_ROLE_OWNER = 'owner';
+export const SHARE_ROLE_EDITOR = 'editor';
+export const SHARE_ROLE_VIEWER = 'viewer';
+
+export const normalizeShareRole = (role, origin = SHARE_ORIGIN_PRIVATE) => {
+  if (origin === SHARE_ORIGIN_OWNED) return SHARE_ROLE_OWNER;
+  if (origin === SHARE_ORIGIN_INCOMING) {
+    return role === SHARE_ROLE_VIEWER ? SHARE_ROLE_VIEWER : SHARE_ROLE_EDITOR;
+  }
+  return null;
+};
 
 export const COLLABORATION_DEFAULTS = Object.freeze({
   cloud_id: null,
@@ -16,20 +27,32 @@ export const COLLABORATION_DEFAULTS = Object.freeze({
   last_synced_at: null,
 });
 
-export const normalizeCollaborationNote = (note) => ({
-  ...COLLABORATION_DEFAULTS,
-  ...note,
-  note_type: note?.note_type || 'note',
-  is_archived: note?.is_archived ? 1 : 0,
-  share_origin: note?.share_origin || SHARE_ORIGIN_PRIVATE,
-  collaborator_count: Number(note?.collaborator_count) || 0,
-  server_revision: Number(note?.server_revision) || 0,
-});
+export const normalizeCollaborationNote = (note) => {
+  const shareOrigin = note?.share_origin || SHARE_ORIGIN_PRIVATE;
+  return {
+    ...COLLABORATION_DEFAULTS,
+    ...note,
+    note_type: note?.note_type || 'note',
+    is_archived: note?.is_archived ? 1 : 0,
+    share_origin: shareOrigin,
+    share_role: normalizeShareRole(note?.share_role, shareOrigin),
+    collaborator_count: Number(note?.collaborator_count) || 0,
+    server_revision: Number(note?.server_revision) || 0,
+  };
+};
 
 export const isIncomingSharedNote = (note) =>
   normalizeCollaborationNote(note).share_origin === SHARE_ORIGIN_INCOMING;
 
 export const isCollaborativeNote = (note) => Boolean(note?.cloud_id);
+
+export const isReadOnlyCollaborativeNote = (note) => {
+  const normalized = normalizeCollaborationNote(note);
+  return normalized.share_origin === SHARE_ORIGIN_INCOMING
+    && normalized.share_role === SHARE_ROLE_VIEWER;
+};
+
+export const canEditCollaborativeNote = (note) => !isReadOnlyCollaborativeNote(note);
 
 export const formatCollaborativeEdit = (note, currentUserEmail = '') => {
   if (!note?.cloud_id || !note?.last_edited_at) return '';
@@ -48,7 +71,9 @@ export const remoteNoteToLocal = (remote) => ({
   content: remote.content || '',
   note_type: remote.note_type || 'note',
   share_origin: remote.is_owner ? SHARE_ORIGIN_OWNED : SHARE_ORIGIN_INCOMING,
-  share_role: remote.role || (remote.is_owner ? 'owner' : 'editor'),
+  share_role: remote.is_owner
+    ? SHARE_ROLE_OWNER
+    : normalizeShareRole(remote.role, SHARE_ORIGIN_INCOMING),
   collaborator_count: Number(remote.collaborator_count) || 0,
   server_revision: Number(remote.revision) || 0,
   last_edited_by_id: remote.updated_by || null,

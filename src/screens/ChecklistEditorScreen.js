@@ -48,6 +48,7 @@ import { getEditorExitDisposition } from '../utils/editor-exit-disposition.mjs';
 import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
+import { isReadOnlyCollaborativeNote } from '../utils/collaboration-note.mjs';
 
 const CHECKLIST_ITEM_MIN_HEIGHT = 60;
 const CHECKLIST_ITEM_GAP = 10;
@@ -78,6 +79,7 @@ const ChecklistItemRow = React.memo(({
   isDragging,
   isDropTarget,
   itemCount,
+  readOnly,
 }) => {
   const [isHolding, setIsHolding] = useState(false);
   const callbacks = useRef({
@@ -115,6 +117,7 @@ const ChecklistItemRow = React.memo(({
   const dragGesture = useMemo(
     () =>
       Gesture.Pan()
+        .enabled(!readOnly)
         .activateAfterLongPress(DRAG_ACTIVATION_DELAY_MS)
         .shouldCancelWhenOutside(false)
         .onBegin(() => {
@@ -150,6 +153,7 @@ const ChecklistItemRow = React.memo(({
       endHold,
       startDrag,
       updateDrag,
+      readOnly,
     ]
   );
 
@@ -173,12 +177,12 @@ const ChecklistItemRow = React.memo(({
               styles.dragHandle,
               isHolding && styles.dragHandleHolding,
             ]}
-            accessible
+            accessible={!readOnly}
             accessibilityRole="adjustable"
             accessibilityLabel={`Move checklist item ${index + 1}`}
             accessibilityHint="Hold still for one second, then drag to move or delete"
             accessibilityValue={{ text: `Position ${index + 1} of ${itemCount}` }}
-            accessibilityActions={[
+            accessibilityActions={readOnly ? [] : [
               { name: 'increment', label: 'Move item down' },
               { name: 'decrement', label: 'Move item up' },
               { name: 'activate', label: 'Delete item' },
@@ -195,12 +199,12 @@ const ChecklistItemRow = React.memo(({
               }
             }}
           >
-            <MaterialIcons
+            {!readOnly && <MaterialIcons
               name="drag-indicator"
               size={25}
               color={isHolding ? colors.primary : colors.textSecondary}
               style={styles.dragIndicatorIcon}
-            />
+            />}
           </View>
         </GestureDetector>
         <Pressable
@@ -209,9 +213,10 @@ const ChecklistItemRow = React.memo(({
             pressed && styles.pressed,
           ]}
           onPress={() => onToggle(item.id)}
+          disabled={readOnly}
           accessibilityRole="checkbox"
           accessibilityLabel={`Mark ${item.text.trim() || `item ${index + 1}`} as ${item.completed ? 'not completed' : 'completed'}`}
-          accessibilityState={{ checked: item.completed }}
+          accessibilityState={{ checked: item.completed, disabled: readOnly }}
         >
           <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
             {item.completed && (
@@ -222,6 +227,7 @@ const ChecklistItemRow = React.memo(({
         <TextInput
           style={[styles.itemInput, item.completed && styles.itemInputCompleted]}
           value={item.text}
+          editable={!readOnly}
           onChangeText={(value) => onTextChange(item.id, value)}
           placeholder={`Item ${index + 1}`}
           placeholderTextColor={colors.textTertiary}
@@ -248,6 +254,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [newItemText, setNewItemText] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
@@ -286,6 +293,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     isPinned: false,
     color: DEFAULT_NOTE_COLOR,
     cloudId: null,
+    readOnly: false,
     deleted: false,
   });
   const {
@@ -342,11 +350,22 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       const localColor = await noteColorPreference.load(noteId);
 
       const parsed = parseChecklistNote(note.content);
+      const readOnly = isReadOnlyCollaborativeNote(note);
+      if (readOnly) {
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+        setSaveError('');
+        setIsTitleFocused(false);
+        activeDragRef.current = null;
+        setActiveDrag(null);
+        Keyboard.dismiss();
+      }
       setTitle(note.title);
       setItems(parsed.items);
       setHasPassword(!!note.password);
       setIsPinned(!!note.is_pinned);
       setNoteColor(localColor);
+      setIsReadOnly(readOnly);
       latest.current = {
         ...latest.current,
         title: note.title,
@@ -356,6 +375,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         isPinned: !!note.is_pinned,
         color: localColor,
         cloudId: note.cloud_id,
+        readOnly,
       };
       loadCompletedRef.current = true;
       clearUndo();
@@ -366,6 +386,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
   const scheduleSave = useCallback(
     (nextTitle, nextItems) => {
+      if (latest.current.readOnly) return;
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       setSaveError('');
       saveTimeout.current = setTimeout(async () => {
@@ -386,18 +407,21 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   );
 
   const updateDraft = useCallback((nextTitle, nextItems) => {
+    if (latest.current.readOnly) return;
     latest.current.title = nextTitle;
     latest.current.items = nextItems;
     scheduleSave(nextTitle, nextItems);
   }, [scheduleSave]);
 
   const handleTitleChange = (value) => {
+    if (latest.current.readOnly) return;
     remember(getUndoSnapshot(), 'title');
     setTitle(value);
     updateDraft(value, latest.current.items);
   };
 
   const handleItemTextChange = useCallback((itemId, value) => {
+    if (latest.current.readOnly) return;
     remember(getUndoSnapshot(), `item:${itemId}`);
     const nextItems = latest.current.items.map((item) =>
       item.id === itemId
@@ -409,6 +433,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }, [getUndoSnapshot, remember, updateDraft]);
 
   const toggleItem = useCallback((itemId) => {
+    if (latest.current.readOnly) return;
     remember(getUndoSnapshot());
     const nextItems = latest.current.items.map((item) =>
       item.id === itemId ? { ...item, completed: !item.completed } : item
@@ -418,6 +443,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }, [getUndoSnapshot, remember, updateDraft]);
 
   const removeItem = useCallback((itemId) => {
+    if (latest.current.readOnly) return;
     remember(getUndoSnapshot());
     const nextItems = latest.current.items.filter((item) => item.id !== itemId);
     setItems(nextItems);
@@ -425,6 +451,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }, [getUndoSnapshot, remember, updateDraft]);
 
   const confirmRemoveItem = useCallback((itemId) => {
+    if (latest.current.readOnly) return;
     const item = latest.current.items.find((entry) => entry.id === itemId);
     if (!item) return;
 
@@ -443,6 +470,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }, [removeItem]);
 
   const moveItem = useCallback((itemId, direction) => {
+    if (latest.current.readOnly) return;
     const nextItems = moveChecklistItem(latest.current.items, itemId, direction);
     if (nextItems === latest.current.items) return;
 
@@ -593,6 +621,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }, []);
 
   const handleDragStart = useCallback((itemId) => {
+    if (latest.current.readOnly) return;
     Keyboard.dismiss();
     measureDragArea();
     const startIndex = latest.current.items.findIndex((item) => item.id === itemId);
@@ -675,6 +704,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }, [finishDrag]);
 
   const addItem = () => {
+    if (latest.current.readOnly) return;
     const text = newItemText.trim();
     if (!text) return;
     if (latest.current.items.length >= CHECKLIST_MAX_ITEMS) {
@@ -695,6 +725,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   };
 
   const handleNewItemTextChange = (value) => {
+    if (latest.current.readOnly) return;
     remember(getUndoSnapshot(), 'new-item');
     const nextValue = sanitizeChecklistItemText(value);
     setNewItemText(nextValue);
@@ -702,7 +733,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   };
 
   const restoreHistorySnapshot = (snapshot) => {
-    if (!snapshot) return;
+    if (!snapshot || latest.current.readOnly) return;
 
     setTitle(snapshot.title);
     setItems(snapshot.items);
@@ -830,6 +861,8 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
+    if (draft.readOnly) return;
+
     if (disposition === 'delete') {
       await noteRepo.hardDelete(noteId);
       await noteColorPreference.remove(noteId);
@@ -867,6 +900,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       isDragging={activeDrag?.itemId === item.id}
       isDropTarget={insertionBeforeItemId === item.id && activeDrag?.itemId !== item.id}
       itemCount={items.length}
+      readOnly={isReadOnly}
     />
   ), [
     activeDrag,
@@ -884,6 +918,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     handleItemTextChange,
     insertionBeforeItemId,
     items.length,
+    isReadOnly,
     moveItem,
     styles,
     toggleItem,
@@ -920,18 +955,20 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
             placeholder="Checklist title"
             placeholderTextColor={colors.textTertiary}
             value={title}
+            editable={!isReadOnly}
             onChangeText={handleTitleChange}
             onFocus={() => setIsTitleFocused(true)}
             onBlur={() => setIsTitleFocused(false)}
             returnKeyType="next"
             onSubmitEditing={() => newItemInputRef.current?.focus()}
             accessibilityLabel="Checklist title"
+            accessibilityHint={isReadOnly ? 'This shared note is view only' : undefined}
           />
         </View>
 
         <EditorHistoryButtons
-          canRedo={canRedo}
-          canUndo={canUndo}
+          canRedo={canRedo && !isReadOnly}
+          canUndo={canUndo && !isReadOnly}
           colors={colors}
           disabledStyle={styles.headerButtonDisabled}
           onRedo={handleRedo}
@@ -958,7 +995,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        extraData={activeDrag}
+        extraData={{ activeDrag, isReadOnly }}
         scrollEnabled={!activeDrag}
         removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
@@ -1005,7 +1042,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
               <Ionicons name="checkbox-outline" size={30} color={colors.primary} />
             </View>
             <Text style={styles.emptyTitle}>No items yet</Text>
-            <Text style={styles.emptyHint}>Add the first item below.</Text>
+            <Text style={styles.emptyHint}>{isReadOnly ? 'This shared checklist is empty.' : 'Add the first item below.'}</Text>
           </View>
         }
         ListFooterComponent={
@@ -1017,7 +1054,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                 <Text style={styles.rowInsertionText}>Item moves here</Text>
               </View>
             )}
-            <View style={styles.addCard}>
+            {!isReadOnly && <View style={styles.addCard}>
               <Text style={styles.addLabel}>ADD ITEM</Text>
               <View style={styles.addRow}>
                 <TextInput
@@ -1047,7 +1084,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                   <Ionicons name="add" size={22} color={colors.card} />
                 </Pressable>
               </View>
-            </View>
+            </View>}
           </>
         }
       />

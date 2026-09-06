@@ -1,6 +1,13 @@
 import { noteRepo } from '../db/noteRepo';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
-import { remoteNoteToLocal } from '../utils/collaboration-note.mjs';
+import {
+  SHARE_ORIGIN_INCOMING,
+  SHARE_ROLE_EDITOR,
+  SHARE_ROLE_VIEWER,
+  isReadOnlyCollaborativeNote,
+  normalizeShareRole,
+  remoteNoteToLocal,
+} from '../utils/collaboration-note.mjs';
 
 const requireCloud = async () => {
   if (!isSupabaseConfigured) {
@@ -17,10 +24,31 @@ const unwrap = ({ data, error }) => {
   return Array.isArray(data) ? data[0] : data;
 };
 
+const remoteWithLocalFallback = (remote, local) => ({
+  ...remote,
+  is_owner: remote?.is_owner ?? local?.share_origin === 'owned',
+  role: remote?.role || local?.share_role,
+  collaborator_count: remote?.collaborator_count ?? local?.collaborator_count,
+});
+
+const createReadOnlyError = () => {
+  const error = new Error('This note is view only. Ask the owner for edit access.');
+  error.code = 'READ_ONLY';
+  return error;
+};
+
+const isReadOnlyError = (error) => error?.code === '42501'
+  || error?.code === 'READ_ONLY'
+  || /view only|edit access/i.test(error?.message || '');
+
 const cacheRemote = async (remote) => {
   if (!remote) return null;
   const existing = await noteRepo.getByCloudId(remote.id);
   if (existing?.sync_status === 'pending') {
+    const remoteContext = remoteWithLocalFallback(remote, existing);
+    if (remoteContext.role === SHARE_ROLE_VIEWER && existing.share_origin === SHARE_ORIGIN_INCOMING) {
+      return await noteRepo.update(existing.id, remoteNoteToLocal(remoteContext));
+    }
     if (Number(remote.revision) !== Number(existing.server_revision || 0)) {
       return await noteRepo.update(existing.id, { sync_status: 'conflict' });
     }
@@ -31,12 +59,10 @@ const cacheRemote = async (remote) => {
         p_title: existing.title,
         p_content: existing.content,
       }));
-      return await noteRepo.update(existing.id, remoteNoteToLocal({
-        ...saved,
-        is_owner: existing.share_origin === 'owned',
-        role: existing.share_role,
-        collaborator_count: remote.collaborator_count,
-      }));
+      return await noteRepo.update(
+        existing.id,
+        remoteNoteToLocal(remoteWithLocalFallback({ ...remote, ...saved }, existing))
+      );
     } catch {
       return existing;
     }
@@ -134,6 +160,8 @@ export const collaborationService = {
 
   async save(noteId, updates) {
     return await enqueueSave(noteId, async () => {
+      const beforeSave = await noteRepo.getById(noteId);
+      if (isReadOnlyCollaborativeNote(beforeSave)) throw createReadOnlyError();
       let local = await noteRepo.update(noteId, updates);
       if (!local?.cloud_id || !isSupabaseConfigured) return local;
       try {
@@ -150,18 +178,38 @@ export const collaborationService = {
           collaborator_count: local.collaborator_count,
         }));
       } catch (error) {
-        await noteRepo.update(noteId, { sync_status: error?.code === '40001' ? 'conflict' : 'pending' });
-        error.localSaved = true;
+        if (isReadOnlyError(error)) {
+          try {
+            const remote = unwrap(await supabase.rpc('get_shared_note', { p_note_id: local.cloud_id }));
+            await noteRepo.update(noteId, remoteNoteToLocal(remoteWithLocalFallback(remote, local)));
+          } catch {
+            await noteRepo.update(noteId, {
+              title: beforeSave.title,
+              content: beforeSave.content,
+              share_role: SHARE_ROLE_VIEWER,
+              sync_status: 'synced',
+            });
+          }
+          error.localSaved = false;
+        } else {
+          await noteRepo.update(noteId, { sync_status: error?.code === '40001' ? 'conflict' : 'pending' });
+          error.localSaved = true;
+        }
         throw error;
       }
       return local;
     });
   },
 
-  async shareByEmail(noteId, email) {
+  async shareByEmail(noteId, email, role = SHARE_ROLE_EDITOR) {
+    const normalizedRole = normalizeShareRole(role, SHARE_ORIGIN_INCOMING);
     const note = await this.ensureCloudNote(noteId);
     const { data, error } = await supabase.functions.invoke('share-note', {
-      body: { noteId: note.cloud_id, email: email.trim().toLowerCase() },
+      body: {
+        noteId: note.cloud_id,
+        email: email.trim().toLowerCase(),
+        role: normalizedRole,
+      },
     });
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
@@ -180,11 +228,31 @@ export const collaborationService = {
     return data || [];
   },
 
+  async updateMemberRole(noteId, userId, role) {
+    const note = await noteRepo.getById(noteId);
+    if (!note?.cloud_id) throw new Error('Share this note before changing access.');
+    const normalizedRole = normalizeShareRole(role, SHARE_ORIGIN_INCOMING);
+    const { data, error } = await supabase.rpc('update_note_member_role', {
+      p_note_id: note.cloud_id,
+      p_user_id: userId,
+      p_role: normalizedRole,
+    });
+    if (error) throw error;
+    return unwrap({ data, error: null });
+  },
+
   async refreshNote(noteId) {
     const local = await noteRepo.getById(noteId);
     if (!local?.cloud_id) return { note: local, changed: false };
     await requireCloud();
     const remote = unwrap(await supabase.rpc('get_shared_note', { p_note_id: local.cloud_id }));
+    const remoteContext = remoteWithLocalFallback(remote, local);
+    if (remoteContext.role === SHARE_ROLE_VIEWER && local.share_origin === SHARE_ORIGIN_INCOMING) {
+      const note = await noteRepo.update(noteId, remoteNoteToLocal(remoteContext));
+      const changed = local.share_role !== SHARE_ROLE_VIEWER
+        || Number(remote.revision) !== Number(local.server_revision || 0);
+      return { note, changed };
+    }
     if (local.sync_status === 'pending') {
       if (Number(remote.revision) !== Number(local.server_revision || 0)) {
         const note = await noteRepo.update(noteId, { sync_status: 'conflict' });
@@ -197,30 +265,25 @@ export const collaborationService = {
           p_title: local.title,
           p_content: local.content,
         }));
-        const note = await noteRepo.update(noteId, remoteNoteToLocal({
-          ...saved,
-          is_owner: local.share_origin === 'owned',
-          role: local.share_role,
-          collaborator_count: remote.collaborator_count,
-        }));
+        const note = await noteRepo.update(
+          noteId,
+          remoteNoteToLocal(remoteWithLocalFallback({ ...remoteContext, ...saved }, local))
+        );
         return { note, changed: false };
       } catch { return { note: local, changed: false }; }
     }
     if (local.sync_status === 'conflict') return { note: local, changed: false };
-    if (!remote || Number(remote.revision) <= Number(local.server_revision || 0)) {
+    const roleChanged = Boolean(remote?.role) && remoteContext.role !== local.share_role;
+    if (!remote || (Number(remote.revision) <= Number(local.server_revision || 0) && !roleChanged)) {
       return { note: local, changed: false };
     }
-    const note = await noteRepo.update(noteId, remoteNoteToLocal({
-      ...remote,
-      is_owner: local.share_origin === 'owned',
-      role: local.share_role,
-      collaborator_count: remote.collaborator_count ?? local.collaborator_count,
-    }));
+    const note = await noteRepo.update(noteId, remoteNoteToLocal(remoteContext));
     return { note, changed: true };
   },
 
   async resolveConflict(noteId, strategy) {
     const local = await noteRepo.getById(noteId);
+    if (strategy === 'local' && isReadOnlyCollaborativeNote(local)) throw createReadOnlyError();
     await requireCloud();
     const remote = unwrap(await supabase.rpc('get_shared_note', { p_note_id: local.cloud_id }));
     const resolved = strategy === 'local'
@@ -231,12 +294,10 @@ export const collaborationService = {
           p_content: local.content,
         }))
       : remote;
-    return await noteRepo.update(noteId, remoteNoteToLocal({
-      ...resolved,
-      is_owner: local.share_origin === 'owned',
-      role: local.share_role,
-      collaborator_count: remote.collaborator_count,
-    }));
+    return await noteRepo.update(
+      noteId,
+      remoteNoteToLocal(remoteWithLocalFallback({ ...remote, ...resolved }, local))
+    );
   },
 
   async removeMember(noteId, userId) {

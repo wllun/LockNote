@@ -16,9 +16,10 @@ Deno.serve(async (request) => {
     const callerClient = createClient(url, anon, { global: { headers: { Authorization: authorization } } });
     const { data: { user }, error: userError } = await callerClient.auth.getUser();
     if (userError || !user) throw new Error('Authentication required.');
-    const { noteId, email } = await request.json();
+    const { noteId, email, role = 'editor' } = await request.json();
     const normalizedEmail = String(email || '').trim().toLowerCase();
     if (!noteId || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) throw new Error('Enter a valid account email.');
+    if (role !== 'editor' && role !== 'viewer') throw new Error('Choose either edit or view-only access.');
 
     const admin = createClient(url, service);
     const { data: note } = await admin.from('shared_notes').select('id, owner_id').eq('id', noteId).is('deleted_at', null).single();
@@ -27,11 +28,11 @@ Deno.serve(async (request) => {
     if (!target) throw new Error('No LockNote account uses this email yet.');
     if (target.id === user.id) throw new Error('This note already belongs to you.');
     const { error: insertError } = await admin.from('note_members').upsert({
-      note_id: noteId, user_id: target.id, role: 'editor', invited_by: user.id,
+      note_id: noteId, user_id: target.id, role, invited_by: user.id,
     }, { onConflict: 'note_id,user_id' });
     if (insertError) throw insertError;
     const { count } = await admin.from('note_members').select('*', { count: 'exact', head: true }).eq('note_id', noteId);
-    return Response.json({ member: { userId: target.id, email: target.email, role: 'editor' }, collaboratorCount: count || 0 }, { headers: cors });
+    return Response.json({ member: { userId: target.id, email: target.email, role }, collaboratorCount: count || 0 }, { headers: cors });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : 'Could not share this note.' }, { status: 400, headers: cors });
   }

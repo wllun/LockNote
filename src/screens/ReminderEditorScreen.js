@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
+  Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
@@ -36,6 +36,7 @@ import { getEditorExitDisposition } from '../utils/editor-exit-disposition.mjs';
 import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
+import { isReadOnlyCollaborativeNote } from '../utils/collaboration-note.mjs';
 
 const ReminderEditorScreen = ({ route, navigation }) => {
   const { noteId, isNewDraft = false } = route.params;
@@ -47,6 +48,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const [reminder, setReminder] = useState(() => normalizeReminder());
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
   const [showColor, setShowColor] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
@@ -61,7 +63,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const loadCompletedRef = useRef(false);
   const bodyRef = useRef(null);
   const bodyLimitDialogShown = useRef(false);
-  const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, cloudId: null, deleted: false });
+  const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, cloudId: null, readOnly: false, deleted: false });
   const {
     canRedo,
     canUndo,
@@ -78,6 +80,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       clearTimeout(saveTimeout.current);
       saveTimeout.current = null;
     }
+    if (next.readOnly) return;
     await collaborationService.save(noteId, {
       title: next.title,
       content: contentFor(next.body, next.reminder),
@@ -85,6 +88,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   }, [noteId]);
 
   const autoSave = useCallback(() => {
+    if (latest.current.readOnly) return;
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
       saveTimeout.current = null;
@@ -98,6 +102,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       if (!note) return;
       const localColor = await noteColorPreference.load(noteId);
       const parsed = parseReminderNote(note.content);
+      const readOnly = isReadOnlyCollaborativeNote(note);
       const next = {
         ...latest.current,
         title: note.title,
@@ -107,11 +112,19 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         isPinned: !!note.is_pinned,
         color: localColor,
         cloudId: note.cloud_id,
+        readOnly,
       };
       latest.current = next;
       loadCompletedRef.current = true;
       setTitle(next.title); setBody(next.body); setReminder(next.reminder);
-      setHasPassword(next.hasPassword); setIsPinned(next.isPinned); setNoteColor(next.color); clearUndo();
+      setHasPassword(next.hasPassword); setIsPinned(next.isPinned); setNoteColor(next.color); setIsReadOnly(readOnly); clearUndo();
+      if (readOnly) {
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+        setShowSchedule(false);
+        setIsTitleFocused(false);
+        Keyboard.dismiss();
+      }
   }, [clearUndo, noteId]);
 
   useEffect(() => {
@@ -145,6 +158,8 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
+    if (draft.readOnly) return;
+
     if (disposition === 'delete') {
       await cancelReminderNotifications(draft.reminder.notificationIds);
       await noteRepo.hardDelete(noteId);
@@ -162,11 +177,13 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const snapshot = () => ({ title: latest.current.title, body: latest.current.body, reminder: latest.current.reminder });
 
   const handleTitleChange = (text) => {
+    if (latest.current.readOnly) return;
     remember(snapshot(), 'title');
     latest.current.title = text; setTitle(text); autoSave();
   };
 
   const handleBodyChange = (text) => {
+    if (latest.current.readOnly) return;
     const limited = constrainNormalNoteContent(text);
     if (limited.limitReached && !bodyLimitDialogShown.current) {
       bodyLimitDialogShown.current = true;
@@ -184,6 +201,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   };
 
   const scheduleAndSave = async (nextReminder, { recordUndo = true } = {}) => {
+    if (latest.current.readOnly) return false;
     const validationError = getReminderScheduleError(nextReminder);
     if (validationError) {
       Alert.alert(
@@ -239,6 +257,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   };
 
   const handleToggleReminder = async (enabled) => {
+    if (latest.current.readOnly) return;
     if (enabled) {
       if (!reminder.scheduledAt || (reminder.repeat === 'none' && new Date(reminder.scheduledAt) <= new Date())) {
         setShowSchedule(true);
@@ -254,7 +273,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   };
 
   const restoreHistorySnapshot = async (previous) => {
-    if (!previous) return;
+    if (!previous || latest.current.readOnly) return;
     const currentIds = latest.current.reminder.notificationIds;
     await cancelReminderNotifications(currentIds);
     let nextReminder = normalizeReminder(previous.reminder);
@@ -369,14 +388,14 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton} activeOpacity={0.7} hitSlop={4} accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={colors.text} /></TouchableOpacity>
         <View style={[styles.titleField, isTitleFocused && styles.titleFieldFocused]}>
           <Ionicons name="alarm-outline" size={18} color={colors.primary} />
-          <TextInput style={styles.titleInput} placeholder="Reminder title" placeholderTextColor={colors.textTertiary} value={title} onChangeText={handleTitleChange} onFocus={() => setIsTitleFocused(true)} onBlur={() => setIsTitleFocused(false)} onSubmitEditing={() => bodyRef.current?.focus()} accessibilityLabel="Reminder title" />
+          <TextInput style={styles.titleInput} placeholder="Reminder title" placeholderTextColor={colors.textTertiary} value={title} editable={!isReadOnly} onChangeText={handleTitleChange} onFocus={() => setIsTitleFocused(true)} onBlur={() => setIsTitleFocused(false)} onSubmitEditing={() => bodyRef.current?.focus()} accessibilityLabel="Reminder title" accessibilityHint={isReadOnly ? 'This shared note is view only' : undefined} />
         </View>
-        <EditorHistoryButtons canRedo={canRedo} canUndo={canUndo} colors={colors} disabledStyle={styles.disabled} onRedo={handleRedo} onUndo={handleUndo} style={styles.headerButton} />
+        <EditorHistoryButtons canRedo={canRedo && !isReadOnly} canUndo={canUndo && !isReadOnly} colors={colors} disabledStyle={styles.disabled} onRedo={handleRedo} onUndo={handleUndo} style={styles.headerButton} />
         <TouchableOpacity onPress={() => setShowActions(true)} style={styles.headerButton} activeOpacity={0.7} hitSlop={4} accessibilityRole="button" accessibilityLabel="More reminder actions"><Ionicons name="ellipsis-vertical" size={22} color={colors.text} /></TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(20, insets.bottom + 12) }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-        <TextInput ref={bodyRef} style={styles.bodyInput} placeholder="Start writing..." placeholderTextColor={colors.textTertiary} value={body} onChangeText={handleBodyChange} maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS} multiline textAlignVertical="top" accessibilityLabel="Reminder note content" />
+        <TextInput ref={bodyRef} style={styles.bodyInput} placeholder="Start writing..." placeholderTextColor={colors.textTertiary} value={body} editable={!isReadOnly} onChangeText={handleBodyChange} maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS} multiline textAlignVertical="top" accessibilityLabel="Reminder note content" accessibilityHint={isReadOnly ? 'This shared note is view only' : undefined} />
 
         <View style={[styles.reminderCard, reminder.enabled && styles.reminderCardEnabled]}>
           <View style={styles.reminderTop}>
@@ -388,14 +407,14 @@ const ReminderEditorScreen = ({ route, navigation }) => {
             <Switch
               value={reminder.enabled}
               onValueChange={handleToggleReminder}
-              disabled={scheduling}
+              disabled={scheduling || isReadOnly}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor={reminder.enabled ? colors.card : colors.textTertiary}
               ios_backgroundColor={colors.border}
               accessibilityLabel="Enable reminder notification"
             />
           </View>
-          <Pressable style={({ pressed }) => [styles.editReminder, pressed && styles.pressed]} onPress={() => setShowSchedule(true)} accessibilityRole="button" accessibilityLabel="Edit reminder date and repeat">
+          <Pressable style={({ pressed }) => [styles.editReminder, isReadOnly && styles.disabled, pressed && !isReadOnly && styles.pressed]} onPress={() => setShowSchedule(true)} disabled={isReadOnly} accessibilityRole="button" accessibilityLabel="Edit reminder date and repeat" accessibilityState={{ disabled: isReadOnly }}>
             <Ionicons name="calendar-outline" size={18} color={colors.primary} />
             <Text style={styles.editReminderText}>{reminder.enabled ? 'Edit reminder' : 'Choose date and time'}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.primary} />
