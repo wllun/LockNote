@@ -111,7 +111,7 @@ const LockPasswordSettingsModal = ({ visible, status, onClose, onSaved }) => {
             {status?.configured ? 'Change LockNote Password' : 'Set LockNote Password'}
           </Text>
           <Text style={styles.description}>
-            One password is used for every locked note. It stays separate from your account password.
+            One password protects all locked notes.
           </Text>
 
           {oldPasswordRequired && renderInput({

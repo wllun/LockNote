@@ -2049,34 +2049,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             </TouchableOpacity>
           </View>}
 
-          <View style={styles.statusRow}>
-            {saveStatus ? (
-              <View style={styles.saveStatus}>
-                <Ionicons
-                  name={
-                    saveStatus === 'Could not save'
-                      ? 'alert-circle-outline'
-                      : 'cloud-done-outline'
-                  }
-                  size={15}
-                  color={saveStatus === 'Could not save' ? colors.danger : colors.textTertiary}
-                />
-                <Text
-                  style={[
-                    styles.saveStatusText,
-                    saveStatus === 'Could not save' && { color: colors.danger },
-                  ]}
-                >
-                  {saveStatus}
-                </Text>
-              </View>
-            ) : null}
-            {invalidAmountCount > 0 && (
+          {invalidAmountCount > 0 && (
+            <View style={styles.statusRow}>
               <Text style={styles.validationText}>
                 Check {invalidAmountCount} amount
               </Text>
-            )}
-          </View>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -3232,19 +3211,6 @@ const makeStyles = (colors) =>
       justifyContent: 'space-between',
       gap: 12,
       paddingHorizontal: 2,
-    },
-    saveStatus: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      backgroundColor: colors.card,
-      borderRadius: radius.full,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-    },
-    saveStatusText: {
-      color: colors.textTertiary,
-      fontSize: 12,
     },
     validationText: {
       color: colors.danger,

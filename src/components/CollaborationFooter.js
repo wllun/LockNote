@@ -32,7 +32,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote }) => {
   const statusMessage = note.sync_status === 'conflict'
     ? 'This note also changed elsewhere'
     : note.sync_status === 'pending'
-      ? 'Saved on this device · waiting to sync'
+      ? 'Waiting to sync'
       : `${isReadOnly ? 'View only · ' : ''}${message || 'Shared note · Waiting for the first synced edit'}`;
   const resolve = async (strategy) => {
     setResolving(true);
