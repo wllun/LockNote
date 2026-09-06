@@ -8,6 +8,7 @@ import {
 } from '../utils/auth.mjs';
 import { validateLockPassword } from '../utils/lock-password.mjs';
 import { sendLockPasswordResetLink } from './authService.mjs';
+import { emailRateLimitService } from './emailRateLimitService';
 import {
   isSupabaseConfigured,
   supabase,
@@ -279,11 +280,14 @@ export const lockPasswordService = {
     }
 
     try {
-      await sendLockPasswordResetLink(
-        supabase.auth,
-        isSupabaseConfigured,
+      await emailRateLimitService.run(
         credential.recoveryEmail,
-        Linking.createURL('reset-lock-password')
+        () => sendLockPasswordResetLink(
+          supabase.auth,
+          isSupabaseConfigured,
+          credential.recoveryEmail,
+          Linking.createURL('reset-lock-password')
+        )
       );
     } catch (error) {
       throw createError(

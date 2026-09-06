@@ -33,6 +33,7 @@ _Snapshot: 2026-08-31. Check off items as they land._
 - [X] Add stronger email and password validation — normalized lowercase emails, format checks, 8-character minimum for new passwords, confirmation matching, and field-level messages.
 - [X] Add user-friendly network and Supabase configuration error handling.
 - [X] Add automated authentication tests covering validation, errors, account and LockNote-password callbacks, redirects, and Supabase request wrappers.
+- [X] Add a device-persistent 120-second email cooldown per normalized address for signup confirmation, account-password reset, and LockNote-password reset. Local Supabase is configured for the same 120-second minimum and 30 authentication emails per hour project-wide; the hosted project still requires matching Dashboard configuration.
 - [X] Android/iOS forced-update baseline — native builds compare their platform
   build number with a public read-only Supabase policy at startup/foreground,
   cache valid policies separately per platform for up to 72 hours, and show a

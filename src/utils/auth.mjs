@@ -48,6 +48,9 @@ export const getAuthErrorMessage = (error, fallback = 'Something went wrong. Ple
   if (error?.code === AUTH_VALIDATION_ERROR) {
     return error.message;
   }
+  if (error?.code === EMAIL_SEND_COOLDOWN_ERROR) {
+    return error.message;
+  }
   if (error?.code === AUTH_CONFIGURATION_ERROR || CONFIG_PATTERNS.some((x) => message.includes(x))) {
     return 'Account services are not configured correctly. Please contact support.';
   }
@@ -134,3 +137,4 @@ export const parseAuthCallback = (url) => {
     };
   }
 };
+import { EMAIL_SEND_COOLDOWN_ERROR } from './email-rate-limit.mjs';

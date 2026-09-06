@@ -27,6 +27,7 @@ import {
   validatePasswordConfirmation,
 } from '../utils/auth.mjs';
 import { radius, shadow, useTheme } from '../theme';
+import { emailRateLimitService } from '../services/emailRateLimitService';
 
 const emptyFieldErrors = {
   email: '',
@@ -81,12 +82,16 @@ const AuthScreen = () => {
     setInfo('');
     try {
       if (isSignUp) {
-        const data = await signUp(
-          supabase.auth,
-          isSupabaseConfigured,
+        const data = await emailRateLimitService.run(
           email,
-          password,
-          Linking.createURL('auth-confirm')
+          () => signUp(
+            supabase.auth,
+            isSupabaseConfigured,
+            email,
+            password,
+            Linking.createURL('auth-confirm')
+          ),
+          { shouldRecord: (result) => !result.session }
         );
         // No session back means email confirmation is required before sign-in works.
         // If a session came back, the auth listener will flip to the Profile screen on its own.
@@ -116,11 +121,14 @@ const AuthScreen = () => {
     setSubmitting(true);
     resetMessages();
     try {
-      await sendPasswordReset(
-        supabase.auth,
-        isSupabaseConfigured,
+      await emailRateLimitService.run(
         email,
-        Linking.createURL('reset-password')
+        () => sendPasswordReset(
+          supabase.auth,
+          isSupabaseConfigured,
+          email,
+          Linking.createURL('reset-password')
+        )
       );
       setInfo('Check your email for a password reset link.');
     } catch (err) {

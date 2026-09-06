@@ -260,6 +260,12 @@ Supabase provides account auth, private account sync, and the backend for notes 
 - `src/context/AuthContext.js` — `AuthProvider` (wraps the app in `App.js`) subscribes to `supabase.auth.onAuthStateChange`, handles account-password recovery, LockNote-password recovery, and email-confirmation deep links (implicit tokens or PKCE codes), and exposes the session and distinct recovery states via `useAuth()`.
 - `AuthScreen` handles sign-up, sign-in, forgotten-account-password email requests, and choosing a new account password. Invalid email, short-password, and confirmation errors appear beneath their relevant fields before Supabase is called. Supabase must allow `locknote://reset-password`, `locknote://reset-lock-password`, and `locknote://auth-confirm` in **Authentication → URL Configuration → Redirect URLs** (plus the corresponding deployed web URLs). On sign-up, if Supabase's "confirm email" setting is on, no session comes back immediately — the screen shows a "check your email" message and flips to sign-in mode; if it's off, a session comes back right away and `onAuthStateChange` flips the Profile tab over on its own.
 - `tests/auth.test.mjs` exercises error mapping, callback parsing, redirects, request payloads, and configuration/error propagation. It runs as part of `npm test`.
+- Authentication emails share a device-persistent, per-address 120-second cooldown
+  across signup confirmation, account-password reset, and LockNote-password reset.
+  Supabase remains authoritative with a project-wide target of 30 authentication
+  emails per hour and the same 120-second minimum frequency. The local values live
+  in `supabase/config.toml`; hosted projects must be configured separately in the
+  Supabase Dashboard.
 - `react-native-url-polyfill/auto` is imported first in `index.js` — required because Hermes' native `URL` implementation is incomplete and `@supabase/supabase-js` depends on it.
 
 ## Private account sync
