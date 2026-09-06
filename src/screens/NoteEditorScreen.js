@@ -9,6 +9,7 @@ import {
   Modal,
   Text,
   Pressable,
+  Keyboard,
 } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
@@ -39,6 +40,7 @@ import {
 } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
+import { isReadOnlyCollaborativeNote } from '../utils/collaboration-note.mjs';
 
 const NoteEditorScreen = ({ route, navigation }) => {
   const colors = useTheme();
@@ -49,6 +51,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [content, setContent] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
@@ -62,7 +65,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const contentRef = useRef(null);
   const contentLimitDialogShown = useRef(false);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
-  const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, cloudId: null, deleted: false });
+  const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, cloudId: null, readOnly: false, deleted: false });
   const {
     canRedo,
     canUndo,
@@ -83,6 +86,14 @@ const NoteEditorScreen = ({ route, navigation }) => {
         setHasPassword(!!note.password);
         setIsPinned(!!note.is_pinned);
         setNoteColor(localColor);
+        const readOnly = isReadOnlyCollaborativeNote(note);
+        setIsReadOnly(readOnly);
+        if (readOnly) {
+          if (saveTimeout.current) clearTimeout(saveTimeout.current);
+          saveTimeout.current = null;
+          setIsTitleFocused(false);
+          Keyboard.dismiss();
+        }
         latest.current = {
           ...latest.current,
           title: note.title,
@@ -91,6 +102,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           isPinned: !!note.is_pinned,
           color: localColor,
           cloudId: note.cloud_id,
+          readOnly,
         };
         loadCompletedRef.current = true;
         clearUndo();
@@ -102,6 +114,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
 
   const autoSave = useCallback(
     (newTitle, newContent) => {
+      if (latest.current.readOnly) return;
       if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
       }
@@ -118,6 +131,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   );
 
   const handleTitleChange = (text) => {
+    if (latest.current.readOnly) return;
     remember(
       { title: latest.current.title, content: latest.current.content },
       'title'
@@ -128,6 +142,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   };
 
   const handleContentChange = (text) => {
+    if (latest.current.readOnly) return;
     const limited = constrainNormalNoteContent(text);
     if (limited.limitReached && !contentLimitDialogShown.current) {
       contentLimitDialogShown.current = true;
@@ -155,7 +170,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   });
 
   const restoreHistorySnapshot = (snapshot) => {
-    if (!snapshot) return;
+    if (!snapshot || latest.current.readOnly) return;
 
     setTitle(snapshot.title);
     setContent(snapshot.content);
@@ -273,6 +288,8 @@ const NoteEditorScreen = ({ route, navigation }) => {
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
+    if (latest.current.readOnly) return;
+
     if (disposition === 'delete') {
       await noteRepo.hardDelete(noteId);
       await noteColorPreference.remove(noteId);
@@ -314,6 +331,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
             placeholder="Note title"
             placeholderTextColor={colors.textTertiary}
             value={title}
+            editable={!isReadOnly}
             onChangeText={handleTitleChange}
             onFocus={() => setIsTitleFocused(true)}
             onBlur={() => setIsTitleFocused(false)}
@@ -321,13 +339,13 @@ const NoteEditorScreen = ({ route, navigation }) => {
             returnKeyType="next"
             onSubmitEditing={() => contentRef.current?.focus()}
             accessibilityLabel="Note title"
-            accessibilityHint="Edits the title of this note"
+            accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Edits the title of this note'}
           />
         </View>
 
         <EditorHistoryButtons
-          canRedo={canRedo}
-          canUndo={canUndo}
+          canRedo={canRedo && !isReadOnly}
+          canUndo={canUndo && !isReadOnly}
           colors={colors}
           disabledStyle={styles.headerButtonDisabled}
           onRedo={handleRedo}
@@ -359,12 +377,13 @@ const NoteEditorScreen = ({ route, navigation }) => {
           placeholder="Start writing..."
           placeholderTextColor={colors.textTertiary}
           value={content}
+          editable={!isReadOnly}
           onChangeText={handleContentChange}
           maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS}
           multiline
           textAlignVertical="top"
           accessibilityLabel="Note content"
-          accessibilityHint={`Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
+          accessibilityHint={isReadOnly ? 'This shared note is view only' : `Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
         />
       </View>
 

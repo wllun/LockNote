@@ -16,7 +16,7 @@ This file describes the product direction and major delivery phases. For detaile
 - [ ] Deploy and verify all required Supabase migrations and the `share-note` Edge Function against the production project.
 - [ ] Verify registration, email confirmation, session persistence, account-password recovery, LockNote-password recovery, and sign-out end-to-end on Android, iOS, and web.
 - [ ] Verify manual private sync on at least two physical devices, including edits, moves, root notes, archives, and soft-delete tombstones.
-- [ ] Verify collaboration with two real accounts, including invitations, member removal, realtime refresh, revision conflicts, and owner/member permissions.
+- [ ] Verify collaboration with two real accounts, including Can edit/View only invitations, permission changes while an editor is open, member removal, realtime refresh, and revision conflicts.
 - [ ] Configure production authentication email branding:
   - Connect Supabase Auth to Resend through Custom SMTP. As checked on 2026-08-31, Resend Free allows 3,000 transactional emails per month and 100 per day; confirm current limits before launch.
   - Use a dedicated sender subdomain such as `auth.example.com` and `LockNote <no-reply@auth.example.com>`. The domain identifies the email sender; it does not require LockNote to have a website.
@@ -45,7 +45,7 @@ This file describes the product direction and major delivery phases. For detaile
 - [X] Email-confirmation and password-recovery deep links on native and web.
 - [X] Manual two-way private folder/note sync with row-level security, last-write-wins timestamps, root-note preservation, and deletion tombstones.
 - [X] Multi-device data transfer through an explicit Sync Notes action after signing in.
-- [X] Collaboration Release 1: share individual notes by registered email, manage collaborators, display Shared-with-me notes, refresh through Realtime, and reject stale-revision saves.
+- [X] Collaboration Release 1: share individual notes by registered email with per-recipient Can edit/View only access, manage collaborators, display Shared-with-me notes, refresh through Realtime, reject viewer writes, and reject stale-revision saves.
 - [X] Android/iOS forced-update baseline driven by platform-specific public read-only Supabase policies; web remains exempt.
 
 ### Remaining

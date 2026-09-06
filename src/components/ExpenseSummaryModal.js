@@ -39,6 +39,7 @@ const ExpenseSummaryModal = ({
   onSave,
   onDelete,
   onNoteChange,
+  readOnly = false,
 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -96,6 +97,7 @@ const ExpenseSummaryModal = ({
   );
   const isUpdating = !!categoryId || !!categoryWithSameName;
   const handleSummaryNoteChange = (value) => {
+    if (readOnly) return;
     const rawValue = String(value ?? '');
     const nextValue = rawValue.slice(0, EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS);
     const limitReached = rawValue.length >= EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS;
@@ -114,6 +116,7 @@ const ExpenseSummaryModal = ({
   };
 
   const startForm = (category = null) => {
+    if (readOnly) return;
     setCategoryId(category?.id ?? null);
     setCategoryName(category?.name ?? '');
     setKeywordInput('');
@@ -209,7 +212,7 @@ const ExpenseSummaryModal = ({
   };
 
   const editActiveCategory = () => {
-    if (!activeCategory) return;
+    if (!activeCategory || readOnly) return;
     const category = activeCategory;
     setCategoryActionId(null);
     setCategoryActionMode('actions');
@@ -217,7 +220,7 @@ const ExpenseSummaryModal = ({
   };
 
   const deleteActiveCategory = async () => {
-    if (!activeCategory || deletingCategory) return;
+    if (!activeCategory || deletingCategory || readOnly) return;
     const categoryIdToDelete = activeCategory.id;
     setDeletingCategory(true);
     try {
@@ -280,7 +283,7 @@ const ExpenseSummaryModal = ({
               keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               keyboardShouldPersistTaps="handled"
             >
-              <Pressable
+              {!readOnly && <Pressable
                 style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
                 onPress={() => startForm()}
                 accessibilityRole="button"
@@ -288,7 +291,7 @@ const ExpenseSummaryModal = ({
               >
                 <Ionicons name="add" size={20} color={colors.primary} />
                 <Text style={styles.outlineButtonText}>Add category</Text>
-              </Pressable>
+              </Pressable>}
 
               <View style={styles.totalCard}>
                 <Text style={styles.totalLabel}>CATEGORIZED TOTAL</Text>
@@ -341,13 +344,14 @@ const ExpenseSummaryModal = ({
               <TextInput
                 style={styles.notesInput}
                 value={summaryNote}
+                editable={!readOnly}
                 onChangeText={handleSummaryNoteChange}
                 placeholder="Add notes about this monthly summary..."
                 placeholderTextColor={colors.textTertiary}
                 multiline
                 textAlignVertical="top"
                 accessibilityLabel="Monthly summary notes"
-                accessibilityHint={`Maximum ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters`}
+                accessibilityHint={readOnly ? 'This shared note is view only' : `Maximum ${EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS.toLocaleString()} characters`}
               />
               {saveStatus === 'Saving...' || saveStatus === 'Could not save' ? (
                 <View style={styles.notesStatus}>
@@ -462,7 +466,7 @@ const ExpenseSummaryModal = ({
                 </View>
               </View>
 
-              <Pressable
+              {!readOnly && <Pressable
                 disabled={saving}
                 style={({ pressed }) => [
                   styles.primaryButton,
@@ -478,7 +482,7 @@ const ExpenseSummaryModal = ({
                 <Text style={styles.primaryButtonText}>
                   {saving ? 'Saving...' : isUpdating ? 'Update category' : 'Save category'}
                 </Text>
-              </Pressable>
+              </Pressable>}
 
               {liveCategories.length > 0 && (
                 <Pressable
@@ -573,7 +577,7 @@ const ExpenseSummaryModal = ({
                 <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
               </Pressable>
 
-              <Pressable
+              {!readOnly && <Pressable
                 style={({ pressed }) => [
                   styles.categoryActionItem,
                   styles.categoryActionItemBorder,
@@ -590,9 +594,9 @@ const ExpenseSummaryModal = ({
                   <Text style={styles.categoryActionItemTitle}>Edit category</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-              </Pressable>
+              </Pressable>}
 
-              <Pressable
+              {!readOnly && <Pressable
                 style={({ pressed }) => [
                   styles.categoryActionItem,
                   styles.categoryDeleteItem,
@@ -610,7 +614,7 @@ const ExpenseSummaryModal = ({
                     Delete category
                   </Text>
                 </View>
-              </Pressable>
+              </Pressable>}
             </>
           ) : categoryActionMode === 'view' ? (
             <View style={styles.categoryTransactions}>

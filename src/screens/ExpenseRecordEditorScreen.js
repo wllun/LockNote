@@ -82,6 +82,7 @@ import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
 import { getEditorExitDisposition } from '../utils/editor-exit-disposition.mjs';
 import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { isReadOnlyCollaborativeNote } from '../utils/collaboration-note.mjs';
 
 const EXPENSE_ROW_MIN_HEIGHT = 48;
 const EXPENSE_REMARK_MAX_HEIGHT = 82;
@@ -108,6 +109,7 @@ const ExpenseRowDragHandle = ({
   onMove,
   onDelete,
   itemLabel = 'expense row',
+  readOnly = false,
 }) => {
   const [isHolding, setIsHolding] = useState(false);
   const callbacks = useRef({
@@ -160,6 +162,7 @@ const ExpenseRowDragHandle = ({
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
+        .enabled(!readOnly)
         .activateAfterLongPress(DRAG_ACTIVATION_DELAY_MS)
         .shouldCancelWhenOutside(false)
         .onBegin(() => {
@@ -203,6 +206,7 @@ const ExpenseRowDragHandle = ({
       endDrag,
       startDrag,
       updateDrag,
+      readOnly,
     ]
   );
 
@@ -215,11 +219,11 @@ const ExpenseRowDragHandle = ({
           styles.rowDragHandle,
           isHolding && styles.rowDragHandleHolding,
         ]}
-        accessible
+        accessible={!readOnly}
         accessibilityRole="adjustable"
         accessibilityLabel={`Move ${itemLabel} ${rowIndex + 1}`}
         accessibilityHint="Hold still for one second, then drag to move or delete"
-        accessibilityActions={[
+        accessibilityActions={readOnly ? [] : [
           { name: 'increment', label: 'Move row down' },
           { name: 'decrement', label: 'Move row up' },
           { name: 'activate', label: 'Delete row' },
@@ -236,12 +240,12 @@ const ExpenseRowDragHandle = ({
           }
         }}
       >
-        <MaterialIcons
+        {!readOnly && <MaterialIcons
           name="drag-indicator"
           size={25}
           color={isHolding ? colors.primary : colors.textSecondary}
           style={styles.dragIndicatorIcon}
-        />
+        />}
       </View>
     </GestureDetector>
   );
@@ -268,6 +272,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [commitmentDraft, setCommitmentDraft] = useState(null);
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
   const [showColorModal, setShowColorModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
@@ -319,6 +324,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     isPinned: false,
     color: DEFAULT_NOTE_COLOR,
     cloudId: null,
+    readOnly: false,
     deleted: false,
   });
   const {
@@ -401,6 +407,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       const localColor = await noteColorPreference.load(noteId);
 
       const parsed = parseExpenseNote(note.content);
+      const readOnly = isReadOnlyCollaborativeNote(note);
       const loadedCurrency = note.content
         ? parsed.currency
         : await expenseCurrencyPreference.load();
@@ -429,6 +436,19 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       setHasPassword(!!note.password);
       setIsPinned(!!note.is_pinned);
       setNoteColor(localColor);
+      setIsReadOnly(readOnly);
+      if (readOnly) {
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
+        saveTimeout.current = null;
+        setSaveStatus('');
+        setCommitmentDraft(null);
+        setPendingDeletion(null);
+        setShowCurrencyModal(false);
+        setFocusedCell(null);
+        activeDragRef.current = null;
+        setActiveDrag(null);
+        Keyboard.dismiss();
+      }
       latest.current = {
         ...latest.current,
         title: loadedTitle,
@@ -443,6 +463,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         isPinned: !!note.is_pinned,
         color: localColor,
         cloudId: note.cloud_id,
+        readOnly,
       };
       loadCompletedRef.current = true;
       clearUndo();
@@ -468,6 +489,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       nextMonthlyCommitments = latest.current.monthlyCommitments,
       nextCurrency = latest.current.currency
     ) => {
+      if (latest.current.readOnly) return;
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       setSaveStatus('Saving...');
 
@@ -495,7 +517,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   );
 
   const restoreHistorySnapshot = (snapshot) => {
-    if (!snapshot) return;
+    if (!snapshot || latest.current.readOnly) return;
 
     setTitle(snapshot.title);
     setRows(snapshot.rows);
@@ -529,6 +551,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const updateDraft = (nextTitle, nextRows) => {
+    if (latest.current.readOnly) return;
     const nextCategories = recalculateExpenseCategories(
       nextRows,
       latest.current.categories
@@ -547,6 +570,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const persistCategories = async (nextCategories) => {
+    if (latest.current.readOnly) throw new Error('This note is view only.');
     const previousCategories = latest.current.categories;
     if (saveTimeout.current) {
       clearTimeout(saveTimeout.current);
@@ -584,6 +608,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleSaveCategory = async (result) => {
+    if (latest.current.readOnly) return;
     const previousSnapshot = getUndoSnapshot();
     const calculation = calculateExpenseCategory(
       latest.current.rows,
@@ -599,6 +624,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleDeleteCategory = async (categoryId) => {
+    if (latest.current.readOnly) return;
     const previousSnapshot = getUndoSnapshot();
     const nextCategories = removeExpenseCategory(latest.current.categories, categoryId);
     try {
@@ -610,6 +636,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleSummaryNoteChange = (value) => {
+    if (latest.current.readOnly) return;
     remember(getUndoSnapshot(), 'summary-note');
     setSummaryNote(value);
     latest.current.summaryNote = value;
@@ -623,6 +650,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleCurrencyChange = (nextCurrency) => {
+    if (latest.current.readOnly) return;
     if (nextCurrency === latest.current.currency) {
       setShowCurrencyModal(false);
       return;
@@ -644,6 +672,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const updateMonthlyCommitments = (nextCommitments) => {
+    if (latest.current.readOnly) return;
     remember(getUndoSnapshot());
     latest.current.monthlyCommitments = nextCommitments;
     setMonthlyCommitments(nextCommitments);
@@ -657,16 +686,19 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const openNewCommitment = () => {
+    if (latest.current.readOnly) return;
     commitmentNameLimitDialogShownRef.current = false;
     setCommitmentDraft(createMonthlyCommitment());
   };
 
   const openCommitment = (commitment) => {
+    if (latest.current.readOnly) return;
     commitmentNameLimitDialogShownRef.current = false;
     setCommitmentDraft({ ...commitment });
   };
 
   const handleCommitmentDraftChange = (field, value) => {
+    if (latest.current.readOnly) return;
     const nextValue = field === 'remark'
       ? String(value ?? '').slice(0, EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS)
       : value;
@@ -692,7 +724,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const saveCommitment = () => {
-    if (!commitmentDraft) return;
+    if (!commitmentDraft || latest.current.readOnly) return;
     const remark = commitmentDraft.remark.trim();
     const day = sanitizeExpenseDateInput(commitmentDraft.day).slice(0, 2);
     const amount = parseExpenseAmount(commitmentDraft.amount);
@@ -729,6 +761,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const toggleCommitmentPaid = (commitmentId) => {
+    if (latest.current.readOnly) return;
     updateMonthlyCommitments(
       latest.current.monthlyCommitments.map((item) =>
         item.id === commitmentId ? { ...item, isPaid: !item.isPaid } : item
@@ -737,6 +770,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const resetCommitmentPaidStatus = () => {
+    if (latest.current.readOnly) return;
     confirmDestructiveAction({
       title: 'Reset paid status?',
       confirmLabel: 'Reset',
@@ -760,6 +794,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const saveCommitmentsForNextNote = async () => {
+    if (latest.current.readOnly) return;
     if (!latest.current.monthlyCommitments.length || isSavingCommitmentTemplate) {
       return;
     }
@@ -783,6 +818,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const applySavedCommitments = () => {
+    if (latest.current.readOnly) return;
     const applied = applyMonthlyCommitmentTemplate({
       version: 1,
       commitments: savedCommitmentTemplate,
@@ -796,12 +832,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const removeCommitment = (commitmentId) => {
+    if (latest.current.readOnly) return;
     updateMonthlyCommitments(
       latest.current.monthlyCommitments.filter((item) => item.id !== commitmentId)
     );
   };
 
   const confirmRemoveCommitment = (commitmentId) => {
+    if (latest.current.readOnly) return;
     const item = latest.current.monthlyCommitments.find(
       (commitment) => commitment.id === commitmentId
     );
@@ -838,6 +876,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const moveCommitment = (commitmentId, direction) => {
+    if (latest.current.readOnly) return;
     const nextCommitments = moveMonthlyCommitment(
       latest.current.monthlyCommitments,
       commitmentId,
@@ -849,12 +888,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleTitleChange = (value) => {
+    if (latest.current.readOnly) return;
     remember(getUndoSnapshot(), 'title');
     setTitle(value);
     updateDraft(value, latest.current.rows);
   };
 
   const handleRowChange = (rowId, field, value) => {
+    if (latest.current.readOnly) return;
     remember(getUndoSnapshot(), `row:${rowId}:${field}`);
     const nextRows = latest.current.rows.map((row) =>
       row.id === rowId ? { ...row, [field]: value } : row
@@ -900,6 +941,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const addRow = (focus = true) => {
+    if (latest.current.readOnly) return;
     const newRow = createExpenseRow();
     const nextRows = [...latest.current.rows, newRow];
     remember(getUndoSnapshot());
@@ -909,6 +951,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const removeRow = (rowId) => {
+    if (latest.current.readOnly) return;
     const remainingRows = latest.current.rows.filter((row) => row.id !== rowId);
     const nextRows = remainingRows.length ? remainingRows : [createExpenseRow()];
     remember(getUndoSnapshot());
@@ -917,6 +960,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const confirmRemoveRow = (rowId) => {
+    if (latest.current.readOnly) return;
     const currentRows = latest.current.rows;
     const rowIndex = currentRows.findIndex((row) => row.id === rowId);
     if (rowIndex < 0) return;
@@ -947,6 +991,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleConfirmDeletion = () => {
+    if (latest.current.readOnly) return;
     const deletion = pendingDeletion;
     if (!deletion) return;
 
@@ -959,6 +1004,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const moveRow = (rowId, direction) => {
+    if (latest.current.readOnly) return;
     const nextRows = moveExpenseRow(latest.current.rows, rowId, direction);
     if (nextRows === latest.current.rows) return;
 
@@ -1124,6 +1170,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   };
 
   const handleDragStart = (rowId, kind = 'expense') => {
+    if (latest.current.readOnly) return;
     Keyboard.dismiss();
     measureDragArea();
     const currentItems =
@@ -1184,6 +1231,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     absoluteX,
     absoluteY
   ) => {
+    if (latest.current.readOnly) return;
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.rowId !== rowId) return;
 
@@ -1389,6 +1437,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
+    if (draft.readOnly) return;
+
     if (disposition === 'delete') {
       await noteRepo.hardDelete(noteId);
       await noteColorPreference.remove(noteId);
@@ -1439,6 +1489,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           <TextInput
             style={styles.headerTitleInput}
             value={title}
+            editable={!isReadOnly}
             onChangeText={handleTitleChange}
             onFocus={() => setFocusedCell('title')}
             onBlur={() => setFocusedCell(null)}
@@ -1447,13 +1498,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             returnKeyType="next"
             onSubmitEditing={() => focusCell(rows[0].id, 'date')}
             accessibilityLabel="Expense note title"
-            accessibilityHint="Edits the title of this expense note"
+            accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Edits the title of this expense note'}
           />
         </View>
 
         <EditorHistoryButtons
-          canRedo={canRedo}
-          canUndo={canUndo}
+          canRedo={canRedo && !isReadOnly}
+          canUndo={canUndo && !isReadOnly}
           colors={colors}
           disabledStyle={styles.headerButtonDisabled}
           onRedo={handleRedo}
@@ -1521,7 +1572,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               </View>
             </View>
             <View style={styles.commitmentHeadingActions}>
-              {commitmentTotals.paidCount > 0 && (
+              {!isReadOnly && commitmentTotals.paidCount > 0 && (
                 <Pressable
                   style={({ pressed }) => [
                     styles.resetPaidIconButton,
@@ -1571,7 +1622,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               </View>
             )}
 
-            {!monthlyCommitments.length && !!savedCommitmentTemplate.length && (
+            {!isReadOnly && !monthlyCommitments.length && !!savedCommitmentTemplate.length && (
               <View style={styles.savedTemplateCallout}>
                 <View style={styles.savedTemplateIcon}>
                   <Ionicons name="copy-outline" size={20} color={colors.primary} />
@@ -1634,6 +1685,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                     onMove={moveCommitment}
                     onDelete={confirmRemoveCommitment}
                     itemLabel="monthly bill"
+                    readOnly={isReadOnly}
                   />
                   <Pressable
                     style={({ pressed }) => [
@@ -1641,9 +1693,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       pressed && styles.actionsMenuItemPressed,
                     ]}
                     onPress={() => toggleCommitmentPaid(commitment.id)}
+                    disabled={isReadOnly}
                     accessibilityRole="checkbox"
                     accessibilityLabel={`Mark ${commitment.remark} as ${commitment.isPaid ? 'unpaid' : 'paid'}`}
-                    accessibilityState={{ checked: commitment.isPaid }}
+                    accessibilityState={{ checked: commitment.isPaid, disabled: isReadOnly }}
                   >
                     <View
                       style={[
@@ -1662,8 +1715,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       pressed && styles.commitmentPressed,
                     ]}
                     onPress={() => openCommitment(commitment)}
+                    disabled={isReadOnly}
                     accessibilityRole="button"
-                    accessibilityLabel={`Edit ${commitment.remark}`}
+                    accessibilityLabel={isReadOnly ? commitment.remark : `Edit ${commitment.remark}`}
                   >
                     <Text
                       style={[
@@ -1685,8 +1739,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       pressed && styles.commitmentPressed,
                     ]}
                     onPress={() => openCommitment(commitment)}
+                    disabled={isReadOnly}
                     accessibilityRole="button"
-                    accessibilityLabel={`Edit amount for ${commitment.remark}`}
+                    accessibilityLabel={isReadOnly ? `Amount for ${commitment.remark}` : `Edit amount for ${commitment.remark}`}
                   >
                     <Text style={styles.commitmentAmount} numberOfLines={1}>
                       {formatExpenseMoney(commitment.amount, currency)}
@@ -1705,7 +1760,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             )}
               </View>
 
-            <View style={styles.commitmentActions}>
+            {!isReadOnly && <View style={styles.commitmentActions}>
               <TouchableOpacity
                 style={styles.addCommitmentButton}
                 onPress={openNewCommitment}
@@ -1757,7 +1812,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                   />
                 </Pressable>
               )}
-            </View>
+            </View>}
 
               {!!commitmentTemplateMessage && (
                 <Text
@@ -1791,9 +1846,11 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                   pressed && styles.amountHeaderButtonPressed,
                 ]}
                 onPress={() => setShowCurrencyModal(true)}
+                disabled={isReadOnly}
                 accessibilityRole="button"
                 accessibilityLabel={`Amount currency ${selectedCurrency.name}, ${selectedCurrency.code}`}
-                accessibilityHint="Changes the currency for this expense note"
+                accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Changes the currency for this expense note'}
+                accessibilityState={{ disabled: isReadOnly }}
               >
                 <Text style={styles.amountHeaderText}>
                   {selectedCurrency.symbol}
@@ -1844,6 +1901,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                       onDragCancel={handleDragCancel}
                       onMove={moveRow}
                       onDelete={confirmRemoveRow}
+                      readOnly={isReadOnly}
                     />
                   <View
                     style={[
@@ -1862,6 +1920,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                         styles.dateInput,
                       ]}
                       value={row.date}
+                      editable={!isReadOnly}
                       onChangeText={(value) =>
                         handleRowChange(row.id, 'date', sanitizeExpenseDateInput(value))
                       }
@@ -1897,6 +1956,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                         focusedCell === `${row.id}:remark` && styles.focusedInput,
                       ]}
                       value={row.remark}
+                      editable={!isReadOnly}
                       onChangeText={(value) => handleRemarkChange(row.id, value)}
                       placeholder={showPlaceholder ? 'Enter remark' : undefined}
                       placeholderTextColor={colors.textTertiary}
@@ -1937,6 +1997,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                         focusedCell === `${row.id}:amount` && styles.focusedInput,
                       ]}
                       value={row.amount}
+                      editable={!isReadOnly}
                       onChangeText={(value) =>
                         handleRowChange(
                           row.id,
@@ -1975,7 +2036,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             )}
           </View>
 
-          <View style={styles.addRowActions}>
+          {!isReadOnly && <View style={styles.addRowActions}>
             <TouchableOpacity
               style={styles.addRowButton}
               onPress={() => addRow(true)}
@@ -1986,7 +2047,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               <Ionicons name="add-circle" size={23} color={colors.primary} />
               <Text style={styles.addRowText}>Add row</Text>
             </TouchableOpacity>
-          </View>
+          </View>}
 
           <View style={styles.statusRow}>
             {saveStatus ? (
@@ -2217,6 +2278,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}
         onNoteChange={handleSummaryNoteChange}
+        readOnly={isReadOnly}
       />
 
       <DestructiveConfirmationModal
