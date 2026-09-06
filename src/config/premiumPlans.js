@@ -1,6 +1,8 @@
 export const PREMIUM_PLANS = [
   {
     id: 'plus',
+    entitlementId: 'plus',
+    packageId: 'plus_monthly',
     name: 'LockNote Plus',
     price: 'RM 4.90',
     period: 'per month',
@@ -16,6 +18,8 @@ export const PREMIUM_PLANS = [
   },
   {
     id: 'pro',
+    entitlementId: 'pro',
+    packageId: 'pro_monthly',
     name: 'LockNote Pro',
     price: 'RM 9.99',
     period: 'per month',

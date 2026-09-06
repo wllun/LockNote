@@ -1,8 +1,11 @@
 # Subscription Plans
 
-This document defines the planned LockNote subscription boundaries. The Premium
-module previews these plans, but billing, entitlement checks, storage quotas,
-expiry handling, and feature restrictions are not implemented yet.
+This document defines the LockNote subscription boundaries. The Premium module
+can load offerings, complete purchases, restore purchases, open subscription
+management, and display the active RevenueCat entitlement. Store and RevenueCat
+dashboard configuration is still required before accepting payments. Premium
+feature restrictions, storage quotas, and server-side expiry enforcement are
+not implemented yet.
 
 ## Product Principles
 
@@ -77,8 +80,14 @@ separate explicit actions.
 
 ## Implementation Status
 
-The app currently allows account login, manual sync, and sharing without premium
-entitlement checks. The current Premium module always displays Free as the active
-plan. App-store billing, server-verified entitlements, quota tracking, downgrade
-state, read-only recovery, and resubscription recovery must be implemented and
-tested before LockNote charges users.
+The Premium module uses RevenueCat offerings and `CustomerInfo` for its purchase
+and restore lifecycle. A user must sign in before subscribing, and the Supabase
+user UUID becomes the RevenueCat App User ID. The screen displays the localized
+store price and changes from Free to the active Plus or Pro entitlement after a
+verified purchase.
+
+The app still allows manual sync and sharing without premium entitlement checks.
+Server-owned entitlement records, quota tracking, feature gating, downgrade
+enforcement, and read-only recovery remain future work. See
+[Subscription Payment Setup](SUBSCRIPTION_SETUP.md) for the external dashboard,
+product, key, and testing steps.

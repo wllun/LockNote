@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,18 +16,135 @@ import {
 } from '../config/premiumPlans';
 import { radius, shadow, useTheme } from '../theme';
 import { AppAlert as Alert } from '../utils/app-alert';
+import { useAuth } from '../context/AuthContext';
+import { useSubscription } from '../context/SubscriptionContext';
+import {
+  FREE_PLAN_ID,
+  getPurchaseErrorMessage,
+  getRenewalCopy,
+  isPurchaseCancelled,
+} from '../utils/subscription.mjs';
 
-const PremiumScreen = () => {
+const PremiumScreen = ({ navigation }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const useWideLayout = width >= 760;
+  const { session } = useAuth();
+  const {
+    activeEntitlement,
+    activePlanId,
+    configured,
+    loading,
+    manage,
+    message,
+    packagesByPlan,
+    purchase,
+    purchasingPlanId,
+    refresh,
+    restore,
+    restoring,
+  } = useSubscription();
+  const [refreshing, setRefreshing] = useState(false);
+  const activePlan = PREMIUM_PLANS.find((plan) => plan.id === activePlanId);
+  const isPremium = activePlanId !== FREE_PLAN_ID;
 
-  const showComingSoon = (action) => {
+  const openProfile = () => {
+    navigation.getParent()?.navigate('Profile');
+  };
+
+  const requireAccount = () => {
     Alert.alert(
-      'Subscriptions coming soon',
-      `${action} will be available after LockNote subscriptions are connected.`
+      'Sign in to subscribe',
+      'Use a free LockNote account so your subscription can be restored on your other devices.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: openProfile },
+      ]
     );
+  };
+
+  const handlePlanPress = async (plan) => {
+    if (!session) {
+      requireAccount();
+      return;
+    }
+    if (isPremium) {
+      if (activePlanId !== plan.id) await handleManage();
+      return;
+    }
+    if (!configured || !packagesByPlan[plan.id]) {
+      Alert.alert('Plan unavailable', message || 'This plan is not available from the store right now.');
+      return;
+    }
+
+    try {
+      const purchasedPlanId = await purchase(plan.id);
+      if (purchasedPlanId === plan.id) {
+        Alert.alert('Welcome to LockNote Premium', `Your ${plan.name} subscription is now active.`);
+      } else {
+        Alert.alert(
+          'Payment is being confirmed',
+          'The store accepted the purchase, but the subscription is not active yet. Use Restore purchases after the store finishes processing it.'
+        );
+      }
+    } catch (error) {
+      if (!isPurchaseCancelled(error)) {
+        Alert.alert('Purchase not completed', getPurchaseErrorMessage(error));
+      }
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!session) {
+      requireAccount();
+      return;
+    }
+    if (!configured) {
+      Alert.alert('Restore unavailable', message || 'Subscriptions are not configured for this build.');
+      return;
+    }
+
+    try {
+      const restoredPlanId = await restore();
+      const restoredPlan = PREMIUM_PLANS.find((plan) => plan.id === restoredPlanId);
+      Alert.alert(
+        restoredPlan ? 'Purchase restored' : 'No purchase found',
+        restoredPlan
+          ? `Your ${restoredPlan.name} subscription is active.`
+          : 'No active subscription was found for this LockNote and store account.'
+      );
+    } catch (error) {
+      Alert.alert('Restore failed', getPurchaseErrorMessage(error));
+    }
+  };
+
+  const handleManage = async () => {
+    if (!isPremium) {
+      Alert.alert('No active subscription', 'Choose a plan before managing a subscription.');
+      return;
+    }
+    try {
+      await manage();
+    } catch (error) {
+      const noSubscription = error?.message === 'No active subscription is available to manage.';
+      Alert.alert(
+        'Unable to manage subscription',
+        noSubscription ? error.message : 'The subscription page could not be opened. Please try again.'
+      );
+    }
+  };
+
+  const handleRetry = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await refresh();
+    } catch {
+      Alert.alert('Still unable to load plans', 'Check your connection and try again.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   return (
@@ -46,28 +164,80 @@ const PremiumScreen = () => {
             Your notes stay yours. Premium plans add cloud services and storage.
           </Text>
           <View style={styles.previewNotice}>
-            <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
-            <Text style={styles.previewNoticeText}>Purchases are not connected yet.</Text>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons
+                name={message ? 'information-circle-outline' : 'shield-checkmark-outline'}
+                size={18}
+                color={colors.primary}
+              />
+            )}
+            <Text accessibilityLiveRegion="polite" style={styles.previewNoticeText}>
+              {loading
+                ? 'Checking your subscription…'
+                : message || 'Payment is completed by the provider shown at checkout.'}
+            </Text>
           </View>
+          {message && configured && session && !loading ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading subscription plans"
+              accessibilityState={{ busy: refreshing, disabled: refreshing }}
+              disabled={refreshing}
+              onPress={handleRetry}
+              style={({ pressed }) => [
+                styles.retryButton,
+                refreshing && styles.buttonDisabled,
+                pressed && styles.pressed,
+              ]}
+            >
+              {refreshing ? <ActivityIndicator size="small" color={colors.primary} /> : null}
+              <Text style={styles.retryButtonText}>
+                {refreshing ? 'Trying again…' : 'Try again'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <Text style={styles.sectionLabel}>CURRENT PLAN</Text>
         <View style={styles.currentCard}>
           <View style={styles.currentIcon}>
-            <Ionicons name="checkmark" size={21} color={colors.primary} />
+            <Ionicons name={isPremium ? 'diamond' : 'checkmark'} size={21} color={colors.primary} />
           </View>
           <View style={styles.currentCopy}>
-            <Text style={styles.currentTitle}>Free</Text>
-            <Text style={styles.currentText}>Offline features, account access and backup · RM 0</Text>
+            <Text style={styles.currentTitle}>{activePlan?.name ?? 'Free'}</Text>
+            <Text style={styles.currentText}>
+              {isPremium
+                ? getRenewalCopy(activeEntitlement)
+                : 'Offline features, account access and backup · RM 0'}
+            </Text>
           </View>
           <View style={styles.currentBadge}>
-            <Text style={styles.currentBadgeText}>Current</Text>
+            <Text style={styles.currentBadgeText}>{isPremium ? 'Premium' : 'Current'}</Text>
           </View>
         </View>
 
         <Text style={styles.sectionLabel}>PLANS</Text>
         <View style={[styles.planGrid, useWideLayout && styles.planGridWide]}>
-          {PREMIUM_PLANS.map((plan) => (
+          {PREMIUM_PLANS.map((plan) => {
+            const storePackage = packagesByPlan[plan.id];
+            const isCurrent = activePlanId === plan.id;
+            const isBusy = purchasingPlanId === plan.id;
+            const isOtherPurchaseBusy = Boolean(purchasingPlanId) && !isBusy;
+            const planUnavailable = Boolean(session) && !isPremium && (!configured || !storePackage);
+            const disabled = loading || restoring || isCurrent || isOtherPurchaseBusy || planUnavailable;
+            const buttonLabel = isCurrent
+              ? 'Current plan'
+              : isPremium
+                ? 'Manage plan'
+                : !session
+                  ? 'Sign in to subscribe'
+                  : !configured || !storePackage
+                    ? 'Unavailable'
+                    : 'Subscribe';
+
+            return (
             <View
               key={plan.id}
               style={[styles.planCard, useWideLayout && styles.planCardWide]}
@@ -83,7 +253,7 @@ const PremiumScreen = () => {
                   ) : null}
                 </View>
                 <View style={styles.priceRow}>
-                  <Text style={styles.price}>{plan.price}</Text>
+                  <Text style={styles.price}>{storePackage?.product?.priceString ?? plan.price}</Text>
                   <Text style={styles.period}>{plan.period}</Text>
                 </View>
                 <Text style={styles.planDescription}>{plan.description}</Text>
@@ -102,27 +272,45 @@ const PremiumScreen = () => {
 
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Choose ${plan.name}`}
-                accessibilityHint="Shows information about subscription availability"
-                onPress={() => showComingSoon(`${plan.name} upgrades`)}
+                accessibilityLabel={`${buttonLabel}: ${plan.name}`}
+                accessibilityHint={isPremium && !isCurrent
+                  ? 'Opens subscription management to change plans'
+                  : 'Starts the secure store subscription process'}
+                accessibilityState={{ busy: isBusy, disabled }}
+                disabled={disabled}
+                onPress={() => handlePlanPress(plan)}
                 style={({ pressed }) => [
                   styles.planButton,
                   plan.id === 'plus' ? styles.planButtonPrimary : styles.planButtonSecondary,
+                  disabled && styles.buttonDisabled,
                   pressed && styles.pressed,
                 ]}
               >
-                <Text
-                  style={
-                    plan.id === 'plus'
+                {isBusy ? (
+                  <View style={styles.buttonBusyContent}>
+                    <ActivityIndicator
+                      size="small"
+                      color={plan.id === 'plus' ? colors.card : colors.primary}
+                    />
+                    <Text style={plan.id === 'plus'
                       ? styles.planButtonPrimaryText
-                      : styles.planButtonSecondaryText
-                  }
-                >
-                  Coming soon
-                </Text>
+                      : styles.planButtonSecondaryText}
+                    >
+                      Completing purchase…
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={plan.id === 'plus'
+                    ? styles.planButtonPrimaryText
+                    : styles.planButtonSecondaryText}
+                  >
+                    {buttonLabel}
+                  </Text>
+                )}
               </Pressable>
             </View>
-          ))}
+            );
+          })}
         </View>
 
         <Text style={styles.sectionLabel}>ALWAYS FREE</Text>
@@ -164,18 +352,34 @@ const PremiumScreen = () => {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Restore purchases"
-            onPress={() => showComingSoon('Restore purchases')}
-            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+            accessibilityState={{ busy: restoring, disabled: loading || Boolean(purchasingPlanId) }}
+            disabled={loading || Boolean(purchasingPlanId)}
+            onPress={handleRestore}
+            style={({ pressed }) => [
+              styles.actionButton,
+              (loading || Boolean(purchasingPlanId)) && styles.buttonDisabled,
+              pressed && styles.pressed,
+            ]}
           >
-            <Ionicons name="refresh-outline" size={20} color={colors.primary} />
-            <Text style={styles.actionText}>Restore purchases</Text>
+            {restoring
+              ? <ActivityIndicator size="small" color={colors.primary} />
+              : <Ionicons name="refresh-outline" size={20} color={colors.primary} />}
+            <Text style={styles.actionText}>
+              {restoring ? 'Restoring purchases…' : 'Restore purchases'}
+            </Text>
           </Pressable>
           <View style={styles.actionDivider} />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Manage subscription"
-            onPress={() => showComingSoon('Manage subscription')}
-            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+            accessibilityState={{ disabled: !isPremium }}
+            disabled={!isPremium}
+            onPress={handleManage}
+            style={({ pressed }) => [
+              styles.actionButton,
+              !isPremium && styles.buttonDisabled,
+              pressed && styles.pressed,
+            ]}
           >
             <Ionicons name="card-outline" size={20} color={colors.primary} />
             <Text style={styles.actionText}>Manage subscription</Text>
@@ -183,7 +387,8 @@ const PremiumScreen = () => {
         </View>
 
         <Text style={styles.footerText}>
-          Prices and included features are proposals and may change before launch.
+          Subscriptions renew automatically until cancelled. The payment provider confirms
+          the final price and billing period before payment.
         </Text>
       </View>
     </ScrollView>
@@ -267,6 +472,20 @@ const makeStyles = (colors) => StyleSheet.create({
     lineHeight: 18,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  retryButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginTop: 6,
+  },
+  retryButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '800',
   },
   sectionLabel: {
     color: colors.textSecondary,
@@ -457,6 +676,15 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.primary,
     fontSize: 15,
     fontWeight: '800',
+  },
+  buttonBusyContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   pressed: {
     opacity: 0.72,

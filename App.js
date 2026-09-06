@@ -7,6 +7,7 @@ import { initDB } from './src/db/sqlite';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider, useTheme, useThemeMode } from './src/theme';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { SubscriptionProvider } from './src/context/SubscriptionContext';
 import AppDialogHost from './src/components/AppDialogHost';
 import LockPasswordResetModal from './src/components/lock-password-reset-modal';
 import AppUpdateGate from './src/components/app-update-gate';
@@ -75,7 +76,9 @@ export default function App() {
     <GestureHandlerRootView style={styles.gestureRoot}>
       <ThemeProvider>
         <AuthProvider>
-          <AppRoot />
+          <SubscriptionProvider>
+            <AppRoot />
+          </SubscriptionProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

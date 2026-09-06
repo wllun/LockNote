@@ -36,6 +36,10 @@ export default {
     extra: {
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+      revenueCatIosApiKey: process.env.REVENUECAT_IOS_API_KEY,
+      revenueCatAndroidApiKey: process.env.REVENUECAT_ANDROID_API_KEY,
+      revenueCatWebApiKey: process.env.REVENUECAT_WEB_API_KEY,
+      revenueCatTestApiKey: process.env.REVENUECAT_TEST_API_KEY,
       eas: {
         projectId: "7d5a673d-6949-45ae-9f32-c6fd926b6af3",
       },

@@ -54,8 +54,13 @@ remain Free. LockNote Plus is planned to add cloud sync and collaboration with a
 100 MB cloud-note quota. LockNote Pro adds planned image features with a 2 GB
 cloud-attachment quota. If a paid plan expires, local notes remain editable and
 existing cloud data remains read-only and downloadable; expiry never deletes
-notes. Billing and entitlement enforcement are not implemented yet. See
-[Subscription Plans](docs/SUBSCRIPTION_PLANS.md) for the complete policy.
+notes.
+
+The Premium tab has RevenueCat checkout, restore, management, localized pricing,
+and active-plan status. Cloud features are deliberately not gated yet. Real
+payments require the external configuration in
+[Subscription Payment Setup](docs/SUBSCRIPTION_SETUP.md). See
+[Subscription Plans](docs/SUBSCRIPTION_PLANS.md) for the product policy.
 
 ## Security
 

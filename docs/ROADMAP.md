@@ -9,7 +9,7 @@ This file describes the product direction and major delivery phases. For detaile
 - LockNote remains offline-first: local storage is authoritative while editing, and core note features work without an account.
 - Cloud features are opt-in. Private data is uploaded only when a signed-in user runs Sync Notes; shared notes use the collaboration backend.
 - Account login, local portable backup, and recovery downloads remain Free. LockNote Plus targets active cloud sync and collaboration with 100 MB of cloud note storage; LockNote Pro adds planned media features with 2 GB of cloud attachment storage.
-- The proposed RM4.90/month LockNote Plus and RM9.99/month LockNote Pro prices are planning targets, not active subscriptions. Premium entitlement, billing, quota enforcement, and downgrade handling are not implemented.
+- LockNote Plus and LockNote Pro checkout is implemented through RevenueCat, with actual localized prices supplied by the configured stores. Store products, public SDK keys, and production payment testing still require external setup. Feature gating, quota enforcement, and server-side downgrade handling are not implemented.
 - Subscription expiry must not delete notes. Local editing continues while cloud writes pause and existing cloud data remains read-only and downloadable.
 - Password protection is an access gate, not encryption. Local and synchronized note content is not end-to-end encrypted.
 
@@ -26,8 +26,10 @@ This file describes the product direction and major delivery phases. For detaile
   - Brand the signup-confirmation, account-password recovery, LockNote-password recovery, and email-change templates while preserving variables such as `{{ .ConfirmationURL }}`.
 - [ ] Test the Android and iOS forced-update policies with older store builds before relying on them for a public rollout.
 - [X] Define the planned Free, LockNote Plus, and LockNote Pro boundaries and non-destructive expiry policy in [Subscription Plans](SUBSCRIPTION_PLANS.md).
-- [ ] Implement server-verified subscription entitlement, quota enforcement, and downgrade/recovery behavior before charging users.
-- [X] Add a Premium tab that previews the proposed plan prices and feature groups without activating billing or feature restrictions.
+- [X] Implement the client payment lifecycle: identified checkout, verified RevenueCat entitlement status, restore purchases, subscription management, foreground refresh, and localized pricing.
+- [ ] Configure and validate RevenueCat plus Apple/Google/web products by following [Subscription Payment Setup](SUBSCRIPTION_SETUP.md).
+- [ ] Implement server-owned entitlement persistence, quota enforcement, and downgrade/recovery behavior before gating cloud features.
+- [X] Keep premium feature restrictions disabled while payment setup and entitlement behavior are validated.
 
 ## Phase 1 — Offline core (free) — shipped
 
@@ -100,6 +102,6 @@ See [NOTE_LIMITS.md](NOTE_LIMITS.md) for text limits and [MONTHLY_EXPENSE_CHECKL
 
 ## Explicitly unresolved product decisions
 
-- Final subscription prices, billing provider, trial policy, and store product identifiers.
+- Final store prices, trial policy, and production store metadata.
 - Exact server schema and enforcement path for entitlements, quota usage, billing grace periods, and read-only recovery.
 - Restore-purchases behavior and the account-deletion flow.
