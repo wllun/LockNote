@@ -115,13 +115,17 @@ export const SubscriptionProvider = ({ children }) => {
     if (!userId) throw new Error('Sign in before subscribing.');
     setPurchasingPlanId(planId);
     try {
-      const info = await subscriptionService.purchase(planId, packagesByPlan);
+      const info = await subscriptionService.purchase(planId, packagesByPlan, {
+        currentPlanId: activePlanId,
+        currentProductIdentifier: activeEntitlement?.productIdentifier,
+        currentStore: activeEntitlement?.store,
+      });
       applyCustomerInfo(info);
       return getActivePlan(info, PREMIUM_PLANS);
     } finally {
       setPurchasingPlanId(null);
     }
-  }, [applyCustomerInfo, packagesByPlan, userId]);
+  }, [activeEntitlement, activePlanId, applyCustomerInfo, packagesByPlan, userId]);
 
   const restore = useCallback(async () => {
     if (!userId) throw new Error('Sign in before restoring purchases.');

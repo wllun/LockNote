@@ -69,7 +69,8 @@ const PremiumScreen = ({ navigation }) => {
       requireAccount();
       return;
     }
-    if (isPremium) {
+    const isUpgrade = activePlanId === 'plus' && plan.id === 'pro';
+    if (isPremium && !isUpgrade) {
       if (activePlanId !== plan.id) await handleManage();
       return;
     }
@@ -81,7 +82,10 @@ const PremiumScreen = ({ navigation }) => {
     try {
       const purchasedPlanId = await purchase(plan.id);
       if (purchasedPlanId === plan.id) {
-        Alert.alert('Welcome to LockNote Premium', `Your ${plan.name} subscription is now active.`);
+        Alert.alert(
+          isUpgrade ? 'Upgrade complete' : 'Welcome to LockNote Premium',
+          `Your ${plan.name} subscription is now active.`
+        );
       } else {
         Alert.alert(
           'Payment is being confirmed',
@@ -223,12 +227,16 @@ const PremiumScreen = ({ navigation }) => {
           {PREMIUM_PLANS.map((plan) => {
             const storePackage = packagesByPlan[plan.id];
             const isCurrent = activePlanId === plan.id;
+            const isUpgrade = activePlanId === 'plus' && plan.id === 'pro';
             const isBusy = purchasingPlanId === plan.id;
             const isOtherPurchaseBusy = Boolean(purchasingPlanId) && !isBusy;
-            const planUnavailable = Boolean(session) && !isPremium && (!configured || !storePackage);
+            const requiresPurchase = !isPremium || isUpgrade;
+            const planUnavailable = Boolean(session) && requiresPurchase && (!configured || !storePackage);
             const disabled = loading || restoring || isCurrent || isOtherPurchaseBusy || planUnavailable;
             const buttonLabel = isCurrent
               ? 'Current plan'
+              : isUpgrade
+                ? 'Upgrade to Pro'
               : isPremium
                 ? 'Manage plan'
                 : !session
@@ -273,9 +281,11 @@ const PremiumScreen = ({ navigation }) => {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`${buttonLabel}: ${plan.name}`}
-                accessibilityHint={isPremium && !isCurrent
-                  ? 'Opens subscription management to change plans'
-                  : 'Starts the secure store subscription process'}
+                accessibilityHint={isUpgrade
+                  ? 'Starts the secure store upgrade process'
+                  : isPremium && !isCurrent
+                    ? 'Opens subscription management to change plans'
+                    : 'Starts the secure store subscription process'}
                 accessibilityState={{ busy: isBusy, disabled }}
                 disabled={disabled}
                 onPress={() => handlePlanPress(plan)}

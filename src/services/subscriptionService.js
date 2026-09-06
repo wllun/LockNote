@@ -6,6 +6,7 @@ import { PREMIUM_PLANS } from '../config/premiumPlans';
 import {
   getActiveEntitlement,
   getActivePlan,
+  getAndroidUpgradeInfo,
   getPlanPackages,
 } from '../utils/subscription.mjs';
 
@@ -85,10 +86,25 @@ const load = async () => {
   };
 };
 
-const purchase = async (planId, packagesByPlan) => {
+const purchase = async (
+  planId,
+  packagesByPlan,
+  { currentPlanId, currentProductIdentifier, currentStore } = {}
+) => {
   const selectedPackage = packagesByPlan?.[planId];
   if (!selectedPackage) throw Object.assign(new Error('Plan unavailable'), { code: '5' });
-  const { customerInfo } = await Purchases.purchasePackage(selectedPackage);
+  const productChangeInfo = getAndroidUpgradeInfo({
+    platform: Platform.OS,
+    currentPlanId,
+    targetPlanId: planId,
+    currentProductIdentifier,
+    currentStore,
+  });
+  const { customerInfo } = await Purchases.purchasePackage(
+    selectedPackage,
+    null,
+    productChangeInfo
+  );
   return customerInfo;
 };
 

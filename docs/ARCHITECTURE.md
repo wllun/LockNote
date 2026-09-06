@@ -63,6 +63,13 @@ to be restored to the same LockNote account. `SubscriptionProvider` owns purchas
 state and account identity changes, while `subscriptionService` owns the SDK.
 The app does not gate features with that entitlement yet.
 
+On Android, an in-app Plus-to-Pro purchase includes the active Plus product ID
+as Google Play replacement information and uses `WITH_TIME_PRORATION`. Google
+Play activates Pro immediately and calculates the unused-time credit. Apple
+handles the same upgrade through the products' shared subscription group and
+service-level ranking. LockNote never calculates or displays an estimated
+proration amount; the platform purchase sheet provides the authoritative price.
+
 Account login, local portable backup, and one-way recovery of existing cloud data
 are Free capabilities. LockNote Plus adds active
 cloud note sync, multi-device use, and owner-funded collaboration with a 100 MB

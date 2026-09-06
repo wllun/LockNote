@@ -54,6 +54,13 @@ On Google Play, activate a monthly base plan for each subscription. Complete
 RevenueCat's Google Play service-account and real-time developer notification
 setup before production testing.
 
+LockNote passes the active Plus product to Google Play when a user upgrades to
+Pro and requests `WITH_TIME_PRORATION`. Pro becomes active immediately while
+Google Play credits the unused Plus time according to its billing calculation.
+The store purchase sheet remains the source of truth for the exact charge,
+credit, tax, and next renewal date. Pro-to-Plus changes continue through the
+store subscription-management screen.
+
 Import or create the products in RevenueCat, attach them to the entitlements,
 and connect them to the two packages in the Current offering.
 
@@ -93,6 +100,8 @@ testing. Test at minimum:
 
 - new Plus purchase;
 - new Pro purchase;
+- Plus-to-Pro upgrade with unused Plus time credited by the store;
+- upgrade near the beginning and near the end of a billing period;
 - user-cancelled checkout;
 - pending or interrupted payment;
 - app restart while subscribed;

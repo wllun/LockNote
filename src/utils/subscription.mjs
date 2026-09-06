@@ -1,4 +1,28 @@
 export const FREE_PLAN_ID = 'free';
+export const ANDROID_UPGRADE_REPLACEMENT_MODE = 'WITH_TIME_PRORATION';
+
+export const getAndroidUpgradeInfo = ({
+  platform,
+  currentPlanId,
+  targetPlanId,
+  currentProductIdentifier,
+  currentStore,
+}) => {
+  if (
+    platform !== 'android'
+    || currentPlanId !== 'plus'
+    || targetPlanId !== 'pro'
+    || currentStore !== 'PLAY_STORE'
+    || !String(currentProductIdentifier ?? '').trim()
+  ) {
+    return null;
+  }
+
+  return {
+    oldProductIdentifier: currentProductIdentifier,
+    replacementMode: ANDROID_UPGRADE_REPLACEMENT_MODE,
+  };
+};
 
 export const getActivePlan = (customerInfo, plans) => {
   const active = customerInfo?.entitlements?.active ?? {};

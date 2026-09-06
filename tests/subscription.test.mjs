@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   FREE_PLAN_ID,
+  ANDROID_UPGRADE_REPLACEMENT_MODE,
   getActiveEntitlement,
   getActivePlan,
+  getAndroidUpgradeInfo,
   getPlanPackages,
   getPurchaseErrorMessage,
   isPurchaseCancelled,
@@ -26,6 +28,46 @@ test('resolves the highest active subscription tier', () => {
 
   assert.equal(getActivePlan(customerInfo, plans), 'pro');
   assert.equal(getActiveEntitlement(customerInfo, plans), pro);
+});
+
+test('uses time proration when upgrading Android Plus to Pro', () => {
+  assert.deepEqual(getAndroidUpgradeInfo({
+    platform: 'android',
+    currentPlanId: 'plus',
+    targetPlanId: 'pro',
+    currentProductIdentifier: 'locknote_plus_monthly',
+    currentStore: 'PLAY_STORE',
+  }), {
+    oldProductIdentifier: 'locknote_plus_monthly',
+    replacementMode: ANDROID_UPGRADE_REPLACEMENT_MODE,
+  });
+});
+
+test('does not send Android replacement details for unrelated purchases', () => {
+  assert.equal(getAndroidUpgradeInfo({
+    platform: 'ios',
+    currentPlanId: 'plus',
+    targetPlanId: 'pro',
+    currentProductIdentifier: 'locknote_plus_monthly',
+    currentStore: 'APP_STORE',
+  }), null);
+  assert.equal(getAndroidUpgradeInfo({
+    platform: 'android',
+    currentPlanId: 'free',
+    targetPlanId: 'pro',
+    currentProductIdentifier: null,
+    currentStore: null,
+  }), null);
+});
+
+test('does not send Play replacement details for a subscription bought elsewhere', () => {
+  assert.equal(getAndroidUpgradeInfo({
+    platform: 'android',
+    currentPlanId: 'plus',
+    targetPlanId: 'pro',
+    currentProductIdentifier: 'locknote_plus_monthly',
+    currentStore: 'APP_STORE',
+  }), null);
 });
 
 test('matches plan cards to exact RevenueCat package identifiers', () => {
