@@ -30,6 +30,15 @@ including completed items that remain in the list. Existing checklists created
 under the former 500-item limit are preserved without truncation, but cannot
 accept another item until their item count is below 100.
 
+## Reminder notes
+
+| Field | Limit |
+| --- | ---: |
+| Reminder description | 5,000 characters |
+
+The reminder editor shows a `Character limit reached` dialog at the maximum.
+Existing longer reminder descriptions remain unchanged until edited.
+
 ## Expense notes
 
 | Field | Limit |

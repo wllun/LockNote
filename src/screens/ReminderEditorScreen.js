@@ -20,8 +20,8 @@ import ReminderScheduleModal from '../components/reminder-schedule-modal';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { useEditorUndo } from '../utils/use-editor-undo';
 import {
-  constrainNormalNoteContent,
-  NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
+  constrainReminderBody,
+  REMINDER_BODY_MAX_CHARACTERS,
 } from '../utils/note-limits.mjs';
 import {
   formatReminderSchedule, getReminderScheduleError, isReminderNoteEmpty, normalizeReminder,
@@ -184,12 +184,12 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
   const handleBodyChange = (text) => {
     if (latest.current.readOnly) return;
-    const limited = constrainNormalNoteContent(text);
+    const limited = constrainReminderBody(text);
     if (limited.limitReached && !bodyLimitDialogShown.current) {
       bodyLimitDialogShown.current = true;
       Alert.alert(
         'Character limit reached',
-        'This reminder note can contain up to 100,000 characters. Additional typed or pasted text cannot be added.'
+        `This reminder description can contain up to ${REMINDER_BODY_MAX_CHARACTERS.toLocaleString()} characters. Additional typed or pasted text cannot be added.`
       );
     } else if (!limited.limitReached) {
       bodyLimitDialogShown.current = false;
@@ -395,7 +395,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(20, insets.bottom + 12) }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-        <TextInput ref={bodyRef} style={styles.bodyInput} placeholder="Start writing..." placeholderTextColor={colors.textTertiary} value={body} editable={!isReadOnly} onChangeText={handleBodyChange} maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS} multiline textAlignVertical="top" accessibilityLabel="Reminder note content" accessibilityHint={isReadOnly ? 'This shared note is view only' : undefined} />
+        <TextInput ref={bodyRef} style={styles.bodyInput} placeholder="Start writing..." placeholderTextColor={colors.textTertiary} value={body} editable={!isReadOnly} onChangeText={handleBodyChange} maxLength={REMINDER_BODY_MAX_CHARACTERS} multiline textAlignVertical="top" accessibilityLabel="Reminder note content" accessibilityHint={isReadOnly ? 'This shared note is view only' : `Maximum ${REMINDER_BODY_MAX_CHARACTERS.toLocaleString()} characters`} />
 
         <View style={[styles.reminderCard, reminder.enabled && styles.reminderCardEnabled]}>
           <View style={styles.reminderTop}>

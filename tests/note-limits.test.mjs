@@ -3,11 +3,13 @@ import test from 'node:test';
 
 import {
   constrainNormalNoteContent,
+  constrainReminderBody,
   EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS,
   EXPENSE_REMARK_MAX_CHARACTERS,
   EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS,
   getNormalNoteCharacterCount,
   NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
+  REMINDER_BODY_MAX_CHARACTERS,
 } from '../src/utils/note-limits.mjs';
 
 test('limits normal note content to 50,000 characters', () => {
@@ -39,6 +41,17 @@ test('constrains typed and pasted note content to the maximum length', () => {
   assert.equal(oversizedPaste.value.length, NORMAL_NOTE_CONTENT_MAX_CHARACTERS);
   assert.equal(oversizedPaste.limitReached, true);
   assert.equal(oversizedPaste.wasTruncated, true);
+});
+
+test('limits reminder descriptions to 5,000 characters', () => {
+  assert.equal(REMINDER_BODY_MAX_CHARACTERS, 5_000);
+
+  const oversizedDescription = constrainReminderBody(
+    'x'.repeat(REMINDER_BODY_MAX_CHARACTERS + 1)
+  );
+  assert.equal(oversizedDescription.value.length, REMINDER_BODY_MAX_CHARACTERS);
+  assert.equal(oversizedDescription.limitReached, true);
+  assert.equal(oversizedDescription.wasTruncated, true);
 });
 
 test('defines visible text limits for expense note fields', () => {

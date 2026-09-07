@@ -1,4 +1,5 @@
 export const NORMAL_NOTE_CONTENT_MAX_CHARACTERS = 50_000;
+export const REMINDER_BODY_MAX_CHARACTERS = 5_000;
 export const EXPENSE_REMARK_MAX_CHARACTERS = 200;
 export const EXPENSE_COMMITMENT_NAME_MAX_CHARACTERS = 120;
 export const EXPENSE_SUMMARY_NOTE_MAX_CHARACTERS = 10_000;
@@ -11,5 +12,14 @@ export const constrainNormalNoteContent = (content = '') => {
     value: value.slice(0, NORMAL_NOTE_CONTENT_MAX_CHARACTERS),
     limitReached: value.length >= NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
     wasTruncated: value.length > NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
+  };
+};
+
+export const constrainReminderBody = (content = '') => {
+  const value = String(content ?? '');
+  return {
+    value: value.slice(0, REMINDER_BODY_MAX_CHARACTERS),
+    limitReached: value.length >= REMINDER_BODY_MAX_CHARACTERS,
+    wasTruncated: value.length > REMINDER_BODY_MAX_CHARACTERS,
   };
 };
