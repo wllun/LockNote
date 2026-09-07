@@ -47,6 +47,13 @@ const NoteExportModal = ({
   const previewRef = useRef(null);
   const [exporting, setExporting] = useState(null);
   const [showShareOptions, setShowShareOptions] = useState(false);
+
+  useEffect(() => {
+    if (!visible) setShowShareOptions(false);
+  }, [visible]);
+
+  if (!visible) return null;
+
   const exportData = {
     title,
     content,
@@ -87,10 +94,6 @@ const NoteExportModal = ({
         : 'Add a clear PNG to Gallery',
     },
   ];
-
-  useEffect(() => {
-    if (!visible) setShowShareOptions(false);
-  }, [visible]);
 
   const runExport = async (format, destination = 'save') => {
     const actionKey = `${destination}:${format}`;

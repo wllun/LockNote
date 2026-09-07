@@ -15,9 +15,9 @@ import {
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import {
+  FlatList,
   Gesture,
   GestureDetector,
-  ScrollView,
 } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -251,6 +251,208 @@ const ExpenseRowDragHandle = ({
   );
 };
 
+const ExpenseDailyRow = React.memo(({
+  row,
+  index,
+  isLast,
+  colors,
+  styles,
+  dragX,
+  dragY,
+  dragAreaX,
+  dragAreaY,
+  focusedField,
+  isDragging,
+  showInsertionBefore,
+  showPlaceholder,
+  readOnly,
+  inputRefs,
+  rowHeightsRef,
+  actionsRef,
+}) => {
+  const [remarkHeight, setRemarkHeight] = useState(EXPENSE_ROW_MIN_HEIGHT);
+  const invalidAmount =
+    !!row.amount.trim() && parseExpenseAmount(row.amount) === null;
+
+  const setInputRef = useCallback((field, ref) => {
+    const key = `${row.id}:${field}`;
+    if (ref) inputRefs.current[key] = ref;
+    else delete inputRefs.current[key];
+  }, [inputRefs, row.id]);
+
+  const handleLayout = useCallback(({ nativeEvent }) => {
+    rowHeightsRef.current[row.id] = Math.max(
+      EXPENSE_ROW_MIN_HEIGHT,
+      nativeEvent.layout.height
+    );
+  }, [row.id, rowHeightsRef]);
+
+  const handleRemarkContentSizeChange = useCallback(({ nativeEvent }) => {
+    const nextHeight = Math.max(
+      EXPENSE_ROW_MIN_HEIGHT,
+      Math.min(
+        EXPENSE_REMARK_MAX_HEIGHT,
+        Math.ceil(nativeEvent.contentSize.height)
+      )
+    );
+    setRemarkHeight((currentHeight) =>
+      currentHeight === nextHeight ? currentHeight : nextHeight
+    );
+  }, []);
+
+  return (
+    <View style={styles.expenseListRowShell}>
+      {showInsertionBefore && (
+        <View style={styles.rowInsertionGap}>
+          <View style={styles.rowInsertionDot} />
+          <View style={styles.rowInsertionLine} />
+          <Text style={styles.rowInsertionText}>Row moves here</Text>
+        </View>
+      )}
+      <View
+        onLayout={handleLayout}
+        style={[
+          styles.tableRow,
+          styles.expenseListRow,
+          index % 2 === 0 ? styles.evenRow : styles.oddRow,
+          focusedField && styles.focusedRow,
+          isDragging && styles.draggingRow,
+          isLast && styles.expenseListLastRow,
+        ]}
+      >
+        <ExpenseRowDragHandle
+          rowId={row.id}
+          rowIndex={index}
+          colors={colors}
+          styles={styles}
+          dragX={dragX}
+          dragY={dragY}
+          dragAreaX={dragAreaX}
+          dragAreaY={dragAreaY}
+          onDragStart={actionsRef.current.onDragStart}
+          onDragUpdate={actionsRef.current.onDragUpdate}
+          onDragEnd={actionsRef.current.onDragEnd}
+          onDragCancel={actionsRef.current.onDragCancel}
+          onMove={actionsRef.current.onMove}
+          onDelete={actionsRef.current.onDelete}
+          readOnly={readOnly}
+        />
+        <View
+          style={[
+            styles.tableCellColumn,
+            styles.dateColumn,
+            focusedField === 'date' && styles.focusedInput,
+          ]}
+        >
+          <TextInput
+            ref={(ref) => setInputRef('date', ref)}
+            style={[
+              styles.cellInput,
+              styles.singleLineCellInput,
+              styles.dateInput,
+            ]}
+            value={row.date}
+            editable={!readOnly}
+            onChangeText={(value) =>
+              actionsRef.current.onRowChange(
+                row.id,
+                'date',
+                sanitizeExpenseDateInput(value)
+              )
+            }
+            placeholder={showPlaceholder ? '1' : undefined}
+            placeholderTextColor={colors.textTertiary}
+            inputMode="numeric"
+            keyboardType="number-pad"
+            multiline
+            numberOfLines={1}
+            scrollEnabled={false}
+            underlineColorAndroid="transparent"
+            submitBehavior="submit"
+            returnKeyType="next"
+            onFocus={() => actionsRef.current.onFocus(row.id, 'date')}
+            onBlur={actionsRef.current.onBlur}
+            onSubmitEditing={() => actionsRef.current.onFocusCell(row.id, 'remark')}
+            selectTextOnFocus
+            accessibilityLabel={`Day for expense row ${index + 1}`}
+          />
+        </View>
+        <View style={[styles.tableCellColumn, styles.remarkColumn]}>
+          <TextInput
+            ref={(ref) => setInputRef('remark', ref)}
+            style={[
+              styles.cellInput,
+              styles.remarkInput,
+              { height: remarkHeight },
+              focusedField === 'remark' && styles.focusedInput,
+            ]}
+            value={row.remark}
+            editable={!readOnly}
+            onChangeText={(value) =>
+              actionsRef.current.onRemarkChange(row.id, value)
+            }
+            placeholder={showPlaceholder ? 'Enter remark' : undefined}
+            placeholderTextColor={colors.textTertiary}
+            multiline
+            scrollEnabled={false}
+            underlineColorAndroid="transparent"
+            onContentSizeChange={handleRemarkContentSizeChange}
+            returnKeyType="next"
+            onFocus={() => actionsRef.current.onFocus(row.id, 'remark')}
+            onBlur={actionsRef.current.onBlur}
+            onSubmitEditing={() => actionsRef.current.onFocusCell(row.id, 'amount')}
+            accessibilityLabel={`Remark for expense row ${index + 1}`}
+            accessibilityHint={`Maximum ${EXPENSE_REMARK_MAX_CHARACTERS} characters`}
+          />
+        </View>
+        <View
+          style={[
+            styles.tableCellColumn,
+            styles.amountColumn,
+            invalidAmount && styles.invalidCell,
+            focusedField === 'amount' && styles.focusedInput,
+          ]}
+        >
+          <TextInput
+            ref={(ref) => setInputRef('amount', ref)}
+            style={[
+              styles.cellInput,
+              styles.singleLineCellInput,
+              styles.amountInput,
+              invalidAmount && styles.invalidCell,
+              focusedField === 'amount' && styles.focusedInput,
+            ]}
+            value={row.amount}
+            editable={!readOnly}
+            onChangeText={(value) =>
+              actionsRef.current.onRowChange(
+                row.id,
+                'amount',
+                sanitizeExpenseAmountInput(value)
+              )
+            }
+            placeholder={showPlaceholder ? '0.00' : undefined}
+            placeholderTextColor={colors.textTertiary}
+            inputMode="decimal"
+            keyboardType="decimal-pad"
+            multiline
+            numberOfLines={1}
+            scrollEnabled={false}
+            underlineColorAndroid="transparent"
+            submitBehavior="submit"
+            returnKeyType="next"
+            onFocus={() => actionsRef.current.onFocus(row.id, 'amount')}
+            onBlur={() => actionsRef.current.onAmountBlur(row)}
+            onSubmitEditing={() => actionsRef.current.onFocusNextRow(index)}
+            selectTextOnFocus
+            accessibilityLabel={`Amount for expense row ${index + 1}`}
+          />
+        </View>
+      </View>
+    </View>
+  );
+});
+
 const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const { noteId, isNewDraft = false } = route.params;
   const colors = useTheme();
@@ -284,7 +486,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
   const [focusedCell, setFocusedCell] = useState(null);
-  const [remarkInputHeights, setRemarkInputHeights] = useState({});
   const [activeDrag, setActiveDrag] = useState(null);
   const [pendingDeletion, setPendingDeletion] = useState(null);
   const [dragAreaBounds, setDragAreaBounds] = useState({
@@ -297,12 +498,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const saveTimeout = useRef(null);
   const loadCompletedRef = useRef(false);
   const inputRefs = useRef({});
+  const rowActionsRef = useRef({});
   const remarkLimitDialogRowsRef = useRef(new Set());
   const commitmentNameLimitDialogShownRef = useRef(false);
   const scrollRef = useRef(null);
   const dragAreaRef = useRef(null);
   const dragAreaBoundsRef = useRef(dragAreaBounds);
-  const rowLayouts = useRef({});
+  const rowHeightsRef = useRef({});
   const commitmentLayouts = useRef({});
   const dragRowLayoutsRef = useRef({});
   const deleteTargetBoundsRef = useRef(null);
@@ -345,20 +547,33 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     currencyChanged: latest.current.currencyChanged,
   }), []);
 
-  const commitmentTotals = calculateMonthlyCommitmentTotals(monthlyCommitments);
-  const total = calculateExpenseGrandTotal(rows, monthlyCommitments);
-  const selectedCurrency = getExpenseCurrency(currency);
-  const savedCommitmentTotals = calculateMonthlyCommitmentTotals(
-    savedCommitmentTemplate
+  const commitmentTotals = useMemo(
+    () => calculateMonthlyCommitmentTotals(monthlyCommitments),
+    [monthlyCommitments]
   );
-  const currentCommitmentsMatchSavedTemplate =
-    !!monthlyCommitments.length &&
-    JSON.stringify(
-      createMonthlyCommitmentTemplate(monthlyCommitments).commitments
-    ) === JSON.stringify(savedCommitmentTemplate);
-  const invalidAmountCount = rows.filter(
-    (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
-  ).length;
+  const total = useMemo(
+    () => calculateExpenseGrandTotal(rows, monthlyCommitments),
+    [monthlyCommitments, rows]
+  );
+  const selectedCurrency = getExpenseCurrency(currency);
+  const savedCommitmentTotals = useMemo(
+    () => calculateMonthlyCommitmentTotals(savedCommitmentTemplate),
+    [savedCommitmentTemplate]
+  );
+  const currentCommitmentsMatchSavedTemplate = useMemo(
+    () =>
+      !!monthlyCommitments.length &&
+      JSON.stringify(
+        createMonthlyCommitmentTemplate(monthlyCommitments).commitments
+      ) === JSON.stringify(savedCommitmentTemplate),
+    [monthlyCommitments, savedCommitmentTemplate]
+  );
+  const invalidAmountCount = useMemo(
+    () => rows.filter(
+      (row) => row.amount.trim() && parseExpenseAmount(row.amount) === null
+    ).length,
+    [rows]
+  );
   const deleteTargetBottom = Math.max(16, insets.bottom + 8);
   const dragPreviewWidth = Math.min(
     DRAG_PREVIEW_MAX_WIDTH,
@@ -425,10 +640,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       setTitle(loadedTitle);
       setRows(loadedRows);
-      const loadedCategories = recalculateExpenseCategories(
-        loadedRows,
-        parsed.categories
-      );
+      const loadedCategories = parsed.categories;
       setCategories(loadedCategories);
       setSummaryNote(parsed.summaryNote);
       setMonthlyCommitments(parsed.monthlyCommitments);
@@ -924,20 +1136,25 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     handleRowChange(rowId, 'remark', nextValue);
   };
 
-  const handleRemarkContentSizeChange = (rowId, contentHeight) => {
-    const nextHeight = Math.max(
-      EXPENSE_ROW_MIN_HEIGHT,
-      Math.min(EXPENSE_REMARK_MAX_HEIGHT, Math.ceil(contentHeight))
-    );
-    setRemarkInputHeights((currentHeights) =>
-      currentHeights[rowId] === nextHeight
-        ? currentHeights
-        : { ...currentHeights, [rowId]: nextHeight }
-    );
-  };
-
   const focusCell = (rowId, field) => {
-    setTimeout(() => inputRefs.current[`${rowId}:${field}`]?.focus(), 40);
+    const key = `${rowId}:${field}`;
+    requestAnimationFrame(() => {
+      const mountedInput = inputRefs.current[key];
+      if (mountedInput) {
+        mountedInput.focus();
+        return;
+      }
+
+      const rowIndex = latest.current.rows.findIndex((row) => row.id === rowId);
+      if (rowIndex >= 0) {
+        scrollRef.current?.scrollToIndex?.({
+          index: rowIndex,
+          animated: false,
+          viewPosition: 0.5,
+        });
+      }
+      setTimeout(() => inputRefs.current[key]?.focus(), 80);
+    });
   };
 
   const addRow = (focus = true) => {
@@ -1060,7 +1277,21 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     const sourceIndex = currentItems.findIndex((item) => item.id === rowId);
     if (sourceIndex < 0) return 0;
 
-    const dragLayouts = dragRowLayoutsRef.current;
+    let dragLayouts = dragRowLayoutsRef.current;
+    if (kind === 'expense') {
+      let cursor = 0;
+      dragLayouts = Object.fromEntries(
+        currentItems.map((item) => {
+          const height = Math.max(
+            EXPENSE_ROW_MIN_HEIGHT,
+            rowHeightsRef.current[item.id] ?? EXPENSE_ROW_MIN_HEIGHT
+          );
+          const layout = { y: cursor, height };
+          cursor += height;
+          return [item.id, layout];
+        })
+      );
+    }
     const sourceLayout = dragLayouts[rowId];
     if (!sourceLayout) {
       return Math.max(
@@ -1145,7 +1376,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
   const dragAutoScroll = useDragAutoScroll({
     scrollRef,
-    mode: 'scroll-view',
+    mode: 'flat-list',
     onAutoScroll: ({ scrollDelta, pointerY }) => {
       const currentDrag = activeDragRef.current;
       if (!currentDrag) return;
@@ -1177,18 +1408,20 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       kind === 'commitment'
         ? latest.current.monthlyCommitments
         : latest.current.rows;
-    const layouts = kind === 'commitment' ? commitmentLayouts.current : rowLayouts.current;
+    const layouts = commitmentLayouts.current;
     const startIndex = currentItems.findIndex((item) => item.id === rowId);
     if (startIndex < 0) return;
 
-    dragRowLayoutsRef.current = Object.fromEntries(
-      currentItems.map((item) => [
-        item.id,
-        layouts[item.id]
-          ? { ...layouts[item.id] }
-          : null,
-      ])
-    );
+    dragRowLayoutsRef.current = kind === 'commitment'
+      ? Object.fromEntries(
+          currentItems.map((item) => [
+            item.id,
+            layouts[item.id]
+              ? { ...layouts[item.id] }
+              : null,
+          ])
+        )
+      : {};
     deleteTargetBoundsRef.current = null;
 
     const nextDrag = {
@@ -1459,6 +1692,69 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 
   const noteColorTheme = getNoteColorTheme(noteColor, colors);
+  const showExpensePlaceholder = useMemo(
+    () => shouldShowExpenseRowPlaceholder(rows, 0),
+    [rows]
+  );
+
+  rowActionsRef.current = {
+    onAmountBlur: handleAmountBlur,
+    onBlur: () => setFocusedCell(null),
+    onDelete: confirmRemoveRow,
+    onDragCancel: handleDragCancel,
+    onDragEnd: handleDragEnd,
+    onDragStart: handleDragStart,
+    onDragUpdate: handleDragUpdate,
+    onFocus: (rowId, field) => setFocusedCell(`${rowId}:${field}`),
+    onFocusCell: focusCell,
+    onFocusNextRow: focusNextRow,
+    onMove: moveRow,
+    onRemarkChange: handleRemarkChange,
+    onRowChange: handleRowChange,
+  };
+
+  const renderExpenseRow = useCallback(({ item, index }) => (
+    <ExpenseDailyRow
+      row={item}
+      index={index}
+      isLast={index === rows.length - 1}
+      colors={colors}
+      styles={styles}
+      dragX={dragX}
+      dragY={dragY}
+      dragAreaX={dragAreaBounds.x}
+      dragAreaY={dragAreaBounds.y}
+      focusedField={
+        focusedCell?.startsWith(`${item.id}:`)
+          ? focusedCell.slice(item.id.length + 1)
+          : null
+      }
+      isDragging={
+        activeDrag?.kind === 'expense' && activeDrag.rowId === item.id
+      }
+      showInsertionBefore={
+        !!activeDrag && insertionBeforeRowId === item.id
+      }
+      showPlaceholder={index === 0 && showExpensePlaceholder}
+      readOnly={isReadOnly}
+      inputRefs={inputRefs}
+      rowHeightsRef={rowHeightsRef}
+      actionsRef={rowActionsRef}
+    />
+  ), [
+    activeDrag,
+    colors,
+    dragAreaBounds.x,
+    dragAreaBounds.y,
+    dragX,
+    dragY,
+    focusedCell,
+    insertionBeforeRowId,
+    isReadOnly,
+    rows.length,
+    showExpensePlaceholder,
+    styles,
+  ]);
 
   return (
     <KeyboardAvoidingView
@@ -1526,13 +1822,21 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <FlatList
         ref={scrollRef}
         style={styles.scroll}
+        data={rows}
+        keyExtractor={(item) => item.id}
+        renderItem={renderExpenseRow}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Math.max(32, insets.bottom + 20) },
         ]}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        updateCellsBatchingPeriod={40}
+        windowSize={7}
+        removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic"
         scrollEnabled={!activeDrag}
@@ -1540,7 +1844,13 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         scrollEventThrottle={16}
         onLayout={dragAutoScroll.handleViewportLayout}
         onContentSizeChange={dragAutoScroll.handleContentSizeChange}
-      >
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          scrollRef.current?.scrollToOffset?.({
+            offset: Math.max(0, index * averageItemLength),
+            animated: false,
+          });
+        }}
+        ListHeaderComponent={
         <View style={styles.editorContent}>
           <View style={styles.summaryCard}>
             <TouchableOpacity
@@ -1831,7 +2141,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             </View>
           </View>
 
-          <View style={styles.table}>
+          <View style={[styles.table, styles.expenseListHeader]}>
             <View style={[styles.tableRow, styles.tableHeader]}>
               <View style={[styles.actionColumn, styles.actionHeaderColumn]} />
               <Text
@@ -1858,183 +2168,26 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 <Ionicons name="chevron-down" size={12} color={colors.card} />
               </Pressable>
             </View>
-
-            {rows.map((row, index) => {
-              const invalidAmount =
-                !!row.amount.trim() && parseExpenseAmount(row.amount) === null;
-              const showPlaceholder = shouldShowExpenseRowPlaceholder(rows, index);
-
-              return (
-                <React.Fragment key={row.id}>
-                  {activeDrag && insertionBeforeRowId === row.id && (
-                    <View style={styles.rowInsertionGap}>
-                      <View style={styles.rowInsertionDot} />
-                      <View style={styles.rowInsertionLine} />
-                      <Text style={styles.rowInsertionText}>Row moves here</Text>
-                    </View>
-                  )}
-                  <View
-                    onLayout={({ nativeEvent }) => {
-                      rowLayouts.current[row.id] = nativeEvent.layout;
-                    }}
-                    style={[
-                      styles.tableRow,
-                      index % 2 === 0 ? styles.evenRow : styles.oddRow,
-                      focusedCell?.startsWith(`${row.id}:`) && styles.focusedRow,
-                      activeDrag?.kind === 'expense' &&
-                        activeDrag.rowId === row.id &&
-                        styles.draggingRow,
-                    ]}
-                  >
-                    <ExpenseRowDragHandle
-                      rowId={row.id}
-                      rowIndex={index}
-                      colors={colors}
-                      styles={styles}
-                      dragX={dragX}
-                      dragY={dragY}
-                      dragAreaX={dragAreaBounds.x}
-                      dragAreaY={dragAreaBounds.y}
-                      onDragStart={handleDragStart}
-                      onDragUpdate={handleDragUpdate}
-                      onDragEnd={handleDragEnd}
-                      onDragCancel={handleDragCancel}
-                      onMove={moveRow}
-                      onDelete={confirmRemoveRow}
-                      readOnly={isReadOnly}
-                    />
-                  <View
-                    style={[
-                      styles.tableCellColumn,
-                      styles.dateColumn,
-                      focusedCell === `${row.id}:date` && styles.focusedInput,
-                    ]}
-                  >
-                    <TextInput
-                      ref={(ref) => {
-                        inputRefs.current[`${row.id}:date`] = ref;
-                      }}
-                      style={[
-                        styles.cellInput,
-                        styles.singleLineCellInput,
-                        styles.dateInput,
-                      ]}
-                      value={row.date}
-                      editable={!isReadOnly}
-                      onChangeText={(value) =>
-                        handleRowChange(row.id, 'date', sanitizeExpenseDateInput(value))
-                      }
-                      placeholder={showPlaceholder ? '1' : undefined}
-                      placeholderTextColor={colors.textTertiary}
-                      inputMode="numeric"
-                      keyboardType="number-pad"
-                      multiline
-                      numberOfLines={1}
-                      scrollEnabled={false}
-                      underlineColorAndroid="transparent"
-                      submitBehavior="submit"
-                      returnKeyType="next"
-                      onFocus={() => setFocusedCell(`${row.id}:date`)}
-                      onBlur={() => setFocusedCell(null)}
-                      onSubmitEditing={() => focusCell(row.id, 'remark')}
-                      selectTextOnFocus
-                      accessibilityLabel={`Day for expense row ${index + 1}`}
-                    />
-                  </View>
-                  <View style={[styles.tableCellColumn, styles.remarkColumn]}>
-                    <TextInput
-                      ref={(ref) => {
-                        inputRefs.current[`${row.id}:remark`] = ref;
-                      }}
-                      style={[
-                        styles.cellInput,
-                        styles.remarkInput,
-                        {
-                          height:
-                            remarkInputHeights[row.id] ?? EXPENSE_ROW_MIN_HEIGHT,
-                        },
-                        focusedCell === `${row.id}:remark` && styles.focusedInput,
-                      ]}
-                      value={row.remark}
-                      editable={!isReadOnly}
-                      onChangeText={(value) => handleRemarkChange(row.id, value)}
-                      placeholder={showPlaceholder ? 'Enter remark' : undefined}
-                      placeholderTextColor={colors.textTertiary}
-                      multiline
-                      scrollEnabled={false}
-                      underlineColorAndroid="transparent"
-                      onContentSizeChange={({ nativeEvent }) =>
-                        handleRemarkContentSizeChange(
-                          row.id,
-                          nativeEvent.contentSize.height
-                        )
-                      }
-                      returnKeyType="next"
-                      onFocus={() => setFocusedCell(`${row.id}:remark`)}
-                      onBlur={() => setFocusedCell(null)}
-                      onSubmitEditing={() => focusCell(row.id, 'amount')}
-                      accessibilityLabel={`Remark for expense row ${index + 1}`}
-                      accessibilityHint={`Maximum ${EXPENSE_REMARK_MAX_CHARACTERS} characters`}
-                    />
-                  </View>
-                    <View
-                      style={[
-                        styles.tableCellColumn,
-                        styles.amountColumn,
-                        invalidAmount && styles.invalidCell,
-                        focusedCell === `${row.id}:amount` && styles.focusedInput,
-                      ]}
-                    >
-                    <TextInput
-                      ref={(ref) => {
-                        inputRefs.current[`${row.id}:amount`] = ref;
-                      }}
-                      style={[
-                        styles.cellInput,
-                        styles.singleLineCellInput,
-                        styles.amountInput,
-                        invalidAmount && styles.invalidCell,
-                        focusedCell === `${row.id}:amount` && styles.focusedInput,
-                      ]}
-                      value={row.amount}
-                      editable={!isReadOnly}
-                      onChangeText={(value) =>
-                        handleRowChange(
-                          row.id,
-                          'amount',
-                          sanitizeExpenseAmountInput(value)
-                        )
-                      }
-                      placeholder={showPlaceholder ? '0.00' : undefined}
-                      placeholderTextColor={colors.textTertiary}
-                      inputMode="decimal"
-                      keyboardType="decimal-pad"
-                      multiline
-                      numberOfLines={1}
-                      scrollEnabled={false}
-                      underlineColorAndroid="transparent"
-                      submitBehavior="submit"
-                      returnKeyType="next"
-                      onFocus={() => setFocusedCell(`${row.id}:amount`)}
-                      onBlur={() => handleAmountBlur(row)}
-                      onSubmitEditing={() => focusNextRow(index)}
-                      selectTextOnFocus
-                      accessibilityLabel={`Amount for expense row ${index + 1}`}
-                      />
-                    </View>
-                  </View>
-                </React.Fragment>
-              );
-            })}
+          </View>
+        </View>
+        }
+        ListFooterComponent={
+          <View
+            style={[
+              styles.editorContent,
+              !showEndInsertionGap && styles.expenseListFooter,
+            ]}
+          >
 
             {showEndInsertionGap && (
-              <View style={styles.rowInsertionGap}>
-                <View style={styles.rowInsertionDot} />
-                <View style={styles.rowInsertionLine} />
-                <Text style={styles.rowInsertionText}>Row moves here</Text>
+              <View style={styles.expenseListRowShell}>
+                <View style={styles.rowInsertionGap}>
+                  <View style={styles.rowInsertionDot} />
+                  <View style={styles.rowInsertionLine} />
+                  <Text style={styles.rowInsertionText}>Row moves here</Text>
+                </View>
               </View>
             )}
-          </View>
 
           {!isReadOnly && <View style={styles.addRowActions}>
             <TouchableOpacity
@@ -2056,8 +2209,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               </Text>
             </View>
           )}
-        </View>
-      </ScrollView>
+          </View>
+        }
+      />
 
       <CollaborationFooter noteId={noteId} onRemoteNote={loadRecord} />
 
@@ -2246,19 +2400,21 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         onClose={() => setShowCurrencyModal(false)}
       />
 
-      <ExpenseSummaryModal
-        visible={showSummaryModal}
-        onClose={() => setShowSummaryModal(false)}
-        rows={rows}
-        categories={categories}
-        summaryNote={summaryNote}
-        currency={currency}
-        saveStatus={saveStatus}
-        onSave={handleSaveCategory}
-        onDelete={handleDeleteCategory}
-        onNoteChange={handleSummaryNoteChange}
-        readOnly={isReadOnly}
-      />
+      {showSummaryModal && (
+        <ExpenseSummaryModal
+          visible
+          onClose={() => setShowSummaryModal(false)}
+          rows={rows}
+          categories={categories}
+          summaryNote={summaryNote}
+          currency={currency}
+          saveStatus={saveStatus}
+          onSave={handleSaveCategory}
+          onDelete={handleDeleteCategory}
+          onNoteChange={handleSummaryNoteChange}
+          readOnly={isReadOnly}
+        />
+      )}
 
       <DestructiveConfirmationModal
         visible={!!pendingDeletion}
@@ -2959,6 +3115,32 @@ const makeStyles = (colors) =>
       borderRadius: radius.lg,
       overflow: 'hidden',
       ...shadow.card,
+    },
+    expenseListHeader: {
+      borderBottomWidth: 0,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      elevation: 0,
+      shadowOpacity: 0,
+    },
+    expenseListRowShell: {
+      width: '100%',
+      maxWidth: 920,
+      alignSelf: 'center',
+    },
+    expenseListRow: {
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      borderLeftColor: colors.border,
+      borderRightColor: colors.border,
+    },
+    expenseListLastRow: {
+      borderBottomLeftRadius: radius.lg,
+      borderBottomRightRadius: radius.lg,
+      overflow: 'hidden',
+    },
+    expenseListFooter: {
+      paddingTop: 16,
     },
     tableRow: {
       minHeight: EXPENSE_ROW_MIN_HEIGHT,
