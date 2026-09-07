@@ -243,7 +243,7 @@ const ChecklistItemRow = React.memo(({
 });
 
 const ChecklistEditorScreen = ({ route, navigation }) => {
-  const { noteId, isNewDraft = false } = route.params;
+  const { noteId, isNewDraft = false, shared = false } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
@@ -350,7 +350,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       const localColor = await noteColorPreference.load(noteId);
 
       const parsed = parseChecklistNote(note.content);
-      const readOnly = isReadOnlyCollaborativeNote(note);
+      const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note);
       if (readOnly) {
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
         saveTimeout.current = null;
@@ -384,9 +384,27 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     }
   }, [clearUndo, noteId]);
 
+  const handleCollaborationAccessChange = useCallback((access) => {
+    if (!access?.collaborative) return;
+    const readOnly = access.canEdit !== true;
+    latest.current.readOnly = readOnly;
+    setIsReadOnly(readOnly);
+    if (readOnly) {
+      setIsTitleFocused(false);
+      activeDragRef.current = null;
+      setActiveDrag(null);
+      Keyboard.dismiss();
+    }
+  }, []);
+
   const scheduleSave = useCallback(
     (nextTitle, nextItems) => {
       if (latest.current.readOnly) return;
+      const nextContent = serializeChecklistNote(nextItems);
+      collaborationService.stageDraft(noteId, {
+        title: nextTitle,
+        content: nextContent,
+      });
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       setSaveError('');
       saveTimeout.current = setTimeout(async () => {
@@ -394,7 +412,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         try {
           await collaborationService.save(noteId, {
             title: nextTitle,
-            content: serializeChecklistNote(nextItems),
+            content: nextContent,
           });
           setSaveError('');
         } catch (error) {
@@ -1089,7 +1107,12 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         }
       />
 
-      <CollaborationFooter noteId={noteId} onRemoteNote={loadChecklist} />
+      <CollaborationFooter
+        noteId={noteId}
+        onRemoteNote={loadChecklist}
+        onEditAccessChange={handleCollaborationAccessChange}
+        onOffline={shared ? navigation.goBack : undefined}
+      />
 
       {activeDrag && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>

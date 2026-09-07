@@ -39,7 +39,7 @@ import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import { isReadOnlyCollaborativeNote } from '../utils/collaboration-note.mjs';
 
 const ReminderEditorScreen = ({ route, navigation }) => {
-  const { noteId, isNewDraft = false } = route.params;
+  const { noteId, isNewDraft = false, shared = false } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -89,6 +89,10 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
   const autoSave = useCallback(() => {
     if (latest.current.readOnly) return;
+    collaborationService.stageDraft(noteId, {
+      title: latest.current.title,
+      content: contentFor(latest.current.body, latest.current.reminder),
+    });
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
       saveTimeout.current = null;
@@ -102,7 +106,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       if (!note) return;
       const localColor = await noteColorPreference.load(noteId);
       const parsed = parseReminderNote(note.content);
-      const readOnly = isReadOnlyCollaborativeNote(note);
+      const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note);
       const next = {
         ...latest.current,
         title: note.title,
@@ -126,6 +130,18 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         Keyboard.dismiss();
       }
   }, [clearUndo, noteId]);
+
+  const handleCollaborationAccessChange = useCallback((access) => {
+    if (!access?.collaborative) return;
+    const readOnly = access.canEdit !== true;
+    latest.current.readOnly = readOnly;
+    setIsReadOnly(readOnly);
+    if (readOnly) {
+      setShowSchedule(false);
+      setIsTitleFocused(false);
+      Keyboard.dismiss();
+    }
+  }, []);
 
   useEffect(() => {
     noteRepo.getById(noteId).then(applyLoadedNote)
@@ -422,7 +438,12 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
-      <CollaborationFooter noteId={noteId} onRemoteNote={applyLoadedNote} />
+      <CollaborationFooter
+        noteId={noteId}
+        onRemoteNote={applyLoadedNote}
+        onEditAccessChange={handleCollaborationAccessChange}
+        onOffline={shared ? navigation.goBack : undefined}
+      />
 
       <Modal
         visible={showActions}

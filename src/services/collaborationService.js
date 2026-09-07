@@ -37,13 +37,67 @@ const createReadOnlyError = () => {
   return error;
 };
 
+const createEditLockedError = (lease = {}) => {
+  const holder = lease.lock_user_email || 'Another collaborator';
+  const error = new Error(`${holder} is editing this note.`);
+  error.code = 'EDIT_LOCKED';
+  error.lease = lease;
+  return error;
+};
+
 const isReadOnlyError = (error) => error?.code === '42501'
   || error?.code === 'READ_ONLY'
   || /view only|edit access/i.test(error?.message || '');
 
+const isEditLockedError = (error) => error?.code === '55P03'
+  || error?.code === 'EDIT_LOCKED'
+  || /another collaborator is editing/i.test(error?.message || '');
+
+const EDIT_LEASE_SECONDS = 90;
+const heldEditLeases = new Set();
+const dirtyDrafts = new Map();
+
+const draftsMatch = (draft, updates) => draft
+  && draft.title === updates.title
+  && draft.content === updates.content;
+
+const requestEditLease = async (local) => {
+  await requireCloud();
+  const lease = unwrap(await supabase.rpc('acquire_shared_note_edit_lease', {
+    p_note_id: local.cloud_id,
+    p_lease_seconds: EDIT_LEASE_SECONDS,
+  }));
+  return {
+    acquired: lease?.acquired === true,
+    lock_user_id: lease?.lock_user_id || null,
+    lock_user_email: lease?.lock_user_email || null,
+    lease_expires_at: lease?.lease_expires_at || null,
+  };
+};
+
+const releaseEditLeaseByCloudId = async (cloudId) => {
+  if (!cloudId || !isSupabaseConfigured) return false;
+  const { error } = await supabase.rpc('release_shared_note_edit_lease', {
+    p_note_id: cloudId,
+  });
+  if (error) throw error;
+  return true;
+};
+
 const cacheRemote = async (remote) => {
   if (!remote) return null;
   const existing = await noteRepo.getByCloudId(remote.id);
+  const dirtyDraft = existing ? dirtyDrafts.get(existing.id) : null;
+  if (dirtyDraft) {
+    if (Number(remote.revision) !== Number(existing.server_revision || 0)) {
+      dirtyDrafts.delete(existing.id);
+      return await noteRepo.update(existing.id, {
+        ...dirtyDraft,
+        sync_status: 'conflict',
+      });
+    }
+    return existing;
+  }
   if (existing?.sync_status === 'pending') {
     const remoteContext = remoteWithLocalFallback(remote, existing);
     if (remoteContext.role === SHARE_ROLE_VIEWER && existing.share_origin === SHARE_ORIGIN_INCOMING) {
@@ -52,7 +106,10 @@ const cacheRemote = async (remote) => {
     if (Number(remote.revision) !== Number(existing.server_revision || 0)) {
       return await noteRepo.update(existing.id, { sync_status: 'conflict' });
     }
+    let lease;
     try {
+      lease = await requestEditLease(existing);
+      if (!lease.acquired) return existing;
       const saved = unwrap(await supabase.rpc('save_shared_note', {
         p_note_id: existing.cloud_id,
         p_expected_revision: existing.server_revision || 0,
@@ -65,6 +122,10 @@ const cacheRemote = async (remote) => {
       );
     } catch {
       return existing;
+    } finally {
+      if (lease?.acquired && !heldEditLeases.has(existing.id)) {
+        releaseEditLeaseByCloudId(existing.cloud_id).catch(() => {});
+      }
     }
   }
   return await noteRepo.upsertSharedCache(remoteNoteToLocal(remote));
@@ -126,6 +187,14 @@ const enqueueSave = (noteId, operation) => {
 };
 
 export const collaborationService = {
+  stageDraft(noteId, updates) {
+    if (!noteId || !updates) return;
+    dirtyDrafts.set(noteId, {
+      title: updates.title ?? '',
+      content: updates.content ?? '',
+    });
+  },
+
   async refreshSharedWithMe() {
     await requireCloud();
     const { data, error } = await supabase.rpc('list_shared_notes');
@@ -158,13 +227,52 @@ export const collaborationService = {
     });
   },
 
+  async acquireEditLease(noteId) {
+    const local = await noteRepo.getById(noteId);
+    if (!local?.cloud_id) {
+      return { collaborative: false, canEdit: true, reason: 'private' };
+    }
+    if (isReadOnlyCollaborativeNote(local)) {
+      return { collaborative: true, canEdit: false, reason: 'viewer' };
+    }
+    try {
+      const lease = await requestEditLease(local);
+      if (lease.acquired) heldEditLeases.add(noteId);
+      else heldEditLeases.delete(noteId);
+      return {
+        collaborative: true,
+        canEdit: lease.acquired,
+        reason: lease.acquired ? 'owner' : 'locked',
+        ...lease,
+      };
+    } catch (error) {
+      heldEditLeases.delete(noteId);
+      throw error;
+    }
+  },
+
+  async releaseEditLease(noteId) {
+    heldEditLeases.delete(noteId);
+    const local = await noteRepo.getById(noteId);
+    if (!local?.cloud_id || !isSupabaseConfigured) return false;
+    await requireCloud();
+    return await releaseEditLeaseByCloudId(local.cloud_id);
+  },
+
   async save(noteId, updates) {
     return await enqueueSave(noteId, async () => {
       const beforeSave = await noteRepo.getById(noteId);
       if (isReadOnlyCollaborativeNote(beforeSave)) throw createReadOnlyError();
-      let local = await noteRepo.update(noteId, updates);
+      let local = await noteRepo.update(
+        noteId,
+        beforeSave?.cloud_id ? { ...updates, sync_status: 'pending' } : updates
+      );
+      if (draftsMatch(dirtyDrafts.get(noteId), updates)) dirtyDrafts.delete(noteId);
       if (!local?.cloud_id || !isSupabaseConfigured) return local;
+      const releaseAfterSave = !heldEditLeases.has(noteId);
       try {
+        const lease = await requestEditLease(local);
+        if (!lease.acquired) throw createEditLockedError(lease);
         const remote = unwrap(await supabase.rpc('save_shared_note', {
           p_note_id: local.cloud_id,
           p_expected_revision: local.server_revision || 0,
@@ -192,10 +300,18 @@ export const collaborationService = {
           }
           error.localSaved = false;
         } else {
-          await noteRepo.update(noteId, { sync_status: error?.code === '40001' ? 'conflict' : 'pending' });
+          await noteRepo.update(noteId, {
+            sync_status: error?.code === '40001' || isEditLockedError(error)
+              ? 'conflict'
+              : 'pending',
+          });
           error.localSaved = true;
         }
         throw error;
+      } finally {
+        if (releaseAfterSave) {
+          releaseEditLeaseByCloudId(local.cloud_id).catch(() => {});
+        }
       }
       return local;
     });
@@ -253,6 +369,18 @@ export const collaborationService = {
         || Number(remote.revision) !== Number(local.server_revision || 0);
       return { note, changed };
     }
+    const dirtyDraft = dirtyDrafts.get(noteId);
+    if (dirtyDraft) {
+      if (Number(remote.revision) !== Number(local.server_revision || 0)) {
+        dirtyDrafts.delete(noteId);
+        const note = await noteRepo.update(noteId, {
+          ...dirtyDraft,
+          sync_status: 'conflict',
+        });
+        return { note, changed: false };
+      }
+      return { note: local, changed: false };
+    }
     if (local.sync_status === 'pending') {
       if (Number(remote.revision) !== Number(local.server_revision || 0)) {
         const note = await noteRepo.update(noteId, { sync_status: 'conflict' });
@@ -286,14 +414,17 @@ export const collaborationService = {
     if (strategy === 'local' && isReadOnlyCollaborativeNote(local)) throw createReadOnlyError();
     await requireCloud();
     const remote = unwrap(await supabase.rpc('get_shared_note', { p_note_id: local.cloud_id }));
-    const resolved = strategy === 'local'
-      ? unwrap(await supabase.rpc('save_shared_note', {
+    let resolved = remote;
+    if (strategy === 'local') {
+      const lease = await requestEditLease(local);
+      if (!lease.acquired) throw createEditLockedError(lease);
+      resolved = unwrap(await supabase.rpc('save_shared_note', {
           p_note_id: local.cloud_id,
           p_expected_revision: remote.revision,
           p_title: local.title,
           p_content: local.content,
-        }))
-      : remote;
+        }));
+    }
     return await noteRepo.update(
       noteId,
       remoteNoteToLocal(remoteWithLocalFallback({ ...remote, ...resolved }, local))
@@ -319,6 +450,7 @@ export const collaborationService = {
   },
 
   async delete(noteId) {
+    dirtyDrafts.delete(noteId);
     const note = await noteRepo.getById(noteId);
     if (note?.share_origin === 'incoming') return await this.leave(noteId);
     if (note?.cloud_id) {

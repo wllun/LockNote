@@ -1,6 +1,11 @@
 # Architecture
 
-LockNote is a local-first Expo / React Native app. SQLite/AsyncStorage remains the primary store and all editing works offline. A signed-in user can manually sync private folders and notes to their own Supabase account, and can separately share an individual note with another LockNote account.
+LockNote is a local-first Expo / React Native app. SQLite/AsyncStorage remains
+the primary store and private-note editing works offline. Shared-with-me notes
+require an internet connection and are hidden from the Shared tab while the
+device is offline. A signed-in user can manually sync private folders and notes
+to their own Supabase account, and can separately share an individual note with
+another LockNote account.
 
 ## Layers
 
@@ -334,7 +339,22 @@ storage quota.
 
 Release 1 shares individual notes by registered account email. The owner assigns each recipient either `editor` or `viewer` access and may change that role later. Viewers can read and export the note but cannot change its shared title or content; this is enforced in the editors and again by the save RPC. Once sharing begins, the local row stores a cloud ID, ownership/origin, collaborator count, server revision, sync state, role, and last-editor metadata. Note color is not part of the collaborative snapshot; each collaborator may color the cached note independently on their own device. Incoming notes are excluded from Home, folder, private-account sync, and search reads and appear only in the Shared tab.
 
-Supabase stores `profiles`, `shared_notes`, and `note_members`. Row-level security limits reads to the owner and current members, while `save_shared_note` permits writes only from the owner or members whose role is `editor`. Email lookup is performed by the authenticated `share-note` Edge Function so the client cannot enumerate account emails and never receives a service-role key. Content saves use an expected server revision; stale saves fail instead of silently replacing newer content. Realtime table events refresh the local cache, role, and an open editor. Release 1 synchronizes complete saved note snapshots and does not provide character-level CRDT cursor merging.
+Supabase stores `profiles`, `shared_notes`, and `note_members`. Row-level security
+limits reads to the owner and current members, while `save_shared_note` permits
+writes only from the owner or members whose role is `editor`. Email lookup is
+performed by the authenticated `share-note` Edge Function so the client cannot
+enumerate account emails and never receives a service-role key. An editor must
+also hold the note's renewable 90-second server lease. The lease is renewed
+every 30 seconds while the editor is active, released when the editor closes or
+backgrounds, and expires automatically after a crash or lost connection. Other
+accounts see who is editing and remain view-only until the lease is available.
+Content saves mark their local snapshot pending before any network request and
+use an expected server revision, so Realtime cannot replace an unsaved draft and
+stale saves fail instead of silently replacing newer content. Realtime table
+events refresh the local cache, role, editing lease, and an open editor. Shared
+notes are fetched from Supabase only while online; local shared caches are kept
+for synchronization but are never displayed offline. Collaboration synchronizes
+complete saved note snapshots and does not provide character-level CRDT merging.
 
 ## Notable state
 

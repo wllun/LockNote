@@ -18,7 +18,7 @@ This file describes the product direction and major delivery phases. For detaile
 - [ ] Deploy and verify all required Supabase migrations and the `share-note` Edge Function against the production project.
 - [ ] Verify registration, email confirmation, session persistence, account-password recovery, LockNote-password recovery, and sign-out end-to-end on Android, iOS, and web.
 - [ ] Verify manual private sync on at least two physical devices, including edits, moves, root notes, archives, and soft-delete tombstones.
-- [ ] Verify collaboration with two real accounts, including Can edit/View only invitations, permission changes while an editor is open, member removal, realtime refresh, and revision conflicts.
+- [ ] Verify collaboration with two real accounts, including Can edit/View only invitations, one-editor leases and expiry, offline Shared-tab hiding, permission changes while an editor is open, member removal, realtime refresh, and revision conflicts.
 - [ ] Configure production authentication email branding:
   - Connect Supabase Auth to Resend through Custom SMTP. As checked on 2026-08-31, Resend Free allows 3,000 transactional emails per month and 100 per day; confirm current limits before launch.
   - Use a dedicated sender subdomain such as `auth.example.com` and `LockNote <no-reply@auth.example.com>`. The domain identifies the email sender; it does not require LockNote to have a website.

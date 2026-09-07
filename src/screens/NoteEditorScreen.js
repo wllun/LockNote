@@ -46,7 +46,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const { noteId, isNewDraft = false } = route.params;
+  const { noteId, isNewDraft = false, shared = false } = route.params;
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
@@ -86,7 +86,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         setHasPassword(!!note.password);
         setIsPinned(!!note.is_pinned);
         setNoteColor(localColor);
-        const readOnly = isReadOnlyCollaborativeNote(note);
+        const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note);
         setIsReadOnly(readOnly);
         if (readOnly) {
           if (saveTimeout.current) clearTimeout(saveTimeout.current);
@@ -112,9 +112,24 @@ const NoteEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleCollaborationAccessChange = useCallback((access) => {
+    if (!access?.collaborative) return;
+    const readOnly = access.canEdit !== true;
+    latest.current.readOnly = readOnly;
+    setIsReadOnly(readOnly);
+    if (readOnly) {
+      setIsTitleFocused(false);
+      Keyboard.dismiss();
+    }
+  }, []);
+
   const autoSave = useCallback(
     (newTitle, newContent) => {
       if (latest.current.readOnly) return;
+      collaborationService.stageDraft(noteId, {
+        title: newTitle,
+        content: newContent,
+      });
       if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
       }
@@ -387,7 +402,12 @@ const NoteEditorScreen = ({ route, navigation }) => {
         />
       </View>
 
-      <CollaborationFooter noteId={noteId} onRemoteNote={loadNote} />
+      <CollaborationFooter
+        noteId={noteId}
+        onRemoteNote={loadNote}
+        onEditAccessChange={handleCollaborationAccessChange}
+        onOffline={shared ? navigation.goBack : undefined}
+      />
 
       <Modal
         visible={showActionsMenu}

@@ -7,6 +7,7 @@ import {
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import NetInfo from '@react-native-community/netinfo';
 import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen from '../screens/HomeScreen';
@@ -32,6 +33,8 @@ import {
   getReminderNoteIdFromResponse,
 } from '../utils/reminder-notification-response.mjs';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
+import { SHARE_ORIGIN_INCOMING } from '../utils/collaboration-note.mjs';
+import { getNetworkAvailability } from '../utils/network-availability.mjs';
 import {
   addReminderNotificationResponseListener,
   clearLastReminderNotificationResponse,
@@ -143,9 +146,12 @@ const AppNavigator = () => {
   const handledResponseKeysRef = useRef(new Set());
   const [lockedReminder, setLockedReminder] = useState(null);
 
-  const navigateToReminder = useCallback((noteId) => {
+  const navigateToReminder = useCallback((noteId, shared = false) => {
     const target = getReminderNavigationTarget(noteId);
-    navigationRef.navigate(target.name, target.params);
+    navigationRef.navigate(target.name, {
+      ...target.params,
+      params: { ...target.params.params, shared },
+    });
   }, [navigationRef]);
 
   const navigateHome = useCallback(() => {
@@ -179,10 +185,22 @@ const AppNavigator = () => {
         return;
       }
 
+      if (note.share_origin === SHARE_ORIGIN_INCOMING) {
+        const network = await NetInfo.fetch();
+        if (getNetworkAvailability(network) !== true) {
+          navigateHome();
+          Alert.alert(
+            'Shared note unavailable',
+            'Connect to the internet to view shared notes.'
+          );
+          return;
+        }
+      }
+
       if (note.password) {
         setLockedReminder(note);
       } else {
-        navigateToReminder(note.id);
+        navigateToReminder(note.id, note.share_origin === SHARE_ORIGIN_INCOMING);
       }
     } catch (error) {
       console.warn('Failed to open reminder from notification:', error);
@@ -293,10 +311,23 @@ const AppNavigator = () => {
         onVerify={(password) =>
           lockPasswordService.verifyNotePassword(password, lockedReminder)
         }
-        onVerified={() => {
+        onVerified={async () => {
           const noteId = lockedReminder?.id;
+          const isIncomingShared = lockedReminder?.share_origin === SHARE_ORIGIN_INCOMING;
           setLockedReminder(null);
-          if (noteId) navigateToReminder(noteId);
+          if (!noteId) return;
+          if (isIncomingShared) {
+            const network = await NetInfo.fetch();
+            if (getNetworkAvailability(network) !== true) {
+              navigateHome();
+              Alert.alert(
+                'Shared note unavailable',
+                'Connect to the internet to view shared notes.'
+              );
+              return;
+            }
+          }
+          navigateToReminder(noteId, isIncomingShared);
         }}
         allowLockPasswordRecovery
         passwordLabel="LockNote password"

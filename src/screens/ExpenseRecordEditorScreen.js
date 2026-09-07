@@ -454,7 +454,7 @@ const ExpenseDailyRow = React.memo(({
 });
 
 const ExpenseRecordEditorScreen = ({ route, navigation }) => {
-  const { noteId, isNewDraft = false } = route.params;
+  const { noteId, isNewDraft = false, shared = false } = route.params;
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
@@ -622,7 +622,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       const localColor = await noteColorPreference.load(noteId);
 
       const parsed = parseExpenseNote(note.content);
-      const readOnly = isReadOnlyCollaborativeNote(note);
+      const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note);
       const loadedCurrency = note.content
         ? parsed.currency
         : await expenseCurrencyPreference.load();
@@ -684,6 +684,22 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     }
   }, [clearUndo, noteId]);
 
+  const handleCollaborationAccessChange = useCallback((access) => {
+    if (!access?.collaborative) return;
+    const readOnly = access.canEdit !== true;
+    latest.current.readOnly = readOnly;
+    setIsReadOnly(readOnly);
+    if (readOnly) {
+      setCommitmentDraft(null);
+      setPendingDeletion(null);
+      setShowCurrencyModal(false);
+      setFocusedCell(null);
+      activeDragRef.current = null;
+      setActiveDrag(null);
+      Keyboard.dismiss();
+    }
+  }, []);
+
   const loadSavedCommitmentTemplate = useCallback(async () => {
     try {
       setSavedCommitmentTemplate(await monthlyCommitmentTemplate.load());
@@ -702,6 +718,17 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       nextCurrency = latest.current.currency
     ) => {
       if (latest.current.readOnly) return;
+      const nextContent = serializeExpenseNote(
+        nextRows,
+        nextCategories,
+        nextSummaryNote,
+        nextMonthlyCommitments,
+        nextCurrency
+      );
+      collaborationService.stageDraft(noteId, {
+        title: nextTitle.trim(),
+        content: nextContent,
+      });
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
       setSaveStatus('Saving...');
 
@@ -710,13 +737,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         try {
           await collaborationService.save(noteId, {
             title: nextTitle.trim(),
-            content: serializeExpenseNote(
-              nextRows,
-              nextCategories,
-              nextSummaryNote,
-              nextMonthlyCommitments,
-              nextCurrency
-            ),
+            content: nextContent,
           });
           setSaveStatus('Saved');
         } catch (error) {
@@ -2213,7 +2234,12 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         }
       />
 
-      <CollaborationFooter noteId={noteId} onRemoteNote={loadRecord} />
+      <CollaborationFooter
+        noteId={noteId}
+        onRemoteNote={loadRecord}
+        onEditAccessChange={handleCollaborationAccessChange}
+        onOffline={shared ? navigation.goBack : undefined}
+      />
 
       {activeDrag && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
