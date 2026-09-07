@@ -1,7 +1,11 @@
 export const CHECKLIST_NOTE_TYPE = 'checklist';
 export const CHECKLIST_NOTE_VERSION = 1;
 export const CHECKLIST_ITEM_MAX_CHARACTERS = 500;
-export const CHECKLIST_MAX_ITEMS = 500;
+export const CHECKLIST_MAX_ITEMS = 100;
+
+// Keep the previous storage ceiling so lowering the editor limit never
+// truncates a checklist that was created before the new limit.
+const CHECKLIST_LEGACY_MAX_ITEMS = 500;
 
 const createChecklistItemId = () =>
   Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
@@ -47,7 +51,7 @@ export const moveChecklistItem = (items, itemId, direction) => {
 const normalizeChecklistItems = (items) =>
   (Array.isArray(items) ? items : [])
     .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
-    .slice(0, CHECKLIST_MAX_ITEMS)
+    .slice(0, CHECKLIST_LEGACY_MAX_ITEMS)
     .map(createChecklistItem);
 
 export const parseChecklistNote = (content) => {

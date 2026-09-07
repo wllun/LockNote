@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   calculateChecklistProgress,
   CHECKLIST_ITEM_MAX_CHARACTERS,
+  CHECKLIST_MAX_ITEMS,
   createChecklistItem,
   getChecklistProgressPreview,
   getChecklistPreview,
@@ -77,5 +78,19 @@ test('detects empty checklist notes and limits item text', () => {
     sanitizeChecklistItemText('x'.repeat(CHECKLIST_ITEM_MAX_CHARACTERS + 10)).length,
     CHECKLIST_ITEM_MAX_CHARACTERS
   );
+});
+
+test('limits new checklists to 100 items without truncating legacy checklist data', () => {
+  assert.equal(CHECKLIST_MAX_ITEMS, 100);
+
+  const legacyItems = Array.from({ length: CHECKLIST_MAX_ITEMS + 1 }, (_, index) => ({
+    id: `legacy-${index}`,
+    text: `Item ${index + 1}`,
+    completed: index % 2 === 0,
+  }));
+  const parsed = parseChecklistNote(JSON.stringify({ version: 1, items: legacyItems }));
+
+  assert.equal(parsed.items.length, CHECKLIST_MAX_ITEMS + 1);
+  assert.equal(parseChecklistNote(serializeChecklistNote(parsed.items)).items.length, legacyItems.length);
 });
 

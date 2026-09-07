@@ -247,7 +247,8 @@ exit guard waits for an untouched local draft to be hard-deleted—or for a pend
 save to finish—before Home/Folder regains focus and reloads its list. This applies
 to normal, checklist, expense, and reminder notes; unmount cleanup remains a
 fallback for non-navigation teardown. Normal note bodies are limited to 100,000
-characters; checklist items are limited to 500 characters and 500 items; see
+characters; checklist items are limited to 500 characters and active checklists
+to 100 items, while legacy oversized checklists are preserved; see
 [Note Character Limits](NOTE_LIMITS.md).
 
 All four editors also keep bounded, in-memory undo and redo history for the

@@ -25,11 +25,13 @@ unchanged until the user edits it.
 | Field | Limit |
 | --- | ---: |
 | Checklist item | 500 characters per item |
-| Checklist size | 500 items |
+| Active checklist size | 100 items |
 
 The checklist editor enforces the per-item text limit on new and existing
-items. The add-item card displays the current item count and stops adding items
-when the checklist reaches 500.
+items. A checklist stops accepting new items when it contains 100 items,
+including completed items that remain in the list. Existing checklists created
+under the former 500-item limit are preserved without truncation, but cannot
+accept another item until their item count is below 100.
 
 ## Expense notes
 
