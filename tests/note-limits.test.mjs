@@ -10,8 +10,8 @@ import {
   NORMAL_NOTE_CONTENT_MAX_CHARACTERS,
 } from '../src/utils/note-limits.mjs';
 
-test('limits normal note content to 100,000 characters', () => {
-  assert.equal(NORMAL_NOTE_CONTENT_MAX_CHARACTERS, 100_000);
+test('limits normal note content to 50,000 characters', () => {
+  assert.equal(NORMAL_NOTE_CONTENT_MAX_CHARACTERS, 50_000);
 });
 
 test('counts the characters displayed by the normal note editor', () => {

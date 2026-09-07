@@ -86,7 +86,7 @@ This file describes the product direction and major delivery phases. For detaile
 ## Phase 6 — Add menu and note types — shipped
 
 - [X] Note-type selection from the Home and Folder Add buttons.
-- [X] Plain note with a 100,000-character limit.
+- [X] Plain note with a 50,000-character limit.
 - [X] Checklist with ordered items, completion progress, drag reordering, and item limits.
 - [X] Expense Record with ordered rows, totals, complete ISO 4217 currency selection, monthly categories, a shared summary note, reusable commitments, and monthly paid-status tracking.
 - [X] Reminder note with one-time/daily/weekly/monthly local notifications and notification-tap navigation into the correct password-gated editor.

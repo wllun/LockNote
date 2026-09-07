@@ -148,7 +148,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
       contentLimitDialogShown.current = true;
       Alert.alert(
         'Character limit reached',
-        'This note can contain up to 100,000 characters. Additional typed or pasted text cannot be added.'
+        `This note can contain up to ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters. Additional typed or pasted text cannot be added.`
       );
     } else if (!limited.limitReached) {
       contentLimitDialogShown.current = false;
