@@ -91,7 +91,7 @@ const DELETE_TARGET_TOLERANCE = 28;
 const MONTHLY_COMMITMENT_MIN_HEIGHT = 68;
 const DRAG_PREVIEW_MAX_WIDTH = 280;
 const DRAG_PREVIEW_POINTER_OFFSET = 50;
-const DRAG_ACTIVATION_DELAY_MS = 1000;
+const DRAG_ACTIVATION_DELAY_MS = 500;
 
 const ExpenseRowDragHandle = ({
   rowId,
@@ -222,7 +222,7 @@ const ExpenseRowDragHandle = ({
         accessible={!readOnly}
         accessibilityRole="adjustable"
         accessibilityLabel={`Move ${itemLabel} ${rowIndex + 1}`}
-        accessibilityHint="Hold still for one second, then drag to move or delete"
+        accessibilityHint="Hold briefly, then drag to move or delete"
         accessibilityActions={readOnly ? [] : [
           { name: 'increment', label: 'Move row down' },
           { name: 'decrement', label: 'Move row up' },
@@ -1468,9 +1468,17 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.rowId !== rowId) return;
     const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
+    const draggedHeight = currentDrag.kind === 'commitment'
+      ? dragRowLayoutsRef.current[rowId]?.height ?? MONTHLY_COMMITMENT_MIN_HEIGHT
+      : rowHeightsRef.current[rowId] ?? EXPENSE_ROW_MIN_HEIGHT;
+    const draggedTopY = absoluteY - DRAG_PREVIEW_POINTER_OFFSET;
     dragTranslationYRef.current = translationY;
     dragAbsoluteXRef.current = absoluteX;
-    dragAutoScroll.updateAutoScrollPointer(absoluteY, { blocked: overDelete });
+    dragAutoScroll.updateAutoScrollPointer(absoluteY, {
+      blocked: overDelete,
+      draggedTopY,
+      draggedBottomY: draggedTopY + draggedHeight,
+    });
     applyDragPosition(
       rowId,
       dragAutoScroll.getEffectiveTranslation(translationY),

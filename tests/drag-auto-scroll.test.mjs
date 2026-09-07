@@ -21,6 +21,34 @@ test('ramps auto-scroll speed as the pointer approaches an edge', () => {
   assert.equal(getDragAutoScrollVelocity({ pointerY: -20, ...options }), -800);
 });
 
+test('uses the dragged row edges to begin scrolling before the finger reaches an edge', () => {
+  const viewport = { viewportTop: 100, viewportHeight: 500, edgeSize: 120, maxSpeed: 900 };
+  assert.ok(getDragAutoScrollVelocity({
+    pointerY: 250,
+    draggedTopY: 180,
+    draggedBottomY: 240,
+    ...viewport,
+  }) < 0);
+  assert.ok(getDragAutoScrollVelocity({
+    pointerY: 450,
+    draggedTopY: 430,
+    draggedBottomY: 540,
+    ...viewport,
+  }) > 0);
+});
+
+test('provides useful speed shortly after entering an edge zone', () => {
+  const velocity = Math.abs(getDragAutoScrollVelocity({
+    pointerY: 208,
+    viewportTop: 100,
+    viewportHeight: 500,
+    edgeSize: 120,
+    maxSpeed: 900,
+    minSpeed: 140,
+  }));
+  assert.ok(velocity >= 140);
+});
+
 test('adds auto-scroll distance to the gesture translation', () => {
   assert.equal(getEffectiveDragTranslation(120, 460, 200), 380);
   assert.equal(getEffectiveDragTranslation(-80, 120, 300), -260);

@@ -56,7 +56,7 @@ const DELETE_TARGET_SIZE = 56;
 const DELETE_TARGET_TOLERANCE = 28;
 const DRAG_PREVIEW_MAX_WIDTH = 280;
 const DRAG_PREVIEW_POINTER_OFFSET = 50;
-const DRAG_ACTIVATION_DELAY_MS = 1000;
+const DRAG_ACTIVATION_DELAY_MS = 500;
 
 const ChecklistItemRow = React.memo(({
   item,
@@ -180,7 +180,7 @@ const ChecklistItemRow = React.memo(({
             accessible={!readOnly}
             accessibilityRole="adjustable"
             accessibilityLabel={`Move checklist item ${index + 1}`}
-            accessibilityHint="Hold still for one second, then drag to move or delete"
+            accessibilityHint="Hold briefly, then drag to move or delete"
             accessibilityValue={{ text: `Position ${index + 1} of ${itemCount}` }}
             accessibilityActions={readOnly ? [] : [
               { name: 'increment', label: 'Move item down' },
@@ -663,9 +663,15 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.itemId !== itemId) return;
     const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
+    const draggedHeight = itemHeightsRef.current[itemId] ?? CHECKLIST_ITEM_MIN_HEIGHT;
+    const draggedTopY = absoluteY - DRAG_PREVIEW_POINTER_OFFSET;
     dragTranslationYRef.current = translationY;
     dragAbsoluteXRef.current = absoluteX;
-    dragAutoScroll.updateAutoScrollPointer(absoluteY, { blocked: overDelete });
+    dragAutoScroll.updateAutoScrollPointer(absoluteY, {
+      blocked: overDelete,
+      draggedTopY,
+      draggedBottomY: draggedTopY + draggedHeight,
+    });
     const effectiveTranslationY = dragAutoScroll.getEffectiveTranslation(translationY);
     applyChecklistDragPosition(
       itemId,

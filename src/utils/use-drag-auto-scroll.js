@@ -13,6 +13,7 @@ export const useDragAutoScroll = ({
   const activeRef = useRef(false);
   const blockedRef = useRef(false);
   const pointerYRef = useRef(Number.NaN);
+  const draggedBoundsRef = useRef({ top: Number.NaN, bottom: Number.NaN });
   const viewportRef = useRef({ top: 0, height: 0 });
   const contentHeightRef = useRef(0);
   const scrollOffsetRef = useRef(0);
@@ -57,6 +58,8 @@ export const useDragAutoScroll = ({
     if (!blockedRef.current) {
       const velocity = getDragAutoScrollVelocity({
         pointerY: pointerYRef.current,
+        draggedTopY: draggedBoundsRef.current.top,
+        draggedBottomY: draggedBoundsRef.current.bottom,
         viewportTop: viewportRef.current.top,
         viewportHeight: viewportRef.current.height,
       });
@@ -87,6 +90,7 @@ export const useDragAutoScroll = ({
     activeRef.current = true;
     blockedRef.current = false;
     pointerYRef.current = Number.NaN;
+    draggedBoundsRef.current = { top: Number.NaN, bottom: Number.NaN };
     dragStartOffsetRef.current = scrollOffsetRef.current;
     previousFrameTimeRef.current = null;
     refreshViewportBounds();
@@ -97,6 +101,7 @@ export const useDragAutoScroll = ({
     activeRef.current = false;
     blockedRef.current = false;
     pointerYRef.current = Number.NaN;
+    draggedBoundsRef.current = { top: Number.NaN, bottom: Number.NaN };
     previousFrameTimeRef.current = null;
     if (animationFrameRef.current !== null) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -104,8 +109,13 @@ export const useDragAutoScroll = ({
     }
   }, []);
 
-  const updateAutoScrollPointer = useCallback((absoluteY, { blocked = false } = {}) => {
+  const updateAutoScrollPointer = useCallback((absoluteY, {
+    blocked = false,
+    draggedTopY = Number.NaN,
+    draggedBottomY = Number.NaN,
+  } = {}) => {
     pointerYRef.current = absoluteY;
+    draggedBoundsRef.current = { top: draggedTopY, bottom: draggedBottomY };
     blockedRef.current = blocked;
   }, []);
 
