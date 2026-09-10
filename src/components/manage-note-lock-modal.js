@@ -102,6 +102,8 @@ const ManageNoteLockModal = ({
       visible={!!visible}
       animationType={visible ? 'fade' : 'none'}
       transparent
+      statusBarTranslucent
+      navigationBarTranslucent
       onRequestClose={close}
     >
       <KeyboardAwareModalContent>

@@ -4,6 +4,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
@@ -14,34 +15,38 @@ const KeyboardAwareModalContent = forwardRef(
     const colors = useTheme();
 
     return (
-      <KeyboardAvoidingView
+      <View
         style={[styles.overlay, { backgroundColor: colors.backdrop }, overlayStyle]}
-        behavior={
-          Platform.OS === 'ios'
-            ? 'padding'
-            : Platform.OS === 'android'
-              ? 'height'
-              : undefined
-        }
       >
-        <ScrollView
-          ref={ref}
-          style={styles.scroll}
-          contentContainerStyle={[
-            styles.content,
-            {
-              paddingTop: Math.max(24, insets.top + 12),
-              paddingBottom: Math.max(24, insets.bottom + 12),
-            },
-            contentContainerStyle,
-          ]}
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoider}
+          behavior={
+            Platform.OS === 'ios'
+              ? 'padding'
+              : Platform.OS === 'android'
+                ? 'height'
+                : undefined
+          }
         >
-          {children}
-        </ScrollView>
-      </KeyboardAvoidingView>
+          <ScrollView
+            ref={ref}
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.content,
+              {
+                paddingTop: Math.max(24, insets.top + 12),
+                paddingBottom: Math.max(24, insets.bottom + 12),
+              },
+              contentContainerStyle,
+            ]}
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
     );
   }
 );
@@ -50,6 +55,9 @@ KeyboardAwareModalContent.displayName = 'KeyboardAwareModalContent';
 
 const styles = StyleSheet.create({
   overlay: {
+    flex: 1,
+  },
+  keyboardAvoider: {
     flex: 1,
   },
   scroll: {

@@ -244,22 +244,30 @@ const ExpenseSummaryModal = ({
 
   return (
     <>
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={
-          Platform.OS === 'ios'
-            ? 'padding'
-            : Platform.OS === 'android'
-              ? 'height'
-              : undefined
-        }
-      >
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
-        <View
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
-          accessibilityViewIsModal
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalRoot}>
+        <KeyboardAvoidingView
+          style={styles.overlay}
+          behavior={
+            Platform.OS === 'ios'
+              ? 'padding'
+              : Platform.OS === 'android'
+                ? 'height'
+                : undefined
+          }
         >
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
+          <View
+            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
+            accessibilityViewIsModal
+          >
           <View style={styles.handle} />
           <View style={styles.header}>
             <View>
@@ -496,8 +504,9 @@ const ExpenseSummaryModal = ({
               )}
             </ScrollView>
           )}
-        </View>
-      </KeyboardAvoidingView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
 
     <Modal
@@ -757,7 +766,8 @@ const ExpenseSummaryModal = ({
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-    overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: colors.backdropStrong },
+    modalRoot: { flex: 1, backgroundColor: colors.backdropStrong },
+    overlay: { flex: 1, justifyContent: 'flex-end' },
     sheet: { maxHeight: '90%', backgroundColor: colors.card, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, ...shadow.card },
     handle: { width: 42, height: 4, borderRadius: radius.full, backgroundColor: colors.border, alignSelf: 'center', marginTop: 9 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 13, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border },

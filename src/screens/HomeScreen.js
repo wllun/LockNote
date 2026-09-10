@@ -818,6 +818,8 @@ const HomeScreen = ({ navigation }) => {
         visible={showFolderModal}
         animationType={showFolderModal ? 'fade' : 'none'}
         transparent
+        statusBarTranslucent
+        navigationBarTranslucent
       >
         <KeyboardAwareModalContent>
           <View style={styles.modalContent}>

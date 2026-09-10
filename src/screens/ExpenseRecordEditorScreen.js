@@ -2500,6 +2500,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         visible={!!commitmentDraft}
         animationType={commitmentDraft ? 'fade' : 'none'}
         transparent
+        statusBarTranslucent
+        navigationBarTranslucent
         onRequestClose={() => setCommitmentDraft(null)}
       >
         <KeyboardAwareModalContent>
