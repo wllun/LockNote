@@ -248,15 +248,18 @@ const ExpenseSummaryModal = ({
       visible={visible}
       animationType="slide"
       transparent
-      statusBarTranslucent
-      navigationBarTranslucent
       onRequestClose={onClose}
     >
       <View style={styles.modalRoot}>
         <KeyboardAvoidingView
           style={styles.overlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          enabled={Platform.OS === 'ios'}
+          behavior={
+            Platform.OS === 'ios'
+              ? 'padding'
+              : Platform.OS === 'android'
+                ? 'height'
+                : undefined
+          }
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
           <View

@@ -91,8 +91,6 @@ const PasswordModal = ({
       visible={visible}
       animationType={visible ? 'fade' : 'none'}
       transparent
-      statusBarTranslucent
-      navigationBarTranslucent
       onRequestClose={handleClose}
     >
       <KeyboardAwareModalContent>

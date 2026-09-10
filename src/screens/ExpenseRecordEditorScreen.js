@@ -1789,8 +1789,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     <KeyboardAvoidingView
       ref={dragAreaRef}
       style={[styles.container, { paddingTop: insets.top, backgroundColor: noteColorTheme.surface }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      enabled={Platform.OS === 'ios'}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       onLayout={measureDragArea}
     >
       <View style={[styles.header, { backgroundColor: noteColorTheme.surface }]}>
@@ -2501,8 +2500,6 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
         visible={!!commitmentDraft}
         animationType={commitmentDraft ? 'fade' : 'none'}
         transparent
-        statusBarTranslucent
-        navigationBarTranslucent
         onRequestClose={() => setCommitmentDraft(null)}
       >
         <KeyboardAwareModalContent>
@@ -2783,11 +2780,12 @@ const makeStyles = (colors) =>
     },
     scrollContent: {
       padding: 16,
-      alignItems: 'center',
+      alignItems: 'stretch',
     },
     editorContent: {
       width: '100%',
       maxWidth: 920,
+      alignSelf: 'center',
       gap: 16,
     },
     summaryCard: {

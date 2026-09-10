@@ -95,8 +95,6 @@ const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
       visible={visible}
       animationType={visible ? 'fade' : 'none'}
       transparent
-      statusBarTranslucent
-      navigationBarTranslucent
       onRequestClose={onClose}
     >
       <KeyboardAwareModalContent
