@@ -20,13 +20,8 @@ const KeyboardAwareModalContent = forwardRef(
       >
         <KeyboardAvoidingView
           style={styles.keyboardAvoider}
-          behavior={
-            Platform.OS === 'ios'
-              ? 'padding'
-              : Platform.OS === 'android'
-                ? 'height'
-                : undefined
-          }
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          enabled={Platform.OS === 'ios'}
         >
           <ScrollView
             ref={ref}

@@ -255,13 +255,8 @@ const ExpenseSummaryModal = ({
       <View style={styles.modalRoot}>
         <KeyboardAvoidingView
           style={styles.overlay}
-          behavior={
-            Platform.OS === 'ios'
-              ? 'padding'
-              : Platform.OS === 'android'
-                ? 'height'
-                : undefined
-          }
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          enabled={Platform.OS === 'ios'}
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
           <View

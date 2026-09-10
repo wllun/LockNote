@@ -1789,7 +1789,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     <KeyboardAvoidingView
       ref={dragAreaRef}
       style={[styles.container, { paddingTop: insets.top, backgroundColor: noteColorTheme.surface }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      enabled={Platform.OS === 'ios'}
       onLayout={measureDragArea}
     >
       <View style={[styles.header, { backgroundColor: noteColorTheme.surface }]}>
