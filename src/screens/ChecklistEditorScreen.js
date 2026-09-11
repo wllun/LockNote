@@ -23,6 +23,8 @@ import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
 import NoteColorModal from '../components/note-color-modal';
+import NoteBackgroundModal from '../components/note-background-modal';
+import NoteBackgroundLayer from '../components/note-background-layer';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { collaborationService } from '../services/collaborationService';
 import { lockPasswordService } from '../services/lockPasswordService';
@@ -47,6 +49,7 @@ import { useAwaitedEditorExit } from '../utils/use-awaited-editor-exit';
 import { getEditorExitDisposition } from '../utils/editor-exit-disposition.mjs';
 import { DEFAULT_NOTE_COLOR, getNoteColorTheme, normalizeNoteColor } from '../utils/note-color.mjs';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { noteBackgroundPreference } from '../utils/note-background-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import { isReadOnlyCollaborativeNote } from '../utils/collaboration-note.mjs';
 
@@ -257,6 +260,8 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
   const [showColorModal, setShowColorModal] = useState(false);
+  const [noteBackgroundUri, setNoteBackgroundUri] = useState(null);
+  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -292,6 +297,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     hasPassword: false,
     isPinned: false,
     color: DEFAULT_NOTE_COLOR,
+    backgroundUri: null,
     cloudId: null,
     readOnly: false,
     deleted: false,
@@ -347,7 +353,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     try {
       const note = await noteRepo.getById(noteId);
       if (!note) return;
-      const localColor = await noteColorPreference.load(noteId);
+      const [localColor, localBackgroundUri] = await Promise.all([
+        noteColorPreference.load(noteId),
+        noteBackgroundPreference.load(noteId),
+      ]);
 
       const parsed = parseChecklistNote(note.content);
       const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note);
@@ -365,6 +374,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       setHasPassword(!!note.password);
       setIsPinned(!!note.is_pinned);
       setNoteColor(localColor);
+      setNoteBackgroundUri(localBackgroundUri);
       setIsReadOnly(readOnly);
       latest.current = {
         ...latest.current,
@@ -374,6 +384,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
         hasPassword: !!note.password,
         isPinned: !!note.is_pinned,
         color: localColor,
+        backgroundUri: localBackgroundUri,
         cloudId: note.cloud_id,
         readOnly,
       };
@@ -813,6 +824,11 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleBackgroundChanged = (uri) => {
+    setNoteBackgroundUri(uri);
+    latest.current.backgroundUri = uri;
+  };
+
   const deleteChecklist = async () => {
     try {
       if (saveTimeout.current) {
@@ -822,6 +838,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       latest.current.deleted = true;
       await collaborationService.delete(noteId);
       await noteColorPreference.remove(noteId);
+      await noteBackgroundPreference.removeQuietly(noteId);
       navigation.goBack();
     } catch {
       latest.current.deleted = false;
@@ -856,7 +873,8 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       isChecklistNoteEmpty(draft.title, draft.items) &&
       !draft.hasPassword &&
       !draft.isPinned &&
-      draft.color === DEFAULT_NOTE_COLOR;
+      draft.color === DEFAULT_NOTE_COLOR &&
+      !draft.backgroundUri;
     return getEditorExitDisposition({
       loadCompleted: loadCompletedRef.current,
       isNewDraft,
@@ -873,7 +891,8 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       isChecklistNoteEmpty(draft.title, draft.items) &&
       !draft.hasPassword &&
       !draft.isPinned &&
-      draft.color === DEFAULT_NOTE_COLOR;
+      draft.color === DEFAULT_NOTE_COLOR &&
+      !draft.backgroundUri;
     const disposition = getEditorExitDisposition({
       loadCompleted: loadCompletedRef.current,
       isNewDraft,
@@ -890,6 +909,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     if (disposition === 'delete') {
       await noteRepo.hardDelete(noteId);
       await noteColorPreference.remove(noteId);
+      await noteBackgroundPreference.removeQuietly(noteId);
     } else {
       await collaborationService.save(noteId, {
         title: draft.title,
@@ -955,7 +975,8 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       onLayout={measureDragArea}
     >
-      <View style={[styles.header, { backgroundColor: noteColorTheme.surface }]}>
+      <NoteBackgroundLayer uri={noteBackgroundUri} surface={noteColorTheme.surface} />
+      <View style={[styles.header, { backgroundColor: noteBackgroundUri ? 'transparent' : noteColorTheme.surface }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.headerButton}
@@ -1202,6 +1223,15 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
+              onPress={() => { setShowActionsMenu(false); setShowBackgroundModal(true); }}
+              accessibilityRole="button"
+              accessibilityLabel="Change checklist background"
+            >
+              <Ionicons name="image-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Background</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowShareModal(true); }}
               accessibilityRole="button"
             >
@@ -1281,6 +1311,13 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       />
       <NoteShareModal visible={showShareModal} noteId={noteId} onClose={() => setShowShareModal(false)} onChanged={loadChecklist} onLeft={() => navigation.goBack()} />
       <NoteColorModal visible={showColorModal} value={noteColor} onClose={() => setShowColorModal(false)} onSelect={handleChangeColor} />
+      <NoteBackgroundModal
+        visible={showBackgroundModal}
+        noteId={noteId}
+        value={noteBackgroundUri}
+        onClose={() => setShowBackgroundModal(false)}
+        onChanged={handleBackgroundChanged}
+      />
 
       <PasswordModal
         visible={showDeletePasswordModal}

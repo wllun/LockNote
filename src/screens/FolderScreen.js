@@ -25,6 +25,7 @@ import CreateNoteTypeModal from '../components/create-note-type-modal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import MoveNoteModal from '../components/MoveNoteModal';
 import NoteColorModal from '../components/note-color-modal';
+import NoteBackgroundModal from '../components/note-background-modal';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { lockPasswordService } from '../services/lockPasswordService';
 import { radius, shadow, useTheme } from '../theme';
@@ -34,6 +35,7 @@ import { confirmDestructiveAction } from '../utils/confirm-action';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { noteBackgroundPreference } from '../utils/note-background-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import {
   LEGACY_HOME_VIEW_MODE_STORAGE_KEY,
@@ -143,6 +145,7 @@ const FolderScreen = ({ route, navigation }) => {
     folders: [],
   });
   const [colorNote, setColorNote] = useState(null);
+  const [backgroundNote, setBackgroundNote] = useState(null);
   const [lockActionNote, setLockActionNote] = useState(null);
 
   useEffect(() => {
@@ -169,7 +172,8 @@ const FolderScreen = ({ route, navigation }) => {
   const loadNotes = useCallback(async () => {
     try {
       const notesData = await noteRepo.getByFolderId(folderId);
-      setNotes(await noteColorPreference.applyToNotes(notesData));
+      const coloredNotes = await noteColorPreference.applyToNotes(notesData);
+      setNotes(await noteBackgroundPreference.applyToNotes(coloredNotes));
     } catch (error) {
       Alert.alert('Error', 'Failed to load notes');
     } finally {
@@ -431,6 +435,7 @@ const FolderScreen = ({ route, navigation }) => {
         onTogglePin={() => handleToggleNotePin(itemActions.note)}
         onMove={() => openMoveNote(itemActions.note)}
         onColor={() => setColorNote(itemActions.note)}
+        onBackground={() => setBackgroundNote(itemActions.note)}
         onToggleLock={() => setLockActionNote(itemActions.note)}
         onArchive={() => handleArchiveNote(itemActions.note)}
         onDelete={() => handleDeleteNote(itemActions.note)}
@@ -441,6 +446,14 @@ const FolderScreen = ({ route, navigation }) => {
         value={colorNote?.color}
         onClose={() => setColorNote(null)}
         onSelect={handleChangeNoteColor}
+      />
+
+      <NoteBackgroundModal
+        visible={!!backgroundNote}
+        noteId={backgroundNote?.id}
+        value={backgroundNote?.background_image_uri}
+        onClose={() => setBackgroundNote(null)}
+        onChanged={loadNotes}
       />
 
       <ManageNoteLockModal

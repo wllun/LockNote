@@ -30,6 +30,7 @@ import {
 } from '../utils/reminder-note.mjs';
 import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
 import { getNoteColorTheme } from '../utils/note-color.mjs';
+import NoteBackgroundLayer from './note-background-layer';
 
 // ponytail: entering animations are native-only — reanimated web leaves items visibility:hidden
 const entering = (index) =>
@@ -109,6 +110,11 @@ const NoteItem = ({
           if (nativeEvent.actionName === 'longpress') onOpenActions?.();
         }}
       >
+        <NoteBackgroundLayer
+          uri={note.background_image_uri}
+          surface={noteColor.surface}
+          borderRadius={radius.md}
+        />
         <View style={[styles.header, grid && styles.headerGrid]}>
           <Text style={[styles.title, grid && styles.titleGrid]} numberOfLines={1}>
             {displayTitle}

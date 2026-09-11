@@ -25,6 +25,8 @@ import NoteItem from '../components/NoteItem';
 import PasswordModal from '../components/PasswordModal';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { radius, useTheme } from '../theme';
+import { noteColorPreference } from '../utils/note-color-preference';
+import { noteBackgroundPreference } from '../utils/note-background-preference';
 
 const editorRouteFor = (note) => {
   if (note.note_type === EXPENSE_NOTE_TYPE) return 'ExpenseRecordEditor';
@@ -61,8 +63,10 @@ const ArchiveScreen = ({ navigation }) => {
       const counts = await Promise.all(
         archivedFolders.map(async (folder) => [folder.id, await folderRepo.getNoteCount(folder.id)])
       );
+      const coloredNotes = await noteColorPreference.applyToNotes(archivedNotes);
+      const decoratedNotes = await noteBackgroundPreference.applyToNotes(coloredNotes);
       setFolders(archivedFolders);
-      setNotes(archivedNotes);
+      setNotes(decoratedNotes);
       setFolderNoteCounts(Object.fromEntries(counts));
     } catch (error) {
       Alert.alert('Archive unavailable', 'LockNote could not load the Archive.');

@@ -84,7 +84,7 @@ _Snapshot: 2026-08-31. Check off items as they land._
 
 ### Phase 3 — LockNote Pro attachments — proposed RM9.99/month
 
-- [ ] Image attachments and custom note backgrounds, with a planned 2 GB cloud attachment quota and a 10 MB target maximum per uploaded image.
+- [ ] Image attachments and optional cloud sync for local custom note backgrounds, with a planned 2 GB cloud attachment quota and a 10 MB maximum per image.
 
 ### Phase 4 — Export
 
@@ -94,7 +94,7 @@ _Snapshot: 2026-08-31. Check off items as they land._
 ### Phase 5 — Structure (not premium)
 
 - [ ] Folder in folder (nesting)
-- [ ] App icon & name change
+- [X] App icon & name change
 
 ### Phase 6 — Add menu and note types
 
@@ -114,7 +114,7 @@ When the user presses the Add button, let them choose one of these note types:
 
 - [X] Pin — already shipped free in Phase 1 scope; decide which tier it belongs to
 - [X] Coloring note — notes can use Default, Rose, Orange, Yellow, Green, Blue, or Purple from list actions and every editor. Semantic colors adapt to light/dark mode and are saved only as a per-device AsyncStorage preference; they are excluded from note rows, backup, private sync, and collaboration.
-- [ ] Custom note background images — allow users to select, change, or remove a background image per note while preserving text readability and local-only storage
+- [X] Custom note background images — every note type can select, change, or remove one image (maximum 10 MB) from its editor or Home/Folder note actions. Native copies the image into app document storage; web stores it in IndexedDB. A theme-aware translucent overlay preserves readability, cards show the background, delete cleanup removes managed files, and the preference remains device-local outside note rows, backup, private sync, and collaboration.
 - [X] View controls — Home independently persists Folder List/Strip and Note List/Grid choices. Search results follow their section setting, notes inside folders inherit the Notes choice, and the former combined preference migrates automatically. Mobile contextual actions use long-press, while web retains visible three-dot controls.
 - [X] Trash — Settings lists soft-deleted notes only, with Restore and password-gated Delete forever inside each row's three-dots menu. Folders are deleted permanently while their notes move to Trash as Home notes. Empty Trash safely removes unlocked notes, and local note content is purged after 30 days at startup or when Trash opens.
 - [X] Archive — Settings module for folders and notes with open, restore, and Move to Trash actions; folder archiving preserves each child note's independent archive state.

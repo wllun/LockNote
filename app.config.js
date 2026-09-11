@@ -63,6 +63,14 @@ export default {
           granularPermissions: [],
         },
       ],
+      [
+        "expo-image-picker",
+        {
+          photosPermission: "Allow LockNote to select a local note background image.",
+          cameraPermission: false,
+          microphonePermission: false,
+        },
+      ],
     ],
   },
 };

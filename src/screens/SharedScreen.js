@@ -19,6 +19,7 @@ import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { getNetworkAvailability } from '../utils/network-availability.mjs';
 import { radius, useTheme } from '../theme';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { noteBackgroundPreference } from '../utils/note-background-preference';
 
 const routeFor = (note) => note.note_type === EXPENSE_NOTE_TYPE
   ? 'ExpenseRecordEditor'
@@ -56,7 +57,8 @@ const SharedScreen = ({ navigation }) => {
 
     try {
       const next = await collaborationService.refreshSharedWithMe();
-      const decorated = await noteColorPreference.applyToNotes(next.filter(Boolean));
+      const colored = await noteColorPreference.applyToNotes(next.filter(Boolean));
+      const decorated = await noteBackgroundPreference.applyToNotes(colored);
       if (requestId !== loadRequestRef.current) return;
       setNotes(decorated);
       setMessage('');

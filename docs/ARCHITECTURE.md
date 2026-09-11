@@ -154,6 +154,16 @@ records, backup, private account sync, and shared-note collaboration. A
 non-default local color still makes an otherwise empty draft meaningful on that
 device, so editor exit cleanup does not discard it.
 
+Custom note backgrounds follow the same presentation-only boundary. Native
+builds copy a selected image (maximum 10 MB) into Expo document storage under
+`note-backgrounds/` and save only the note-ID-to-file-URI mapping in
+AsyncStorage. Web stores the image Blob in a local IndexedDB object store and
+creates a temporary object URL for rendering. Editors and note cards place a
+theme-colored translucent layer above the image to preserve text contrast.
+Background images are device-local and excluded from note rows, backups,
+private sync, and shared-note collaboration; deleting the note also removes its
+managed local image. A background makes an otherwise empty new draft meaningful.
+
 The device-level default expense currency is stored in AsyncStorage under
 `@locknote_expense_currency` and is read when a new, still-empty expense note is
 opened. Settings can change that default for future notes or explicitly rewrite

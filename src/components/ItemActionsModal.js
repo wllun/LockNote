@@ -20,6 +20,7 @@ const ItemActionsModal = ({
   onTogglePin,
   onToggleLock,
   onColor,
+  onBackground,
   onMove,
   onArchive,
   trashMode = false,
@@ -135,6 +136,20 @@ const ItemActionsModal = ({
                 <Ionicons name="color-palette-outline" size={20} color={colors.textSecondary} />
               </View>
               <Text style={styles.actionText}>Color</Text>
+            </Pressable>
+          )}
+
+          {!trashMode && !archiveMode && isNote && !!onBackground && (
+            <Pressable
+              style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+              onPress={() => runAction(onBackground)}
+              accessibilityRole="button"
+              accessibilityLabel="Change note background"
+            >
+              <View style={styles.actionIcon}>
+                <Ionicons name="image-outline" size={20} color={colors.textSecondary} />
+              </View>
+              <Text style={styles.actionText}>Background</Text>
             </Pressable>
           )}
 

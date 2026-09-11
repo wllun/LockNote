@@ -24,6 +24,7 @@ import CreateNoteTypeModal from '../components/create-note-type-modal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import MoveNoteModal from '../components/MoveNoteModal';
 import NoteColorModal from '../components/note-color-modal';
+import NoteBackgroundModal from '../components/note-background-modal';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { radius, shadow, useTheme } from '../theme';
@@ -33,6 +34,7 @@ import { confirmDestructiveAction } from '../utils/confirm-action';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { noteBackgroundPreference } from '../utils/note-background-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import {
   FOLDER_VIEW_MODES,
@@ -56,6 +58,9 @@ const getFolderNoteCounts = async (folderList) => {
   );
   return Object.fromEntries(countEntries);
 };
+
+const applyLocalNoteAppearance = async (notes) =>
+  noteBackgroundPreference.applyToNotes(await noteColorPreference.applyToNotes(notes));
 
 const HomeScreen = ({ navigation }) => {
   const colors = useTheme();
@@ -88,6 +93,7 @@ const HomeScreen = ({ navigation }) => {
     folders: [],
   });
   const [colorNote, setColorNote] = useState(null);
+  const [backgroundNote, setBackgroundNote] = useState(null);
   const [lockActionNote, setLockActionNote] = useState(null);
   const [folderNoteCounts, setFolderNoteCounts] = useState({});
   const [folderViewMode, setFolderViewMode] = useState('list');
@@ -101,7 +107,7 @@ const HomeScreen = ({ navigation }) => {
       ]);
       const [noteCounts, coloredNotes] = await Promise.all([
         getFolderNoteCounts(foldersData),
-        noteColorPreference.applyToNotes(notesData),
+        applyLocalNoteAppearance(notesData),
       ]);
       setFolders(foldersData);
       setNotes(coloredNotes);
@@ -126,7 +132,7 @@ const HomeScreen = ({ navigation }) => {
       const [f, n] = await Promise.all([folderRepo.search(q), noteRepo.search(q)]);
       const [noteCounts, coloredNotes] = await Promise.all([
         getFolderNoteCounts(f),
-        noteColorPreference.applyToNotes(n),
+        applyLocalNoteAppearance(n),
       ]);
       setResults({ folders: f, notes: coloredNotes });
       setFolderNoteCounts((current) => ({ ...current, ...noteCounts }));
@@ -147,7 +153,7 @@ const HomeScreen = ({ navigation }) => {
         const [f, n] = await Promise.all([folderRepo.search(q), noteRepo.search(q)]);
         const [noteCounts, coloredNotes] = await Promise.all([
           getFolderNoteCounts(f),
-          noteColorPreference.applyToNotes(n),
+          applyLocalNoteAppearance(n),
         ]);
         if (!cancelled) {
           setResults({ folders: f, notes: coloredNotes });
@@ -772,6 +778,11 @@ const HomeScreen = ({ navigation }) => {
             ? () => setColorNote(itemActions.item)
             : undefined
         }
+        onBackground={
+          itemActions.type === 'note'
+            ? () => setBackgroundNote(itemActions.item)
+            : undefined
+        }
         onToggleLock={
           itemActions.type === 'note'
             ? () => setLockActionNote(itemActions.item)
@@ -796,6 +807,14 @@ const HomeScreen = ({ navigation }) => {
         value={colorNote?.color}
         onClose={() => setColorNote(null)}
         onSelect={handleChangeNoteColor}
+      />
+
+      <NoteBackgroundModal
+        visible={!!backgroundNote}
+        noteId={backgroundNote?.id}
+        value={backgroundNote?.background_image_uri}
+        onClose={() => setBackgroundNote(null)}
+        onChanged={refreshCurrent}
       />
 
       <ManageNoteLockModal
