@@ -73,7 +73,6 @@ export const initDB = async () => {
     CREATE INDEX IF NOT EXISTS idx_notes_folder_id ON notes(folder_id);
     CREATE INDEX IF NOT EXISTS idx_notes_is_deleted ON notes(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_folders_is_deleted ON folders(is_deleted);
-    CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON folders(parent_id);
   `);
 
   // Migrate is_pinned onto DBs created before this column existed.
