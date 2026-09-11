@@ -60,6 +60,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
+  const [initialContentSelection, setInitialContentSelection] = useState({ start: 0, end: 0 });
   const saveTimeout = useRef(null);
   const loadCompletedRef = useRef(false);
   const contentRef = useRef(null);
@@ -274,6 +275,9 @@ const NoteEditorScreen = ({ route, navigation }) => {
   };
 
   useEffect(() => {
+    setInitialContentSelection({ start: 0, end: 0 });
+    contentRef.current?.blur();
+    Keyboard.dismiss();
     loadNote();
   }, [noteId]);
 
@@ -394,8 +398,12 @@ const NoteEditorScreen = ({ route, navigation }) => {
           value={content}
           editable={!isReadOnly}
           onChangeText={handleContentChange}
+          onFocus={() => setInitialContentSelection(undefined)}
+          onPressIn={() => setInitialContentSelection(undefined)}
           maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS}
           multiline
+          autoFocus={false}
+          selection={initialContentSelection}
           textAlignVertical="top"
           accessibilityLabel="Note content"
           accessibilityHint={isReadOnly ? 'This shared note is view only' : `Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
