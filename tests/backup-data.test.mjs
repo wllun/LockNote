@@ -16,6 +16,7 @@ const UPDATED = '2026-08-02T10:00:00.000Z';
 
 const folder = (overrides = {}) => ({
   id: 'folder-1',
+  parent_id: null,
   name: 'Work',
   password: HASH,
   is_pinned: 1,
@@ -109,6 +110,26 @@ test('validates a backup and resets restored notes to private collaboration stat
   assert.equal(restored.folder_id, 'folder-1');
   assert.equal(restored.is_archived, 1);
   assert.equal(result.backup.folders.records[0].is_archived, 1);
+});
+
+test('preserves nested folders and accepts version 1 backups as root folders', () => {
+  const nested = validateBackupDocument(makeDocument({
+    folders: { records: [folder(), folder({ id: 'child', parent_id: 'folder-1' })], tombstones: [] },
+  }));
+  assert.equal(nested.backup.folders.records[1].parent_id, 'folder-1');
+
+  const legacy = validateBackupDocument({ ...makeDocument(), version: 1 });
+  assert.equal(legacy.backup.folders.records[0].parent_id, null);
+  assert.equal(legacy.backup.version, BACKUP_VERSION);
+});
+
+test('rejects invalid nested folder paths in backups', () => {
+  assert.throws(() => validateBackupDocument(makeDocument({
+    folders: { records: [folder({ parent_id: 'missing' })], tombstones: [] },
+  })), /parent folder that does not exist/);
+  assert.throws(() => validateBackupDocument(makeDocument({
+    folders: { records: [folder({ parent_id: 'folder-1' })], tombstones: [] },
+  })), /cannot contain itself/);
 });
 
 test('rejects unsupported versions, plaintext passwords, duplicates, and orphan notes', () => {

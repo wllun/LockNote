@@ -26,6 +26,7 @@ export const initDB = async () => {
 
     CREATE TABLE IF NOT EXISTS folders (
       id TEXT PRIMARY KEY NOT NULL,
+      parent_id TEXT,
       name TEXT NOT NULL,
       password TEXT,
       is_deleted INTEGER DEFAULT 0,
@@ -43,7 +44,8 @@ export const initDB = async () => {
       sync_status TEXT,
       last_synced_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (parent_id) REFERENCES folders(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS notes (
@@ -71,6 +73,7 @@ export const initDB = async () => {
     CREATE INDEX IF NOT EXISTS idx_notes_folder_id ON notes(folder_id);
     CREATE INDEX IF NOT EXISTS idx_notes_is_deleted ON notes(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_folders_is_deleted ON folders(is_deleted);
+    CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON folders(parent_id);
   `);
 
   // Migrate is_pinned onto DBs created before this column existed.
@@ -93,6 +96,10 @@ export const initDB = async () => {
   }
 
   const folderColumns = await db.getAllAsync('PRAGMA table_info(folders)');
+  if (!folderColumns.some((column) => column.name === 'parent_id')) {
+    await db.execAsync(`ALTER TABLE folders ADD COLUMN parent_id TEXT`);
+  }
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON folders(parent_id)');
   if (!folderColumns.some((column) => column.name === 'is_archived')) {
     await db.execAsync(`ALTER TABLE folders ADD COLUMN is_archived INTEGER DEFAULT 0`);
   }

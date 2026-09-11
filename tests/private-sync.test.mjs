@@ -33,7 +33,7 @@ test('builds active records and deletion tombstones without incoming shared note
   const payload = buildSyncPayload(
     {
       records: [{
-        id: 'folder-1', name: 'Work', password: null, is_pinned: 0, is_archived: 1,
+        id: 'folder-1', parent_id: 'folder-parent', name: 'Work', password: null, is_pinned: 0, is_archived: 1,
         created_at: timestamp, updated_at: timestamp,
       }],
       tombstones: [{ id: 'folder-old', updated_at: timestamp }],
@@ -50,6 +50,7 @@ test('builds active records and deletion tombstones without incoming shared note
   assert.deepEqual(payload.folders.map((item) => item.id), ['folder-1', 'folder-old']);
   assert.equal(payload.folders[1].is_deleted, true);
   assert.equal(payload.folders[0].is_archived, true);
+  assert.equal(payload.folders[0].parent_id, 'folder-parent');
   assert.deepEqual(payload.notes.map((item) => item.id), ['note-1', 'note-old']);
   assert.equal(payload.notes[0].folder_id, null);
   assert.equal(payload.notes[0].password, 'sha256-hash');
@@ -105,9 +106,10 @@ test('preserves local archive state when an older sync response omits it', () =>
 test('preserves local folder archive state when an older sync response omits it', () => {
   const restored = cloudFolderForLocal(
     { id: 'folder-1', name: 'Work', is_pinned: false, created_at: timestamp, updated_at: timestamp },
-    { id: 'folder-1', is_archived: 1 },
+    { id: 'folder-1', parent_id: 'folder-parent', is_archived: 1 },
   );
   assert.equal(restored.is_archived, 1);
+  assert.equal(restored.parent_id, 'folder-parent');
 });
 
 test('sync service pushes snapshots, then applies folders before notes', async () => {

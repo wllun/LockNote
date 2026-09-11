@@ -109,7 +109,10 @@ List items expose contextual actions through long-press on native and a visible
 three-dots button on web. Note actions are color, pin, move, archive, and soft-delete;
 folder actions are rename, pin, archive, and move to Trash. Moving a note updates
 `folder_id`, with `null`
-representing Home. Deleting a folder soft-deletes its contained notes first so
+representing Home. Folders may be moved beneath another folder or back to Home;
+cycle checks allow only one subfolder layer (Home → folder → subfolder) and
+apply to the complete subtree. A subfolder screen omits the Folders section and
+shows only its breadcrumb and Notes section. Deleting a folder soft-deletes its contained notes first so
 normal reads do not leave inaccessible active notes behind. Deleting a locked
 note uses one combined destructive confirmation that shows the note details,
 verifies its password, and deletes immediately after successful confirmation.
@@ -120,7 +123,7 @@ confirmation is shown; unlocked-item deletion is unchanged.
 
 Two tables / collections. Timestamps are ISO strings; IDs are generated client-side (`Date.now()` base36 + random suffix).
 
-**folders**: `id, name, password, is_deleted, is_pinned, is_archived, created_at, updated_at`
+**folders**: `id, parent_id (nullable → top-level folder), name, password, is_deleted, is_pinned, is_archived, created_at, updated_at`
 
 **notes**: `id, folder_id (nullable → root note), title, content, note_type, password, is_deleted, is_pinned, is_archived, created_at, updated_at` plus collaboration/sync metadata
 
@@ -194,13 +197,16 @@ expense note. This app-level template is stored locally in AsyncStorage under
 `@locknote_monthly_commitment_template`, excludes paid state and note-specific
 IDs, and creates fresh unpaid commitments when applied.
 
-On native, `notes.folder_id` has `ON DELETE CASCADE`; archive indexes cover both folders and notes, alongside the existing folder/deletion indexes.
+On native, `notes.folder_id` has `ON DELETE CASCADE`; `folders.parent_id` is a
+self-reference for new databases and existing databases receive the nullable
+column through a guarded migration. Archive and parent indexes cover folder-tree
+reads alongside the existing folder/deletion indexes.
 
 ### Conventions
 
 - **Archive** — folder/note `archive()` sets `is_archived = 1`. Home and folder
-  list reads exclude archived rows; search also excludes ordinary notes whose
-  parent folder is archived. Settings → Archive intentionally reads archived
+  list reads exclude archived rows and their descendants; search also excludes
+  ordinary notes beneath any archived ancestor. Settings → Archive intentionally reads archived
   folders and private/owned notes through each repository's `getArchived()`.
   Opening an archived folder shows its visible child notes without rewriting
   their own archive flags. Restoring a folder therefore reveals its visible
@@ -217,9 +223,10 @@ On native, `notes.folder_id` has `ON DELETE CASCADE`; archive indexes cover both
   active record. A note returns to its original folder when that folder still
   exists, otherwise it returns to Home. Previously shared notes return as
   private notes because their cloud collaboration was removed when deleted.
-- **Folder deletion** — folders are not retained in Trash. After their active
-  notes are soft-deleted, `noteRepo.detachFromFolder()` moves those trashed
-  notes to Home/root semantics and the folder is hard-deleted. Startup/Trash
+- **Folder deletion** — folders are not retained in Trash. The complete subtree
+  is inspected first; all active descendant notes are soft-deleted, detached to
+  Home/root semantics, and every folder is soft-deleted from leaves to root.
+  Startup/Trash
   cleanup applies the same conversion to legacy soft-deleted folders.
 - **30-day Trash retention** — startup and opening Trash call `trashService.purgeExpired()`.
   The soft-deletion `updated_at` is the deletion time. At 30 days, the local
@@ -300,7 +307,9 @@ owned notes. The server stores typed rows in `private_folders` and
 owner. The `sync_private_data` RPC merges snapshots atomically with
 last-write-wins ordering by each client's ISO `updated_at`, then returns the
 account's canonical snapshot. Sync applies folders before notes to preserve
-foreign keys and keeps `folder_id = null` for Home notes.
+foreign keys, preserves nullable folder `parent_id` links, and keeps
+`folder_id = null` for Home notes. Clients apply synced folders in two passes so
+parents are available before child links are restored.
 
 Incoming collaboration notes are excluded because their source of truth is the
 shared-note service. Soft-delete and historical tombstones propagate removals.
@@ -320,18 +329,22 @@ cloud writes are rejected.
 
 Settings → Export Backup builds a schema-versioned `locknote-backup` JSON file
 from the repositories' active private/owned records and sync tombstones. The
-file includes folders, notes, note types, pin/archive state, ISO timestamps, nullable
-`folder_id` relationships, and existing SHA-256 access-gate hashes. It does not
+file includes folders, notes, note types, pin/archive state, ISO timestamps,
+nullable folder `parent_id` and note `folder_id` relationships, and existing
+SHA-256 access-gate hashes. It does not
 include incoming shared-note caches or account/collaboration identifiers.
 
 Settings → Import Backup reads a selected JSON file into memory, enforces a 25
 MB limit, validates its format, version, field types, timestamps, unique IDs,
-password-hash shape, and folder references, then shows folder/note/deletion
+password-hash shape, folder references, cycles, and the one-subfolder-layer limit,
+then shows folder/note/deletion
 counts before writing. Merge reuses the repositories' last-write-wins snapshot
 methods. Replace uses matching `replaceBackupSnapshot()` methods on native and
 web, clears current private data and tombstones, and keeps Shared-with-me notes.
 Folders are always restored before notes so foreign keys remain valid; a null
 `folder_id` stays a Home/root note.
+Backup schema version 2 stores folder parents; version 1 backups remain accepted
+and their folders import at the top level.
 
 Reminder bodies and schedule settings are portable, but notification IDs are
 device-local. Export and import clear those IDs and disable the reminder so a

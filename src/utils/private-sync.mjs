@@ -30,6 +30,7 @@ const reminderContentForDevice = (cloudContent, localContent) => {
 
 export const folderRecordForCloud = (folder) => ({
   id: String(folder.id),
+  parent_id: folder.parent_id ?? null,
   name: String(folder.name ?? ''),
   password: folder.password || null,
   is_pinned: asBoolean(folder.is_pinned),
@@ -123,6 +124,9 @@ export const parseSyncResponse = (response) => {
 
 export const cloudFolderForLocal = (folder, existing = null) => ({
   id: folder.id,
+  parent_id: folder.parent_id === undefined
+    ? existing?.parent_id ?? null
+    : folder.parent_id ?? null,
   name: folder.name || '',
   password: folder.password || null,
   is_pinned: asBoolean(folder.is_pinned) ? 1 : 0,

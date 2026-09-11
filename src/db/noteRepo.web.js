@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hashPassword } from '../utils/crypto';
 import { COLLABORATION_DEFAULTS, normalizeCollaborationNote } from '../utils/collaboration-note.mjs';
+import { getVisibleFolders } from '../utils/folder-hierarchy.mjs';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
@@ -272,17 +273,13 @@ export const noteRepo = {
       AsyncStorage.getItem(FOLDERS_KEY),
     ]);
     const folders = folderData ? JSON.parse(folderData) : [];
-    const archivedFolderIds = new Set(
-      folders
-        .filter((folder) => !folder.is_deleted && !!folder.is_archived)
-        .map((folder) => folder.id)
-    );
+    const visibleFolderIds = new Set(getVisibleFolders(folders).map((folder) => folder.id));
     return notes
       .filter(
         (n) =>
           !n.is_deleted &&
           !n.is_archived &&
-          !archivedFolderIds.has(n.folder_id) &&
+          (n.folder_id === null || n.folder_id === undefined || visibleFolderIds.has(n.folder_id)) &&
           n.share_origin !== 'incoming' &&
           (n.title.toLowerCase().includes(query.toLowerCase()) ||
             n.content.toLowerCase().includes(query.toLowerCase()))

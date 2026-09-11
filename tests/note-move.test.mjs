@@ -14,6 +14,7 @@ test('uses null as the Home destination for root-note semantics', () => {
   assert.deepEqual(destinations[0], {
     id: null,
     name: 'Home',
+    path: 'Home',
     isCurrent: false,
     isLocked: false,
   });

@@ -13,6 +13,8 @@ import {
   StyleSheet,
   RefreshControl,
   TextInput,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppAlert as Alert } from '../utils/app-alert';
@@ -20,14 +22,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
 import NoteItem from '../components/NoteItem';
+import FolderItem from '../components/FolderItem';
 import PasswordModal from '../components/PasswordModal';
 import CreateNoteTypeModal from '../components/create-note-type-modal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import MoveNoteModal from '../components/MoveNoteModal';
+import MoveFolderModal from '../components/MoveFolderModal';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { lockPasswordService } from '../services/lockPasswordService';
+import { deleteFolderTree, inspectFolderTree } from '../services/folderTreeService';
+import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
 import { radius, shadow, useTheme } from '../theme';
 import { EXPENSE_NOTE_TYPE } from '../utils/expense-record.mjs';
 import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
@@ -37,10 +43,16 @@ import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
 import { noteColorPreference } from '../utils/note-color-preference';
 import { noteBackgroundPreference } from '../utils/note-background-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
+import { hashPassword } from '../utils/crypto';
 import {
+  FOLDER_VIEW_MODES,
+  FOLDER_VIEW_MODE_STORAGE_KEY,
   LEGACY_HOME_VIEW_MODE_STORAGE_KEY,
+  NOTE_VIEW_MODES,
   NOTE_VIEW_MODE_STORAGE_KEY,
+  publishViewModePreferences,
   resolveViewModePreferences,
+  subscribeToViewModePreferences,
 } from '../utils/note-view-mode.mjs';
 
 const editorRouteFor = (note) => {
@@ -123,57 +135,98 @@ const FolderScreen = ({ route, navigation }) => {
 
   const { folderId, folderName } = route.params;
   const [currentFolderName, setCurrentFolderName] = useState(folderName || 'Folder');
+  const [isSubfolder, setIsSubfolder] = useState(!!route.params?.isSubfolder);
+  const [folderPath, setFolderPath] = useState([]);
+  const [childFolders, setChildFolders] = useState([]);
+  const [folderNoteCounts, setFolderNoteCounts] = useState({});
   const [notes, setNotes] = useState([]);
+  const requestedFolderViewMode = route.params?.folderViewMode;
   const requestedNoteViewMode = route.params?.noteViewMode ?? route.params?.viewMode;
+  const [folderViewMode, setFolderViewMode] = useState(() =>
+    resolveViewModePreferences({ folderMode: requestedFolderViewMode }).folderViewMode
+  );
   const [noteViewMode, setNoteViewMode] = useState(() =>
     resolveViewModePreferences({ noteMode: requestedNoteViewMode }).noteViewMode
   );
   const [refreshing, setRefreshing] = useState(false);
   const [showNoteTypeModal, setShowNoteTypeModal] = useState(false);
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [folderNameDraft, setFolderNameDraft] = useState('');
+  const [folderPassword, setFolderPassword] = useState('');
   const [passwordModal, setPasswordModal] = useState({
     visible: false,
-    note: null,
+    item: null,
+    type: 'note',
     action: 'open',
   });
   const [itemActions, setItemActions] = useState({
     visible: false,
-    note: null,
+    item: null,
+    type: 'note',
   });
   const [moveNoteModal, setMoveNoteModal] = useState({
     visible: false,
     note: null,
     folders: [],
   });
+  const [moveFolderModal, setMoveFolderModal] = useState({ visible: false, folder: null, folders: [] });
   const [colorNote, setColorNote] = useState(null);
   const [backgroundNote, setBackgroundNote] = useState(null);
   const [lockActionNote, setLockActionNote] = useState(null);
 
-  useEffect(() => {
-    if (requestedNoteViewMode) {
-      setNoteViewMode(
-        resolveViewModePreferences({ noteMode: requestedNoteViewMode }).noteViewMode
-      );
-      return undefined;
-    }
+  useEffect(() => subscribeToViewModePreferences((change) => {
+    if (change.folderViewMode) setFolderViewMode(change.folderViewMode);
+    if (change.noteViewMode) setNoteViewMode(change.noteViewMode);
+  }), []);
 
+  useEffect(() => {
     let active = true;
     Promise.all([
+      AsyncStorage.getItem(FOLDER_VIEW_MODE_STORAGE_KEY),
       AsyncStorage.getItem(NOTE_VIEW_MODE_STORAGE_KEY),
       AsyncStorage.getItem(LEGACY_HOME_VIEW_MODE_STORAGE_KEY),
     ])
-      .then(([noteMode, legacyMode]) => {
+      .then(([folderMode, noteMode, legacyMode]) => {
         if (!active) return;
-        setNoteViewMode(resolveViewModePreferences({ noteMode, legacyMode }).noteViewMode);
+        const preferences = resolveViewModePreferences({
+          folderMode: requestedFolderViewMode ?? folderMode,
+          noteMode: requestedNoteViewMode ?? noteMode,
+          legacyMode,
+        });
+        setFolderViewMode(preferences.folderViewMode);
+        setNoteViewMode(preferences.noteViewMode);
       })
       .catch(() => {});
     return () => { active = false; };
-  }, [requestedNoteViewMode]);
+  }, [requestedFolderViewMode, requestedNoteViewMode]);
+
+  const changeFolderViewMode = (nextMode) => {
+    if (!FOLDER_VIEW_MODES.includes(nextMode) || nextMode === folderViewMode) return;
+    setFolderViewMode(nextMode);
+    publishViewModePreferences({ folderViewMode: nextMode });
+    AsyncStorage.setItem(FOLDER_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => {});
+  };
+
+  const changeNoteViewMode = (nextMode) => {
+    if (!NOTE_VIEW_MODES.includes(nextMode) || nextMode === noteViewMode) return;
+    setNoteViewMode(nextMode);
+    publishViewModePreferences({ noteViewMode: nextMode });
+    AsyncStorage.setItem(NOTE_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => {});
+  };
 
   const loadNotes = useCallback(async () => {
     try {
-      const notesData = await noteRepo.getByFolderId(folderId);
+      const [notesData, children, ancestors] = await Promise.all([
+        noteRepo.getByFolderId(folderId),
+        folderRepo.getChildren(folderId),
+        folderRepo.getAncestors(folderId),
+      ]);
       const coloredNotes = await noteColorPreference.applyToNotes(notesData);
       setNotes(await noteBackgroundPreference.applyToNotes(coloredNotes));
+      setChildFolders(children);
+      setFolderPath(ancestors);
+      const counts = await Promise.all(children.map(async (folder) => [folder.id, await folderRepo.getNoteCount(folder.id)]));
+      setFolderNoteCounts(Object.fromEntries(counts));
     } catch (error) {
       Alert.alert('Error', 'Failed to load notes');
     } finally {
@@ -191,6 +244,7 @@ const FolderScreen = ({ route, navigation }) => {
       const folder = await folderRepo.getById(folderId);
       if (folder) {
         setCurrentFolderName(folder.name);
+        setIsSubfolder(!!folder.parent_id);
         navigation.setParams({ folderName: folder.name });
       }
     } catch (error) {
@@ -240,9 +294,71 @@ const FolderScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleCreateFolder = async () => {
+    const name = folderNameDraft.trim();
+    if (!name) {
+      Alert.alert('Error', 'Please enter a folder name');
+      return;
+    }
+    try {
+      await folderRepo.create(name, folderPassword || null, folderId);
+      setFolderNameDraft('');
+      setFolderPassword('');
+      setShowFolderModal(false);
+      loadNotes();
+    } catch (error) {
+      Alert.alert('Cannot create folder', error.message || 'Failed to create folder');
+    }
+  };
+
+  const navigateToFolder = (folder) => navigation.push('Folder', {
+    folderId: folder.id,
+    folderName: folder.name,
+    isSubfolder: !!folder.parent_id,
+    folderViewMode,
+    noteViewMode,
+  });
+
+  const navigateHome = () => {
+    const tabs = navigation.getParent?.();
+    if (tabs) tabs.navigate('Home', { screen: 'HomeMain' });
+    else navigation.popToTop();
+  };
+
+  const navigateToBreadcrumbFolder = (folder) => {
+    const params = {
+      folderId: folder.id,
+      folderName: folder.name,
+      isSubfolder: !!folder.parent_id,
+      folderViewMode,
+      noteViewMode,
+    };
+    const routes = navigation.getState?.()?.routes || [];
+    let existingRouteIndex = -1;
+
+    for (let index = routes.length - 2; index >= 0; index -= 1) {
+      if (routes[index].name === 'Folder' && routes[index].params?.folderId === folder.id) {
+        existingRouteIndex = index;
+        break;
+      }
+    }
+
+    if (existingRouteIndex >= 0) {
+      navigation.pop(routes.length - 1 - existingRouteIndex);
+      return;
+    }
+
+    navigation.replace('Folder', params);
+  };
+
+  const handleFolderPress = (folder) => {
+    if (folder.password) setPasswordModal({ visible: true, item: folder, type: 'folder', action: 'open' });
+    else navigateToFolder(folder);
+  };
+
   const handleNotePress = (note) => {
     if (note.password) {
-      setPasswordModal({ visible: true, note, action: 'open' });
+      setPasswordModal({ visible: true, item: note, type: 'note', action: 'open' });
     } else {
       navigation.navigate(editorRouteFor(note), { noteId: note.id });
     }
@@ -251,6 +367,15 @@ const FolderScreen = ({ route, navigation }) => {
   const handleToggleNotePin = async (note) => {
     try {
       await noteRepo.update(note.id, { is_pinned: !note.is_pinned });
+      loadNotes();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update pin');
+    }
+  };
+
+  const handleToggleFolderPin = async (folder) => {
+    try {
+      await folderRepo.update(folder.id, { is_pinned: !folder.is_pinned });
       loadNotes();
     } catch (error) {
       Alert.alert('Error', 'Failed to update pin');
@@ -280,6 +405,15 @@ const FolderScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleArchiveFolder = async (folder) => {
+    try {
+      await folderRepo.archive(folder.id);
+      loadNotes();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to archive folder');
+    }
+  };
+
   const lockSelectedNote = async (password) => {
     if (!lockActionNote) return;
     await lockPasswordService.lockNote(lockActionNote.id, password);
@@ -296,8 +430,8 @@ const FolderScreen = ({ route, navigation }) => {
     await loadNotes();
   };
 
-  const openItemActions = (note) => {
-    setItemActions({ visible: true, note });
+  const openItemActions = (item, type) => {
+    setItemActions({ visible: true, item, type });
   };
 
   const closeItemActions = () => {
@@ -324,10 +458,40 @@ const FolderScreen = ({ route, navigation }) => {
 
   const handleDeleteNote = (note) => {
     if (note.password) {
-      setPasswordModal({ visible: true, note, action: 'delete' });
+      setPasswordModal({ visible: true, item: note, type: 'note', action: 'delete' });
       return;
     }
     confirmDeleteNote(note);
+  };
+
+  const confirmDeleteFolder = async (folder) => {
+    try {
+      const contents = await inspectFolderTree(folderRepo, noteRepo, folder.id);
+      const childCount = contents.folderCount - 1;
+      confirmDestructiveAction({
+        title: 'Delete this folder?',
+        details: [
+          { label: 'Folder', value: folder.name, iconName: 'folder-outline' },
+          { label: 'Contains', value: `${contents.noteCount} ${contents.noteCount === 1 ? 'note' : 'notes'}${childCount ? ` and ${childCount} subfolder${childCount === 1 ? '' : 's'}` : ''}` },
+        ],
+        confirmLabel: 'Delete folder',
+        onConfirm: async () => {
+          try {
+            await deleteFolderTree(folderRepo, noteRepo, folder.id);
+            loadNotes();
+          } catch (error) {
+            Alert.alert('Error', 'Failed to delete folder');
+          }
+        },
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to inspect folder contents');
+    }
+  };
+
+  const handleDeleteFolder = (folder) => {
+    if (folder.password) setPasswordModal({ visible: true, item: folder, type: 'folder', action: 'delete' });
+    else confirmDeleteFolder(folder);
   };
 
   const openMoveNote = async (note) => {
@@ -359,6 +523,27 @@ const FolderScreen = ({ route, navigation }) => {
     }
   };
 
+  const openMoveFolder = async (folder) => {
+    try {
+      setMoveFolderModal({ visible: true, folder, folders: await folderRepo.getAll() });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load folders');
+    }
+  };
+
+  const closeMoveFolder = () => setMoveFolderModal({ visible: false, folder: null, folders: [] });
+
+  const handleMoveFolder = async (parentId) => {
+    const folder = moveFolderModal.folder;
+    if (!folder) return;
+    try {
+      await folderRepo.move(folder.id, parentId);
+      loadNotes();
+    } catch (error) {
+      Alert.alert('Cannot move folder', error.message || 'Failed to move folder');
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadNotes();
@@ -366,6 +551,76 @@ const FolderScreen = ({ route, navigation }) => {
     });
     return unsubscribe;
   }, [navigation, loadNotes, loadFolder]);
+
+  const renderViewControl = ({ scope, modes, value, onChange }) => (
+    <View
+      style={styles.sectionViewToggle}
+      accessibilityRole="tablist"
+      accessibilityLabel={`${scope} view options`}
+    >
+      {modes.map((mode) => {
+        const selected = value === mode;
+        const label = mode.charAt(0).toUpperCase() + mode.slice(1);
+        const iconName = mode === 'list'
+          ? 'list-outline'
+          : mode === 'strip'
+            ? 'albums-outline'
+            : 'grid-outline';
+        return (
+          <TouchableOpacity
+            key={mode}
+            style={styles.sectionViewButton}
+            onPress={() => onChange(mode)}
+            activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityLabel={`${scope} ${label.toLowerCase()} view`}
+            accessibilityState={{ selected }}
+          >
+            <View style={[styles.viewButtonIndicator, selected && styles.viewButtonSelected]}>
+              <Ionicons
+                name={iconName}
+                size={19}
+                color={selected ? colors.primary : colors.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  const renderFolderItems = () => {
+    const items = childFolders.map((folder, index) => (
+      <View
+        key={folder.id}
+        style={folderViewMode === 'strip' ? styles.folderStripItem : undefined}
+      >
+        <FolderItem
+          folder={folder}
+          noteCount={folderNoteCounts[folder.id] || 0}
+          index={index}
+          strip={folderViewMode === 'strip'}
+          onPress={() => handleFolderPress(folder)}
+          onOpenActions={() => openItemActions(folder, 'folder')}
+        />
+      </View>
+    ));
+
+    if (folderViewMode === 'strip') {
+      return (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.folderStrip}
+          contentContainerStyle={styles.folderStripContent}
+        >
+          {items}
+        </ScrollView>
+      );
+    }
+
+    return <View>{items}</View>;
+  };
 
   return (
     <View style={styles.container}>
@@ -390,16 +645,86 @@ const FolderScreen = ({ route, navigation }) => {
               index={index}
               grid={noteViewMode === 'grid'}
               onPress={() => handleNotePress(item)}
-              onOpenActions={() => openItemActions(item)}
+              onOpenActions={() => openItemActions(item, 'note')}
             />
           </View>
         )}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={32} color={colors.textTertiary} />
-            <Text style={styles.emptyText}>No notes in this folder</Text>
-            <Text style={styles.emptyHint}>Tap + to create one</Text>
+        ListHeaderComponent={(
+          <View>
+            {folderPath.length > 1 && (
+              <View style={styles.breadcrumbs} accessibilityLabel="Folder path">
+                <TouchableOpacity onPress={navigateHome} accessibilityRole="button">
+                  <Text style={styles.breadcrumbText}>Home</Text>
+                </TouchableOpacity>
+                {folderPath.map((folder, index) => (
+                  <React.Fragment key={folder.id}>
+                    <Ionicons name="chevron-forward" size={13} color={colors.textTertiary} />
+                    <TouchableOpacity
+                      disabled={folder.id === folderId}
+                      onPress={() => navigateToBreadcrumbFolder(folder)}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.breadcrumbText, folder.id === folderId && styles.breadcrumbCurrent]} numberOfLines={1}>{folder.name}</Text>
+                    </TouchableOpacity>
+                  </React.Fragment>
+                ))}
+              </View>
+            )}
+            {!isSubfolder && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Folders</Text>
+                  <View style={styles.sectionHeaderActions}>
+                    {renderViewControl({
+                      scope: 'Folders',
+                      modes: FOLDER_VIEW_MODES,
+                      value: folderViewMode,
+                      onChange: changeFolderViewMode,
+                    })}
+                    <TouchableOpacity
+                      style={styles.sectionAddButton}
+                      onPress={() => setShowFolderModal(true)}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel="Add subfolder"
+                    >
+                      <Ionicons name="add" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {renderFolderItems()}
+              </>
+            )}
+            <View style={[styles.sectionHeader, !isSubfolder && childFolders.length > 0 && styles.notesHeader]}>
+              <Text style={styles.sectionTitle}>Notes</Text>
+              <View style={styles.sectionHeaderActions}>
+                {renderViewControl({
+                  scope: 'Notes',
+                  modes: NOTE_VIEW_MODES,
+                  value: noteViewMode,
+                  onChange: changeNoteViewMode,
+                })}
+                <TouchableOpacity
+                  style={styles.sectionAddButton}
+                  onPress={() => setShowNoteTypeModal(true)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add note"
+                >
+                  <Ionicons name="add" size={20} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
+        )}
+        ListEmptyComponent={
+          (isSubfolder || childFolders.length === 0) ? <View style={styles.emptyState}>
+            <Ionicons name="document-text-outline" size={32} color={colors.textTertiary} />
+            <Text style={styles.emptyText}>This folder is empty</Text>
+            <Text style={styles.emptyHint}>
+              {isSubfolder ? 'Tap + to create a note' : 'Add a folder or tap + to create a note'}
+            </Text>
+          </View> : null
         }
         refreshControl={
           <RefreshControl
@@ -428,17 +753,17 @@ const FolderScreen = ({ route, navigation }) => {
 
       <ItemActionsModal
         visible={itemActions.visible}
-        itemType="note"
-        isPinned={!!itemActions.note?.is_pinned}
-        isLocked={!!itemActions.note?.password}
+        itemType={itemActions.type}
+        isPinned={!!itemActions.item?.is_pinned}
+        isLocked={!!itemActions.item?.password}
         onClose={closeItemActions}
-        onTogglePin={() => handleToggleNotePin(itemActions.note)}
-        onMove={() => openMoveNote(itemActions.note)}
-        onColor={() => setColorNote(itemActions.note)}
-        onBackground={() => setBackgroundNote(itemActions.note)}
-        onToggleLock={() => setLockActionNote(itemActions.note)}
-        onArchive={() => handleArchiveNote(itemActions.note)}
-        onDelete={() => handleDeleteNote(itemActions.note)}
+        onTogglePin={() => itemActions.type === 'folder' ? handleToggleFolderPin(itemActions.item) : handleToggleNotePin(itemActions.item)}
+        onMove={() => itemActions.type === 'folder' ? openMoveFolder(itemActions.item) : openMoveNote(itemActions.item)}
+        onColor={itemActions.type === 'note' ? () => setColorNote(itemActions.item) : undefined}
+        onBackground={itemActions.type === 'note' ? () => setBackgroundNote(itemActions.item) : undefined}
+        onToggleLock={itemActions.type === 'note' ? () => setLockActionNote(itemActions.item) : undefined}
+        onArchive={() => itemActions.type === 'folder' ? handleArchiveFolder(itemActions.item) : handleArchiveNote(itemActions.item)}
+        onDelete={() => itemActions.type === 'folder' ? handleDeleteFolder(itemActions.item) : handleDeleteNote(itemActions.item)}
       />
 
       <NoteColorModal
@@ -473,36 +798,67 @@ const FolderScreen = ({ route, navigation }) => {
         onSelect={handleMoveNote}
       />
 
+      <MoveFolderModal
+        visible={moveFolderModal.visible}
+        folders={moveFolderModal.folders}
+        folderId={moveFolderModal.folder?.id}
+        onClose={closeMoveFolder}
+        onSelect={handleMoveFolder}
+      />
+
+      <Modal visible={showFolderModal} animationType={showFolderModal ? 'fade' : 'none'} transparent>
+        <KeyboardAwareModalContent>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconCircle}><Ionicons name="folder-open" size={26} color={colors.folder} /></View>
+            <Text style={styles.modalTitle}>New subfolder</Text>
+            <TextInput style={styles.input} placeholder="Folder name" placeholderTextColor={colors.textTertiary} value={folderNameDraft} onChangeText={setFolderNameDraft} autoFocus />
+            <TextInput style={styles.input} placeholder="Password (optional)" placeholderTextColor={colors.textTertiary} value={folderPassword} onChangeText={setFolderPassword} secureTextEntry />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setShowFolderModal(false)}><Text style={styles.buttonText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.button, styles.createButton]} onPress={handleCreateFolder}><Text style={[styles.buttonText, styles.createButtonText]}>Create</Text></TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAwareModalContent>
+      </Modal>
+
       <PasswordModal
         visible={passwordModal.visible}
         onClose={() => setPasswordModal({
           visible: false,
-          note: null,
+          item: null,
+          type: 'note',
           action: 'open',
         })}
         onVerify={async (password) => {
-          if (!passwordModal.note) return false;
-          return lockPasswordService.verifyNotePassword(password, passwordModal.note);
+          if (!passwordModal.item) return false;
+          return passwordModal.type === 'folder'
+            ? await hashPassword(password) === passwordModal.item.password
+            : lockPasswordService.verifyNotePassword(password, passwordModal.item);
         }}
         onVerified={async () => {
-          const { note, action } = passwordModal;
-          setPasswordModal({ visible: false, note: null, action: 'open' });
+          const { item, type, action } = passwordModal;
+          setPasswordModal({ visible: false, item: null, type: 'note', action: 'open' });
           if (action === 'delete') {
-            await deleteNote(note);
+            if (type === 'folder') await confirmDeleteFolder(item);
+            else await deleteNote(item);
+          } else if (type === 'folder') {
+            navigateToFolder(item);
           } else {
-            navigation.navigate(editorRouteFor(note), { noteId: note.id });
+            navigation.navigate(editorRouteFor(item), { noteId: item.id });
           }
         }}
-        allowLockPasswordRecovery={passwordModal.action === 'open'}
-        passwordLabel="LockNote password"
-        title={passwordModal.action === 'delete' ? 'Delete this note?' : 'Locked'}
+        allowLockPasswordRecovery={passwordModal.type === 'note' && passwordModal.action === 'open'}
+        passwordLabel={passwordModal.type === 'folder' ? 'Folder password' : 'LockNote password'}
+        title={passwordModal.action === 'delete' ? `Delete this ${passwordModal.type}?` : 'Locked'}
         subtitle={passwordModal.action === 'delete'
-          ? 'Enter its password to confirm deletion. This note will be removed from this folder.'
+          ? `Enter its password to confirm deletion. This ${passwordModal.type} will be removed.`
           : 'Enter the password to continue'}
         verifyLabel={passwordModal.action === 'delete' ? 'Delete' : 'Unlock'}
         variant={passwordModal.action === 'delete' ? 'danger' : 'default'}
-        details={passwordModal.action === 'delete' && passwordModal.note ? [
-          createNoteDeleteDetail(passwordModal.note.note_type, passwordModal.note.title),
+        details={passwordModal.action === 'delete' && passwordModal.item ? [
+          passwordModal.type === 'folder'
+            ? { label: 'Folder', value: passwordModal.item.name, iconName: 'folder-outline' }
+            : createNoteDeleteDetail(passwordModal.item.note_type, passwordModal.item.title),
         ] : []}
       />
     </View>
@@ -559,6 +915,81 @@ const makeStyles = (colors) =>
       paddingBottom: 100,
       flexGrow: 1,
     },
+    breadcrumbs: {
+      minHeight: 36,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 5,
+      marginBottom: 10,
+    },
+    breadcrumbText: { color: colors.primary, fontSize: 13, fontWeight: '600', maxWidth: 140 },
+    breadcrumbCurrent: { color: colors.textSecondary },
+    sectionHeader: {
+      minHeight: 46,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    sectionHeaderActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    sectionViewToggle: {
+      height: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 2,
+      borderRadius: 8,
+      borderCurve: 'continuous',
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      ...shadow.card,
+    },
+    sectionViewButton: {
+      width: 44,
+      height: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    viewButtonIndicator: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    viewButtonSelected: {
+      borderRadius: 8,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
+    },
+    notesHeader: { marginTop: 8 },
+    sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
+    sectionAddButton: {
+      width: 44,
+      height: 44,
+      borderRadius: radius.full,
+      backgroundColor: colors.primarySoft,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    folderStrip: {
+      marginHorizontal: -16,
+    },
+    folderStripContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 2,
+      gap: 12,
+    },
+    folderStripItem: {
+      width: 104,
+    },
     gridRow: {
       gap: 10,
       marginBottom: 10,
@@ -599,6 +1030,25 @@ const makeStyles = (colors) =>
       alignItems: 'center',
       ...shadow.fab,
     },
+    modalContent: {
+      width: '100%', maxWidth: 400, padding: 24, borderRadius: radius.lg,
+      backgroundColor: colors.card, alignItems: 'center', ...shadow.card,
+    },
+    modalIconCircle: {
+      width: 54, height: 54, borderRadius: radius.full, backgroundColor: colors.folderSoft,
+      justifyContent: 'center', alignItems: 'center', marginBottom: 14,
+    },
+    modalTitle: { color: colors.text, fontSize: 19, fontWeight: '700', marginBottom: 18 },
+    input: {
+      alignSelf: 'stretch', backgroundColor: colors.inputBg, borderRadius: radius.md,
+      padding: 14, marginBottom: 12, color: colors.text, fontSize: 16,
+    },
+    modalButtons: { alignSelf: 'stretch', flexDirection: 'row', gap: 12, marginTop: 8 },
+    button: { flex: 1, padding: 14, borderRadius: radius.md, alignItems: 'center' },
+    cancelButton: { backgroundColor: colors.inputBg },
+    createButton: { backgroundColor: colors.primary },
+    buttonText: { color: colors.text, fontSize: 16, fontWeight: '600' },
+    createButtonText: { color: colors.card },
   });
 
 export default FolderScreen;

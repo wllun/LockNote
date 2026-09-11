@@ -4,7 +4,7 @@ _Snapshot: 2026-08-31. Check off items as they land._
 
 ## Done
 
-- [X] Create/open/delete folders (soft delete)
+- [X] Create/open/move/delete nested folders. Folders support one subfolder layer (Home → folder → subfolder) with cycle-safe subtree moves, breadcrumbs, descendant note counts, and recursive deletion. Subfolder screens omit the Folders section entirely.
 - [X] Create/open/delete notes, at root or inside a folder (soft delete)
 - [X] Auto-saving note editor (debounced 800ms)
 - [X] Password lock/unlock on folders and notes (SHA-256 gate). Locked notes share one LockNote password; folders retain their own individual passwords.
@@ -93,7 +93,7 @@ _Snapshot: 2026-08-31. Check off items as they land._
 
 ### Phase 5 — Structure (not premium)
 
-- [ ] Folder in folder (nesting)
+- [X] Folder in folder (one subfolder layer) — nullable `parent_id` is supported by native SQLite, web AsyncStorage, backup schema v2, and private sync. Version-1 backups import folders at Home; the Supabase nesting migration still requires deployment.
 - [X] App icon & name change
 
 ### Phase 6 — Add menu and note types

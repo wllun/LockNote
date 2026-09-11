@@ -1,4 +1,5 @@
 import { getDB } from './sqlite';
+import { getVisibleFolders } from '../utils/folder-hierarchy.mjs';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
@@ -240,21 +241,20 @@ export const noteRepo = {
 
   async search(query) {
     const db = getDB();
-    return await db.getAllAsync(
+    const [notes, folders] = await Promise.all([
+      db.getAllAsync(
       `SELECT notes.* FROM notes
        WHERE notes.is_deleted = 0
          AND notes.is_archived = 0
          AND notes.share_origin != 'incoming'
-         AND NOT EXISTS (
-           SELECT 1 FROM folders
-           WHERE folders.id = notes.folder_id
-             AND folders.is_deleted = 0
-             AND folders.is_archived = 1
-         )
          AND (notes.title LIKE ? OR notes.content LIKE ?)
        ORDER BY notes.is_pinned DESC, notes.updated_at DESC`,
       [`%${query}%`, `%${query}%`]
-    );
+      ),
+      db.getAllAsync(`SELECT * FROM folders WHERE is_deleted = 0`),
+    ]);
+    const visibleFolderIds = new Set(getVisibleFolders(folders).map((folder) => folder.id));
+    return notes.filter((note) => note.folder_id === null || visibleFolderIds.has(note.folder_id));
   },
 
   async getSharedWithMe() {

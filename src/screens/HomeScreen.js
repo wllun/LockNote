@@ -23,6 +23,7 @@ import PasswordModal from '../components/PasswordModal';
 import CreateNoteTypeModal from '../components/create-note-type-modal';
 import ItemActionsModal from '../components/ItemActionsModal';
 import MoveNoteModal from '../components/MoveNoteModal';
+import MoveFolderModal from '../components/MoveFolderModal';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
@@ -36,13 +37,16 @@ import { softDeleteNoteWithCleanup } from '../utils/reminder-cleanup';
 import { noteColorPreference } from '../utils/note-color-preference';
 import { noteBackgroundPreference } from '../utils/note-background-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
+import { deleteFolderTree, inspectFolderTree } from '../services/folderTreeService';
 import {
   FOLDER_VIEW_MODES,
   FOLDER_VIEW_MODE_STORAGE_KEY,
   LEGACY_HOME_VIEW_MODE_STORAGE_KEY,
   NOTE_VIEW_MODES,
   NOTE_VIEW_MODE_STORAGE_KEY,
+  publishViewModePreferences,
   resolveViewModePreferences,
+  subscribeToViewModePreferences,
 } from '../utils/note-view-mode.mjs';
 
 const editorRouteFor = (note) => {
@@ -92,6 +96,11 @@ const HomeScreen = ({ navigation }) => {
     note: null,
     folders: [],
   });
+  const [moveFolderModal, setMoveFolderModal] = useState({
+    visible: false,
+    folder: null,
+    folders: [],
+  });
   const [colorNote, setColorNote] = useState(null);
   const [backgroundNote, setBackgroundNote] = useState(null);
   const [lockActionNote, setLockActionNote] = useState(null);
@@ -99,10 +108,15 @@ const HomeScreen = ({ navigation }) => {
   const [folderViewMode, setFolderViewMode] = useState('list');
   const [noteViewMode, setNoteViewMode] = useState('list');
 
+  useEffect(() => subscribeToViewModePreferences((change) => {
+    if (change.folderViewMode) setFolderViewMode(change.folderViewMode);
+    if (change.noteViewMode) setNoteViewMode(change.noteViewMode);
+  }), []);
+
   const loadData = useCallback(async () => {
     try {
       const [foldersData, notesData] = await Promise.all([
-        folderRepo.getAll(),
+        folderRepo.getRootFolders(),
         noteRepo.getRootNotes(),
       ]);
       const [noteCounts, coloredNotes] = await Promise.all([
@@ -192,12 +206,14 @@ const HomeScreen = ({ navigation }) => {
   const changeFolderViewMode = (nextMode) => {
     if (!FOLDER_VIEW_MODES.includes(nextMode) || nextMode === folderViewMode) return;
     setFolderViewMode(nextMode);
+    publishViewModePreferences({ folderViewMode: nextMode });
     AsyncStorage.setItem(FOLDER_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => {});
   };
 
   const changeNoteViewMode = (nextMode) => {
     if (!NOTE_VIEW_MODES.includes(nextMode) || nextMode === noteViewMode) return;
     setNoteViewMode(nextMode);
+    publishViewModePreferences({ noteViewMode: nextMode });
     AsyncStorage.setItem(NOTE_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => {});
   };
 
@@ -247,6 +263,8 @@ const HomeScreen = ({ navigation }) => {
       navigation.navigate('Folder', {
         folderId: folder.id,
         folderName: folder.name,
+        isSubfolder: !!folder.parent_id,
+        folderViewMode,
         noteViewMode,
       });
     }
@@ -271,6 +289,8 @@ const HomeScreen = ({ navigation }) => {
       navigation.navigate('Folder', {
         folderId: item.id,
         folderName: item.name,
+        isSubfolder: !!item.parent_id,
+        folderViewMode,
         noteViewMode,
       });
     } else {
@@ -386,8 +406,8 @@ const HomeScreen = ({ navigation }) => {
 
   const confirmDeleteFolder = async (folder) => {
     try {
-      const folderNotes = await noteRepo.getActiveByFolderId(folder.id);
-      const noteCount = folderNotes.length;
+      const contents = await inspectFolderTree(folderRepo, noteRepo, folder.id);
+      const childCount = Math.max(0, contents.folderCount - 1);
 
       confirmDestructiveAction({
         title: 'Delete this folder?',
@@ -395,17 +415,13 @@ const HomeScreen = ({ navigation }) => {
           { label: 'Folder', value: folder.name, iconName: 'folder-outline' },
           {
             label: 'Contains',
-            value: `${noteCount} ${noteCount === 1 ? 'note' : 'notes'}`,
+            value: `${contents.noteCount} ${contents.noteCount === 1 ? 'note' : 'notes'}${childCount ? ` and ${childCount} subfolder${childCount === 1 ? '' : 's'}` : ''}`,
           },
         ],
         confirmLabel: 'Delete folder',
         onConfirm: async () => {
           try {
-            await Promise.all(
-              folderNotes.map((note) => softDeleteNoteWithCleanup(noteRepo, note))
-            );
-            await noteRepo.detachFromFolder(folder.id);
-            await folderRepo.hardDelete(folder.id);
+            await deleteFolderTree(folderRepo, noteRepo, folder.id);
             refreshCurrent();
           } catch (error) {
             Alert.alert('Error', 'Failed to delete folder');
@@ -456,6 +472,27 @@ const HomeScreen = ({ navigation }) => {
       refreshCurrent();
     } catch (error) {
       Alert.alert('Error', 'Failed to move note');
+    }
+  };
+
+  const openMoveFolder = async (folder) => {
+    try {
+      setMoveFolderModal({ visible: true, folder, folders: await folderRepo.getAll() });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load folders');
+    }
+  };
+
+  const closeMoveFolder = () => setMoveFolderModal({ visible: false, folder: null, folders: [] });
+
+  const handleMoveFolder = async (parentId) => {
+    const folder = moveFolderModal.folder;
+    if (!folder) return;
+    try {
+      await folderRepo.move(folder.id, parentId);
+      refreshCurrent();
+    } catch (error) {
+      Alert.alert('Cannot move folder', error.message || 'Failed to move folder');
     }
   };
 
@@ -537,6 +574,7 @@ const HomeScreen = ({ navigation }) => {
       >
           <FolderItem
             folder={folder}
+            showPath={searching}
             noteCount={folderNoteCounts[folder.id] ?? 0}
             index={index}
             strip={folderViewMode === 'strip'}
@@ -771,7 +809,7 @@ const HomeScreen = ({ navigation }) => {
         onMove={
           itemActions.type === 'note'
             ? () => openMoveNote(itemActions.item)
-            : undefined
+            : () => openMoveFolder(itemActions.item)
         }
         onColor={
           itemActions.type === 'note'
@@ -831,6 +869,14 @@ const HomeScreen = ({ navigation }) => {
         currentFolderId={moveNoteModal.note?.folder_id ?? null}
         onClose={closeMoveNote}
         onSelect={handleMoveNote}
+      />
+
+      <MoveFolderModal
+        visible={moveFolderModal.visible}
+        folders={moveFolderModal.folders}
+        folderId={moveFolderModal.folder?.id}
+        onClose={closeMoveFolder}
+        onSelect={handleMoveFolder}
       />
 
       <Modal

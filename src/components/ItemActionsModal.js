@@ -153,7 +153,7 @@ const ItemActionsModal = ({
             </Pressable>
           )}
 
-          {!trashMode && !archiveMode && isNote && !!onMove && (
+          {!trashMode && !archiveMode && !!onMove && (
             <Pressable
               style={({ pressed }) => [
                 styles.action,
@@ -161,7 +161,7 @@ const ItemActionsModal = ({
               ]}
               onPress={() => runAction(onMove)}
               accessibilityRole="button"
-              accessibilityLabel="Move note"
+              accessibilityLabel={`Move ${itemType}`}
             >
               <View style={styles.actionIcon}>
                 <Ionicons

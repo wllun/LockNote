@@ -19,6 +19,7 @@ import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
 import { lockPasswordService } from '../services/lockPasswordService';
+import { deleteFolderTree, inspectFolderTree } from '../services/folderTreeService';
 import FolderItem from '../components/FolderItem';
 import ItemActionsModal from '../components/ItemActionsModal';
 import NoteItem from '../components/NoteItem';
@@ -84,7 +85,11 @@ const ArchiveScreen = ({ navigation }) => {
 
   const navigateToItem = (item, type) => {
     if (type === 'folder') {
-      navigation.navigate('Folder', { folderId: item.id, folderName: item.name });
+      navigation.navigate('Folder', {
+        folderId: item.id,
+        folderName: item.name,
+        isSubfolder: !!item.parent_id,
+      });
     } else {
       navigation.navigate(editorRouteFor(item), { noteId: item.id });
     }
@@ -129,12 +134,7 @@ const ArchiveScreen = ({ navigation }) => {
 
   const moveFolderToTrash = async (folder) => {
     try {
-      const folderNotes = await noteRepo.getActiveByFolderId(folder.id);
-      for (const note of folderNotes) {
-        await softDeleteNoteWithCleanup(noteRepo, note);
-      }
-      await noteRepo.detachFromFolder(folder.id);
-      await folderRepo.hardDelete(folder.id);
+      await deleteFolderTree(folderRepo, noteRepo, folder.id);
       await loadArchive();
     } catch (error) {
       Alert.alert('Move failed', 'LockNote could not remove this folder or move its notes to Trash.');
@@ -159,17 +159,17 @@ const ArchiveScreen = ({ navigation }) => {
 
   const confirmMoveFolderToTrash = async (folder) => {
     try {
-      const folderNotes = await noteRepo.getActiveByFolderId(folder.id);
-      const noteCount = folderNotes.length;
+      const contents = await inspectFolderTree(folderRepo, noteRepo, folder.id);
+      const childCount = contents.folderCount - 1;
       confirmDestructiveAction({
         title: 'Move this folder to Trash?',
-        message: noteCount
-          ? `The folder itself will be permanently removed. Its ${noteCount} ${noteCount === 1 ? 'note' : 'notes'} will stay in Trash for 30 days.`
+        message: contents.noteCount
+          ? `The folder tree will be permanently removed. Its ${contents.noteCount} ${contents.noteCount === 1 ? 'note' : 'notes'} will stay in Trash for 30 days.`
           : 'The empty folder will be permanently removed.',
         confirmLabel: 'Move to Trash',
         details: [
           { label: 'Folder', value: itemTitle(folder, 'folder'), iconName: 'folder-outline' },
-          { label: 'Contains', value: `${noteCount} ${noteCount === 1 ? 'note' : 'notes'}` },
+          { label: 'Contains', value: `${contents.noteCount} ${contents.noteCount === 1 ? 'note' : 'notes'}${childCount ? ` and ${childCount} subfolder${childCount === 1 ? '' : 's'}` : ''}` },
         ],
         onConfirm: () => moveFolderToTrash(folder),
       });

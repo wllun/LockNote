@@ -123,7 +123,7 @@ const MoveNoteModal = ({
                   ]}
                   numberOfLines={2}
                 >
-                  {destination.name}
+                  {destination.path || destination.name}
                 </Text>
                 {destination.isLocked && (
                   <Ionicons

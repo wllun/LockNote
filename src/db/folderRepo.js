@@ -1,4 +1,15 @@
 import { getDB } from './sqlite';
+import {
+  flattenFolderHierarchy,
+  getFolderDescendantIds,
+  getFolderDepthLimitMessage,
+  getFolderMoveError,
+  getFolderPath,
+  getVisibleFolders,
+  getVisibleSubtreeFolderIds,
+  MAX_FOLDER_DEPTH,
+  sortFolderSiblings,
+} from '../utils/folder-hierarchy.mjs';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
@@ -6,12 +17,36 @@ const generateId = () => {
 
 const now = () => new Date().toISOString();
 
+const getStoredFolders = async () => {
+  const db = getDB();
+  return await db.getAllAsync(`SELECT * FROM folders WHERE is_deleted = 0`);
+};
+
 export const folderRepo = {
   async getAll() {
-    const db = getDB();
-    return await db.getAllAsync(
-      `SELECT * FROM folders WHERE is_deleted = 0 AND is_archived = 0 ORDER BY is_pinned DESC, created_at DESC`
-    );
+    return flattenFolderHierarchy(await getStoredFolders());
+  },
+
+  async getRootFolders() {
+    return (await this.getAll()).filter((folder) => folder.parent_id == null);
+  },
+
+  async getChildren(parentId) {
+    if (!parentId) return [];
+    return (await getStoredFolders())
+      .filter((folder) => !folder.is_archived && folder.parent_id === parentId)
+      .sort(sortFolderSiblings);
+  },
+
+  async getAncestors(id) {
+    return getFolderPath(await getStoredFolders(), id);
+  },
+
+  async getDescendantIds(id, includeArchived = true) {
+    const folders = includeArchived
+      ? await getStoredFolders()
+      : getVisibleFolders(await getStoredFolders());
+    return getFolderDescendantIds(folders, id);
   },
 
   async getById(id) {
@@ -37,16 +72,25 @@ export const folderRepo = {
     );
   },
 
-  async create(name, password = null) {
+  async create(name, password = null, parentId = null) {
     const db = getDB();
     const { hashPassword } = require('../utils/crypto');
     const id = generateId();
     const timestamp = now();
     const passwordHash = password ? await hashPassword(password) : null;
 
+    if (parentId !== null) {
+      const folders = await getStoredFolders();
+      const parent = folders.find((folder) => folder.id === parentId);
+      if (!parent || parent.is_archived) throw new Error('The parent folder is unavailable.');
+      if (getFolderPath(folders, parentId).length >= MAX_FOLDER_DEPTH) {
+        throw new Error(getFolderDepthLimitMessage());
+      }
+    }
+
     await db.runAsync(
-      `INSERT INTO folders (id, name, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-      [id, name, passwordHash, timestamp, timestamp]
+      `INSERT INTO folders (id, parent_id, name, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, parentId, name, passwordHash, timestamp, timestamp]
     );
 
     return await this.getById(id);
@@ -87,6 +131,18 @@ export const folderRepo = {
       values
     );
 
+    return await this.getById(id);
+  },
+
+  async move(id, parentId = null) {
+    const db = getDB();
+    const folders = await getStoredFolders();
+    const error = getFolderMoveError(folders, id, parentId);
+    if (error) throw new Error(error);
+    await db.runAsync(
+      `UPDATE folders SET parent_id = ?, updated_at = ? WHERE id = ? AND is_deleted = 0`,
+      [parentId, now(), id]
+    );
     return await this.getById(id);
   },
 
@@ -135,24 +191,27 @@ export const folderRepo = {
          ON CONFLICT(entity_type, entity_id) DO UPDATE SET deleted_at = excluded.deleted_at`,
         [id, timestamp]
       );
+      await txn.runAsync(`UPDATE folders SET parent_id = NULL WHERE parent_id = ?`, [id]);
       await txn.runAsync(`DELETE FROM folders WHERE id = ?`, [id]);
     });
   },
 
   async getNoteCount(folderId) {
     const db = getDB();
+    const folderIds = getVisibleSubtreeFolderIds(await getStoredFolders(), folderId);
+    if (!folderIds.length) return 0;
+    const placeholders = folderIds.map(() => '?').join(', ');
     const result = await db.getFirstAsync(
-      `SELECT COUNT(*) as count FROM notes WHERE folder_id = ? AND is_deleted = 0 AND is_archived = 0`,
-      [folderId]
+      `SELECT COUNT(*) as count FROM notes WHERE folder_id IN (${placeholders}) AND is_deleted = 0 AND is_archived = 0`,
+      folderIds
     );
     return result?.count || 0;
   },
 
   async search(query) {
-    const db = getDB();
-    return await db.getAllAsync(
-      `SELECT * FROM folders WHERE is_deleted = 0 AND is_archived = 0 AND name LIKE ? ORDER BY is_pinned DESC, created_at DESC`,
-      [`%${query}%`]
+    const normalized = String(query || '').toLocaleLowerCase();
+    return (await this.getAll()).filter((folder) =>
+      String(folder.name || '').toLocaleLowerCase().includes(normalized)
     );
   },
 
@@ -160,7 +219,7 @@ export const folderRepo = {
     const db = getDB();
     const [records, tombstones] = await Promise.all([
       db.getAllAsync(
-        `SELECT id, name, password, is_pinned, is_archived, created_at, updated_at
+        `SELECT id, parent_id, name, password, is_pinned, is_archived, created_at, updated_at
          FROM folders WHERE is_deleted = 0`
       ),
       db.getAllAsync(
@@ -177,9 +236,10 @@ export const folderRepo = {
       for (const folder of records) {
         await txn.runAsync(
           `INSERT INTO folders (
-             id, name, password, is_deleted, is_pinned, is_archived, created_at, updated_at
-           ) VALUES (?, ?, ?, 0, ?, ?, ?, ?)
+             id, parent_id, name, password, is_deleted, is_pinned, is_archived, created_at, updated_at
+           ) VALUES (?, NULL, ?, ?, 0, ?, ?, ?, ?)
            ON CONFLICT(id) DO UPDATE SET
+             parent_id = NULL,
              name = excluded.name,
              password = excluded.password,
              is_deleted = 0,
@@ -202,6 +262,13 @@ export const folderRepo = {
           `DELETE FROM sync_tombstones
            WHERE entity_type = 'folder' AND entity_id = ? AND deleted_at <= ?`,
           [folder.id, folder.updated_at]
+        );
+      }
+      for (const folder of records) {
+        await txn.runAsync(
+          `UPDATE folders SET parent_id = ?
+           WHERE id = ? AND is_deleted = 0 AND updated_at <= ?`,
+          [folder.parent_id ?? null, folder.id, folder.updated_at]
         );
       }
       for (const tombstone of tombstones) {
@@ -232,8 +299,8 @@ export const folderRepo = {
       for (const folder of records) {
         await txn.runAsync(
           `INSERT INTO folders (
-             id, name, password, is_deleted, is_pinned, is_archived, created_at, updated_at
-           ) VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
+             id, parent_id, name, password, is_deleted, is_pinned, is_archived, created_at, updated_at
+           ) VALUES (?, NULL, ?, ?, 0, ?, ?, ?, ?)`,
           [
             folder.id,
             folder.name,
@@ -243,6 +310,12 @@ export const folderRepo = {
             folder.created_at,
             folder.updated_at,
           ]
+        );
+      }
+      for (const folder of records) {
+        await txn.runAsync(
+          `UPDATE folders SET parent_id = ? WHERE id = ?`,
+          [folder.parent_id ?? null, folder.id]
         );
       }
       for (const tombstone of tombstones) {

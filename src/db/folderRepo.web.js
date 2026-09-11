@@ -1,5 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hashPassword } from '../utils/crypto';
+import {
+  flattenFolderHierarchy,
+  getFolderDescendantIds,
+  getFolderDepthLimitMessage,
+  getFolderMoveError,
+  getFolderPath,
+  getVisibleFolders,
+  getVisibleSubtreeFolderIds,
+  MAX_FOLDER_DEPTH,
+  sortFolderSiblings,
+} from '../utils/folder-hierarchy.mjs';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
@@ -45,9 +56,28 @@ const upsertTombstone = (tombstones, id, updatedAt) => {
 export const folderRepo = {
   async getAll() {
     const folders = await getStorage();
-    return folders
-      .filter((f) => !f.is_deleted && !f.is_archived)
-      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.created_at) - new Date(a.created_at));
+    return flattenFolderHierarchy(folders);
+  },
+
+  async getRootFolders() {
+    return (await this.getAll()).filter((folder) => folder.parent_id == null);
+  },
+
+  async getChildren(parentId) {
+    if (!parentId) return [];
+    return (await getStorage())
+      .filter((folder) => !folder.is_deleted && !folder.is_archived && folder.parent_id === parentId)
+      .sort(sortFolderSiblings);
+  },
+
+  async getAncestors(id) {
+    return getFolderPath((await getStorage()).filter((folder) => !folder.is_deleted), id);
+  },
+
+  async getDescendantIds(id, includeArchived = true) {
+    const stored = (await getStorage()).filter((folder) => !folder.is_deleted);
+    const folders = includeArchived ? stored : getVisibleFolders(stored);
+    return getFolderDescendantIds(folders, id);
   },
 
   async getById(id) {
@@ -70,13 +100,22 @@ export const folderRepo = {
       .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
   },
 
-  async create(name, password = null) {
+  async create(name, password = null, parentId = null) {
     const id = generateId();
     const timestamp = now();
     const passwordHash = password ? await hashPassword(password) : null;
+    const stored = (await getStorage()).filter((folder) => !folder.is_deleted);
+    if (parentId !== null) {
+      const parent = stored.find((folder) => folder.id === parentId);
+      if (!parent || parent.is_archived) throw new Error('The parent folder is unavailable.');
+      if (getFolderPath(stored, parentId).length >= MAX_FOLDER_DEPTH) {
+        throw new Error(getFolderDepthLimitMessage());
+      }
+    }
 
     const newFolder = {
       id,
+      parent_id: parentId,
       name,
       password: passwordHash,
       is_deleted: 0,
@@ -106,6 +145,18 @@ export const folderRepo = {
       if (updates.is_archived !== undefined) folders[index].is_archived = updates.is_archived ? 1 : 0;
       folders[index].updated_at = now();
       return folders[index];
+    });
+  },
+
+  async move(id, parentId = null) {
+    return await mutateStorage((folders) => {
+      const active = folders.filter((folder) => !folder.is_deleted);
+      const error = getFolderMoveError(active, id, parentId);
+      if (error) throw new Error(error);
+      const folder = folders.find((item) => item.id === id);
+      folder.parent_id = parentId;
+      folder.updated_at = now();
+      return folder;
     });
   },
 
@@ -143,6 +194,9 @@ export const folderRepo = {
 
   async hardDelete(id) {
     await mutateStorage((folders, tombstones) => {
+      for (const folder of folders) {
+        if (folder.parent_id === id) folder.parent_id = null;
+      }
       const index = folders.findIndex((f) => f.id === id);
       if (index !== -1) folders.splice(index, 1);
       upsertTombstone(tombstones, id, now());
@@ -151,16 +205,15 @@ export const folderRepo = {
 
   async getNoteCount(folderId) {
     const { noteRepo } = require('./noteRepo.web');
-    const notes = await noteRepo.getByFolderId(folderId);
-    return notes.length;
+    const stored = (await getStorage()).filter((folder) => !folder.is_deleted);
+    const folderIds = getVisibleSubtreeFolderIds(stored, folderId);
+    const notes = await Promise.all(folderIds.map((id) => noteRepo.getByFolderId(id)));
+    return notes.reduce((count, items) => count + items.length, 0);
   },
 
   async search(query) {
-    const folders = await getStorage();
     const q = query.toLowerCase();
-    return folders
-      .filter((f) => !f.is_deleted && !f.is_archived && f.name.toLowerCase().includes(q))
-      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.created_at) - new Date(a.created_at));
+    return (await this.getAll()).filter((folder) => folder.name.toLowerCase().includes(q));
   },
 
   async getSyncSnapshot() {
@@ -171,6 +224,7 @@ export const folderRepo = {
         .filter((folder) => !folder.is_deleted)
         .map((folder) => ({
           id: folder.id,
+          parent_id: folder.parent_id ?? null,
           name: folder.name,
           password: folder.password || null,
           is_pinned: folder.is_pinned || 0,
@@ -189,6 +243,7 @@ export const folderRepo = {
         if (index === -1) {
           folders.push({
             ...remote,
+            parent_id: remote.parent_id ?? null,
             is_deleted: 0,
             is_pinned: remote.is_pinned ? 1 : 0,
             is_archived: remote.is_archived ? 1 : 0,
@@ -197,6 +252,7 @@ export const folderRepo = {
           folders[index] = {
             ...folders[index],
             ...remote,
+            parent_id: remote.parent_id ?? null,
             is_deleted: 0,
             is_pinned: remote.is_pinned ? 1 : 0,
             is_archived: remote.is_archived ? 1 : 0,
@@ -224,6 +280,7 @@ export const folderRepo = {
     await mutateStorage((folders, localTombstones) => {
       folders.splice(0, folders.length, ...records.map((folder) => ({
         ...folder,
+        parent_id: folder.parent_id ?? null,
         is_deleted: 0,
         is_pinned: folder.is_pinned ? 1 : 0,
         is_archived: folder.is_archived ? 1 : 0,

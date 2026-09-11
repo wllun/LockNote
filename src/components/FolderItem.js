@@ -22,6 +22,7 @@ const FolderItem = ({
   onOpenActions,
   index = 0,
   strip = false,
+  showPath = false,
 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -73,6 +74,9 @@ const FolderItem = ({
           <Text style={[styles.name, strip && styles.nameGrid]} numberOfLines={strip ? 2 : 1}>
             {folder.name}
           </Text>
+          {showPath && folder.path && folder.path !== folder.name && (
+            <Text style={styles.path} numberOfLines={1}>{folder.path}</Text>
+          )}
         </View>
         <View style={[styles.trailing, strip && styles.trailingGrid]}>
           {folder.password && (
@@ -206,6 +210,11 @@ const makeStyles = (colors) =>
       fontSize: 14,
       lineHeight: 18,
       textAlign: 'center',
+    },
+    path: {
+      marginTop: 3,
+      color: colors.textTertiary,
+      fontSize: 12,
     },
     trailing: {
       flexDirection: 'row',

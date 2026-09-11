@@ -1,7 +1,8 @@
 import { parseReminderNote, serializeReminderNote } from './reminder-note.mjs';
+import { getFolderHierarchyIssue } from './folder-hierarchy.mjs';
 
 export const BACKUP_FORMAT = 'locknote-backup';
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 export const MAX_BACKUP_BYTES = 25 * 1024 * 1024;
 
 const MAX_RECORDS_PER_COLLECTION = 100000;
@@ -80,6 +81,7 @@ const portableReminderContent = (content) => {
 
 const portableFolder = (folder) => ({
   id: folder.id,
+  parent_id: folder.parent_id ?? null,
   name: folder.name,
   password: folder.password || null,
   is_pinned: folder.is_pinned ? 1 : 0,
@@ -155,7 +157,7 @@ const normalizeTombstones = (items, label, activeIds) => {
   });
 };
 
-const normalizeFolders = (section) => {
+const normalizeFolders = (section, version) => {
   ensureObject(section, 'folders');
   const seen = new Set();
   const records = ensureArray(section.records, 'folders.records').map((folder, index) => {
@@ -165,6 +167,9 @@ const normalizeFolders = (section) => {
     seen.add(id);
     return {
       id,
+      parent_id: version >= 2 && folder.parent_id !== null && folder.parent_id !== undefined
+        ? ensureId(folder.parent_id, `folders.records[${index}].parent_id`)
+        : null,
       name: ensureString(folder.name, `folders.records[${index}].name`, MAX_NAME_LENGTH),
       password: ensurePasswordHash(folder.password, `folders.records[${index}].password`),
       is_pinned: ensurePinned(folder.is_pinned, `folders.records[${index}].is_pinned`),
@@ -173,6 +178,8 @@ const normalizeFolders = (section) => {
       updated_at: ensureTimestamp(folder.updated_at, `folders.records[${index}].updated_at`),
     };
   });
+  const hierarchyIssue = getFolderHierarchyIssue(records);
+  if (hierarchyIssue) fail(hierarchyIssue);
   return {
     records,
     tombstones: normalizeTombstones(section.tombstones, 'folders.tombstones', seen),
@@ -235,12 +242,12 @@ const normalizeNotes = (section, folderIds) => {
 export const validateBackupDocument = (value) => {
   const backup = ensureObject(value, 'backup');
   if (backup.format !== BACKUP_FORMAT) fail('the file format is not recognized.');
-  if (backup.version !== BACKUP_VERSION) {
+  if (backup.version !== 1 && backup.version !== BACKUP_VERSION) {
     fail(`schema version ${String(backup.version)} is not supported by this app.`);
   }
 
   const exportedAt = ensureTimestamp(backup.exported_at, 'exported_at');
-  const folders = normalizeFolders(backup.folders);
+  const folders = normalizeFolders(backup.folders, backup.version);
   const notes = normalizeNotes(backup.notes, folders.activeIds);
   const normalized = {
     format: BACKUP_FORMAT,
