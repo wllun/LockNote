@@ -78,6 +78,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [attachments, setAttachments] = useState([]);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
+  const [isContentEditing, setIsContentEditing] = useState(false);
   const saveTimeout = useRef(null);
   const loadCompletedRef = useRef(false);
   const contentEditorRef = useRef(null);
@@ -117,6 +118,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           if (saveTimeout.current) clearTimeout(saveTimeout.current);
           saveTimeout.current = null;
           setIsTitleFocused(false);
+          setIsContentEditing(false);
           Keyboard.dismiss();
         }
         latest.current = {
@@ -157,6 +159,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
     setIsReadOnly(readOnly);
     if (readOnly) {
       setIsTitleFocused(false);
+      setIsContentEditing(false);
       Keyboard.dismiss();
     }
   }, []);
@@ -521,6 +524,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   useEffect(() => {
     loadCompletedRef.current = false;
     latest.current.noteId = noteId;
+    setIsContentEditing(false);
     Keyboard.dismiss();
     loadNote();
     return () => {
@@ -653,6 +657,8 @@ const NoteEditorScreen = ({ route, navigation }) => {
           attachments={attachments}
           busy={attachmentBusy}
           readOnly={isReadOnly}
+          editing={isContentEditing}
+          onRequestEdit={() => setIsContentEditing(true)}
           maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS}
           onChangeTextBlock={handleTextBlockChange}
           onSelectionChange={handleTextSelection}

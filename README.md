@@ -10,6 +10,7 @@ A local-first note-taking app with folder organization, password protection, opt
 - Full-text search across notes (native)
 - Soft delete (items are flagged, not immediately purged)
 - Plain-note inline images inserted between text blocks, with wrapping multi-image rows, long-press drag/drop, and proportional resizing (up to 20 per note)
+- Preview-first plain-note bodies and reminder descriptions; double-tap the content to edit
 - Checklist, Expense Record, and reminder note types
 - Archive, 30-day Trash recovery, PDF/image export, and Undo/Redo
 - Manual two-way account sync across iOS, Android, and web

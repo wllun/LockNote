@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import EditorHistoryButtons from '../components/editor-history-buttons';
@@ -63,6 +65,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const [showLock, setShowLock] = useState(false);
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
+  const [isBodyEditing, setIsBodyEditing] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const saveTimeout = useRef(null);
   const loadCompletedRef = useRef(false);
@@ -136,6 +139,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         saveTimeout.current = null;
         setShowSchedule(false);
         setIsTitleFocused(false);
+        setIsBodyEditing(false);
         Keyboard.dismiss();
       }
   }, [clearUndo, noteId]);
@@ -148,11 +152,13 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     if (readOnly) {
       setShowSchedule(false);
       setIsTitleFocused(false);
+      setIsBodyEditing(false);
       Keyboard.dismiss();
     }
   }, []);
 
   useEffect(() => {
+    setIsBodyEditing(false);
     noteRepo.getById(noteId).then(applyLoadedNote)
       .catch(() => Alert.alert('Error', 'Failed to load reminder'));
   }, [noteId, applyLoadedNote]);
@@ -225,6 +231,24 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     remember(snapshot(), 'body');
     latest.current.body = limited.value; setBody(limited.value); autoSave();
   };
+
+  const activateBodyEditing = useCallback(() => {
+    if (latest.current.readOnly) return;
+    setIsBodyEditing(true);
+  }, []);
+
+  const bodyPreviewGesture = useMemo(() => Gesture.Tap()
+    .enabled(!isReadOnly && !isBodyEditing)
+    .numberOfTaps(2)
+    .onEnd((_event, success) => {
+      if (success) scheduleOnRN(activateBodyEditing);
+    }), [activateBodyEditing, isBodyEditing, isReadOnly]);
+
+  useEffect(() => {
+    if (!isBodyEditing || isReadOnly) return undefined;
+    const frame = requestAnimationFrame(() => bodyRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [isBodyEditing, isReadOnly]);
 
   const scheduleAndSave = async (nextReminder, { recordUndo = true } = {}) => {
     if (latest.current.readOnly) return false;
@@ -421,14 +445,29 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton} activeOpacity={0.7} hitSlop={4} accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={colors.text} /></TouchableOpacity>
         <View style={[styles.titleField, isTitleFocused && styles.titleFieldFocused]}>
           <Ionicons name="alarm-outline" size={18} color={colors.primary} />
-          <TextInput style={styles.titleInput} placeholder="Reminder title" placeholderTextColor={colors.textTertiary} value={title} editable={!isReadOnly} onChangeText={handleTitleChange} onFocus={() => setIsTitleFocused(true)} onBlur={() => setIsTitleFocused(false)} onSubmitEditing={() => bodyRef.current?.focus()} accessibilityLabel="Reminder title" accessibilityHint={isReadOnly ? 'This shared note is view only' : undefined} />
+          <TextInput style={styles.titleInput} placeholder="Reminder title" placeholderTextColor={colors.textTertiary} value={title} editable={!isReadOnly} onChangeText={handleTitleChange} onFocus={() => setIsTitleFocused(true)} onBlur={() => setIsTitleFocused(false)} onSubmitEditing={activateBodyEditing} accessibilityLabel="Reminder title" accessibilityHint={isReadOnly ? 'This shared note is view only' : undefined} />
         </View>
         <EditorHistoryButtons canRedo={canRedo && !isReadOnly} canUndo={canUndo && !isReadOnly} colors={colors} disabledStyle={styles.disabled} onRedo={handleRedo} onUndo={handleUndo} style={styles.headerButton} />
         <TouchableOpacity onPress={() => setShowActions(true)} style={styles.headerButton} activeOpacity={0.7} hitSlop={4} accessibilityRole="button" accessibilityLabel="More reminder actions"><Ionicons name="ellipsis-vertical" size={22} color={colors.text} /></TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(20, insets.bottom + 12) }]} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
-        <TextInput ref={bodyRef} style={styles.bodyInput} placeholder="Start writing..." placeholderTextColor={colors.textTertiary} value={body} editable={!isReadOnly} onChangeText={handleBodyChange} maxLength={REMINDER_BODY_MAX_CHARACTERS} multiline textAlignVertical="top" accessibilityLabel="Reminder note content" accessibilityHint={isReadOnly ? 'This shared note is view only' : `Maximum ${REMINDER_BODY_MAX_CHARACTERS.toLocaleString()} characters`} />
+        {isBodyEditing && !isReadOnly ? (
+          <TextInput ref={bodyRef} style={styles.bodyInput} placeholder="Start writing..." placeholderTextColor={colors.textTertiary} value={body} editable onChangeText={handleBodyChange} maxLength={REMINDER_BODY_MAX_CHARACTERS} multiline textAlignVertical="top" accessibilityLabel="Reminder description" accessibilityHint={`Maximum ${REMINDER_BODY_MAX_CHARACTERS.toLocaleString()} characters`} />
+        ) : (
+          <GestureDetector gesture={bodyPreviewGesture}>
+            <View
+              style={styles.bodyPreview}
+              accessible
+              accessibilityRole={isReadOnly ? 'text' : 'button'}
+              accessibilityLabel={body || 'Empty reminder description'}
+              accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Double-tap to edit the reminder description'}
+              onAccessibilityTap={activateBodyEditing}
+            >
+              <Text style={[styles.bodyPreviewText, !body && styles.bodyPlaceholder]}>{body || 'Start writing...'}</Text>
+            </View>
+          </GestureDetector>
+        )}
 
         <View style={[styles.reminderCard, reminder.enabled && styles.reminderCardEnabled]}>
           <View style={styles.reminderTop}>
@@ -528,6 +567,9 @@ const makeStyles = (colors) => StyleSheet.create({
   titleInput: { flex: 1, minWidth: 0, height: 42, paddingVertical: 0, fontSize: 16, fontWeight: '700', color: colors.text, outlineStyle: 'none' },
   scroll: { flex: 1 }, scrollContent: { flexGrow: 1, padding: 20, gap: 18 },
   bodyInput: { minHeight: 220, fontSize: 16, lineHeight: 25, color: colors.text, padding: 0, outlineStyle: 'none' },
+  bodyPreview: { minHeight: 220 },
+  bodyPreviewText: { color: colors.text, fontSize: 16, lineHeight: 25 },
+  bodyPlaceholder: { color: colors.textTertiary },
   reminderCard: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBg, overflow: 'hidden' },
   reminderCardEnabled: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   reminderTop: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },

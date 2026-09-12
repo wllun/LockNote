@@ -44,6 +44,7 @@ const InlineAttachment = ({
   attachment,
   baseWidth,
   busy,
+  editing,
   readOnly,
   styles,
   onDrop,
@@ -77,7 +78,7 @@ const InlineAttachment = ({
   }, []);
 
   const dragGesture = useMemo(() => Gesture.Pan()
-    .enabled(!readOnly && !busy)
+    .enabled(editing && !readOnly && !busy)
     .activateAfterLongPress(DRAG_ACTIVATION_DELAY_MS)
     .shouldCancelWhenOutside(false)
     .onStart(() => {
@@ -98,10 +99,10 @@ const InlineAttachment = ({
       translateY.set(withSpring(0, SETTLE_SPRING));
       visualScale.set(withSpring(1, SETTLE_SPRING));
       scheduleOnRN(markGestureFinished);
-    }), [active, attachment.id, busy, markGestureFinished, markGestureStarted, onDrop, readOnly, translateX, translateY, visualScale]);
+    }), [active, attachment.id, busy, editing, markGestureFinished, markGestureStarted, onDrop, readOnly, translateX, translateY, visualScale]);
 
   const resizeGesture = useMemo(() => Gesture.Pan()
-    .enabled(!readOnly && !busy)
+    .enabled(editing && !readOnly && !busy)
     .shouldCancelWhenOutside(false)
     .onStart(() => {
       active.set(1);
@@ -126,7 +127,7 @@ const InlineAttachment = ({
       active.set(0);
       visualScale.set(withSpring(1, SETTLE_SPRING));
       scheduleOnRN(markGestureFinished);
-    }), [active, aspectRatio, attachment.id, baseWidth, busy, displayRatio, initialDisplayRatio, markGestureFinished, markGestureStarted, onResize, readOnly, visualScale]);
+    }), [active, aspectRatio, attachment.id, baseWidth, busy, displayRatio, editing, initialDisplayRatio, markGestureFinished, markGestureStarted, onResize, readOnly, visualScale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     width: baseWidth * initialDisplayRatio,
@@ -154,8 +155,12 @@ const InlineAttachment = ({
             style={({ pressed }) => [styles.inlineImageButton, pressed && !isDragging && styles.pressed]}
             accessibilityRole="button"
             accessibilityLabel="Open attached image"
-            accessibilityHint={readOnly ? 'This shared note is view only' : 'Hold for one second, then drag to move. Use the bottom-right handle to resize.'}
-            accessibilityActions={readOnly ? [] : [
+            accessibilityHint={readOnly
+              ? 'This shared note is view only'
+              : editing
+                ? 'Hold for one second, then drag to move. Use the bottom-right handle to resize.'
+                : 'Double-tap the note text to enable image editing'}
+            accessibilityActions={readOnly || !editing ? [] : [
               { name: 'decrement', label: 'Move image earlier' },
               { name: 'increment', label: 'Move image later' },
             ]}
@@ -173,13 +178,13 @@ const InlineAttachment = ({
             <View style={styles.imageBadge} pointerEvents="none">
               <Ionicons name="expand-outline" size={16} color="#ffffff" />
             </View>
-            {!readOnly && (
+            {!readOnly && editing && (
               <View style={styles.dragBadge} pointerEvents="none">
                 <Ionicons name="reorder-three" size={21} color="#ffffff" />
               </View>
             )}
           </Pressable>
-          {!readOnly && (
+          {!readOnly && editing && (
             <GestureDetector gesture={resizeGesture}>
               <View
                 style={styles.resizeHandle}
@@ -209,7 +214,8 @@ const InlineAttachment = ({
 };
 
 const NoteAttachmentGallery = forwardRef(({
-  content = '', attachments = [], busy = false, readOnly = false, maxLength,
+  content = '', attachments = [], busy = false, readOnly = false, editing = false, maxLength,
+  onRequestEdit,
   onChangeTextBlock, onSelectionChange, onMove, onDrop, onResize, onRemove,
 }, ref) => {
   const colors = useTheme();
@@ -218,7 +224,8 @@ const NoteAttachmentGallery = forwardRef(({
   const { width } = useWindowDimensions();
   const [selectedId, setSelectedId] = useState(null);
   const [inputHeights, setInputHeights] = useState({});
-  const firstInputRef = useRef(null);
+  const inputRefs = useRef(new Map());
+  const pendingFocusBlockIdRef = useRef(null);
   const blockLayoutsRef = useRef(new Map());
   const blocks = useMemo(() => buildInlineNoteBlocks(content, attachments), [content, attachments]);
   const renderBlocks = useMemo(() => groupInlineNoteBlocks(blocks), [blocks]);
@@ -236,7 +243,33 @@ const NoteAttachmentGallery = forwardRef(({
   const selected = selectedIndex >= 0 ? orderedAttachments[selectedIndex] : null;
   const baseImageWidth = Math.max(112, Math.min(width - 40, 720) - IMAGE_ROW_GAP);
 
-  useImperativeHandle(ref, () => ({ focus: () => firstInputRef.current?.focus() }), []);
+  const requestTextEditing = useCallback((blockId) => {
+    if (readOnly) return;
+    pendingFocusBlockIdRef.current = blockId;
+    if (editing) {
+      inputRefs.current.get(blockId)?.focus();
+      return;
+    }
+    onRequestEdit?.();
+  }, [editing, onRequestEdit, readOnly]);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      const firstTextBlock = blocks.find((block) => block.type === 'text');
+      if (firstTextBlock) requestTextEditing(firstTextBlock.id);
+    },
+  }), [blocks, requestTextEditing]);
+
+  useEffect(() => {
+    if (!editing || readOnly) return undefined;
+    const blockId = pendingFocusBlockIdRef.current;
+    if (!blockId) return undefined;
+    const frame = requestAnimationFrame(() => {
+      inputRefs.current.get(blockId)?.focus();
+      pendingFocusBlockIdRef.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editing, readOnly]);
 
   useEffect(() => {
     if (selectedId && !attachments.some((item) => item.id === selectedId)) setSelectedId(null);
@@ -310,36 +343,67 @@ const NoteAttachmentGallery = forwardRef(({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator
       >
-        {renderBlocks.map((block, blockIndex) => block.type === 'text' ? (
-          <TextInput
-            key={block.id}
-            ref={blockIndex === 0 ? firstInputRef : undefined}
-            value={block.text}
-            editable={!readOnly}
-            multiline
-            scrollEnabled={false}
-            maxLength={Math.max(0, (Number(maxLength) || 50000) - (content.length - block.text.length))}
-            placeholder={blocks.length === 1 ? 'Start writing...' : ''}
-            placeholderTextColor={colors.textTertiary}
-            textAlignVertical="top"
-            style={[
-              styles.textBlock,
-              block.id === blocks[blocks.length - 1]?.id && styles.trailingTextBlock,
-              { height: Math.max(52, inputHeights[block.id] || 52) },
-              readOnly && styles.readOnlyText,
-            ]}
-            onLayout={(event) => saveBlockLayout(block.id, event.nativeEvent.layout)}
-            onChangeText={(value) => onChangeTextBlock?.(block, value)}
-            onSelectionChange={(event) => onSelectionChange?.(block, event.nativeEvent.selection)}
-            onContentSizeChange={(event) => {
-              const nextHeight = Math.max(52, Math.ceil(event.nativeEvent.contentSize.height));
-              setInputHeights((current) => Math.abs((current[block.id] || 52) - nextHeight) < 2
-                ? current
-                : { ...current, [block.id]: nextHeight });
-            }}
-            accessibilityLabel="Note text"
-            accessibilityHint={readOnly ? 'This shared note is view only' : 'Type text around the images in this note'}
-          />
+        {renderBlocks.map((block) => block.type === 'text' ? (
+          editing && !readOnly ? (
+            <TextInput
+              key={block.id}
+              ref={(input) => {
+                if (input) inputRefs.current.set(block.id, input);
+                else inputRefs.current.delete(block.id);
+              }}
+              value={block.text}
+              editable
+              multiline
+              scrollEnabled={false}
+              maxLength={Math.max(0, (Number(maxLength) || 50000) - (content.length - block.text.length))}
+              placeholder={blocks.length === 1 ? 'Start writing...' : ''}
+              placeholderTextColor={colors.textTertiary}
+              textAlignVertical="top"
+              style={[
+                styles.textBlock,
+                block.id === blocks[blocks.length - 1]?.id && styles.trailingTextBlock,
+                { height: Math.max(52, inputHeights[block.id] || 52) },
+              ]}
+              onLayout={(event) => saveBlockLayout(block.id, event.nativeEvent.layout)}
+              onChangeText={(value) => onChangeTextBlock?.(block, value)}
+              onSelectionChange={(event) => onSelectionChange?.(block, event.nativeEvent.selection)}
+              onContentSizeChange={(event) => {
+                const nextHeight = Math.max(52, Math.ceil(event.nativeEvent.contentSize.height));
+                setInputHeights((current) => Math.abs((current[block.id] || 52) - nextHeight) < 2
+                  ? current
+                  : { ...current, [block.id]: nextHeight });
+              }}
+              accessibilityLabel="Note text"
+              accessibilityHint="Type text around the images in this note"
+            />
+          ) : (
+            <GestureDetector
+              key={block.id}
+              gesture={Gesture.Tap()
+                .enabled(!readOnly)
+                .numberOfTaps(2)
+                .onEnd((_event, success) => {
+                  if (success) scheduleOnRN(requestTextEditing, block.id);
+                })}
+            >
+              <View
+                style={[
+                  styles.previewTextBlock,
+                  block.id === blocks[blocks.length - 1]?.id && styles.trailingTextBlock,
+                ]}
+                onLayout={(event) => saveBlockLayout(block.id, event.nativeEvent.layout)}
+                accessible
+                accessibilityRole={readOnly ? 'text' : 'button'}
+                accessibilityLabel={block.text || 'Empty note'}
+                accessibilityHint={readOnly ? 'This shared note is view only' : 'Double-tap to edit this note'}
+                onAccessibilityTap={() => requestTextEditing(block.id)}
+              >
+                <Text style={[styles.previewText, readOnly && styles.readOnlyText]}>
+                  {block.text || (blocks.length === 1 ? 'Start writing...' : '')}
+                </Text>
+              </View>
+            </GestureDetector>
+          )
         ) : (
           <View
             key={block.id}
@@ -356,6 +420,7 @@ const NoteAttachmentGallery = forwardRef(({
                   560 * Math.max(0.05, imageBlock.attachment.width / imageBlock.attachment.height)
                 )}
                 busy={busy}
+                editing={editing}
                 readOnly={readOnly}
                 styles={styles}
                 onDrop={handleDrop}
@@ -421,6 +486,8 @@ const makeStyles = (colors) => StyleSheet.create({
   editorScroll: { flex: 1 },
   editorContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 24 },
   textBlock: { width: '100%', minHeight: 52, paddingHorizontal: 0, paddingVertical: 8, color: colors.text, fontSize: 16, lineHeight: 25 },
+  previewTextBlock: { width: '100%', minHeight: 52, justifyContent: 'flex-start', paddingVertical: 8 },
+  previewText: { color: colors.text, fontSize: 16, lineHeight: 25 },
   trailingTextBlock: { flexGrow: 1, minHeight: 180 },
   readOnlyText: { color: colors.textSecondary },
   imageRow: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: IMAGE_ROW_GAP, paddingVertical: 8, zIndex: 1 },

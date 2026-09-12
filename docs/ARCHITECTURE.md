@@ -215,6 +215,12 @@ reminders schedule privacy-safe text, but their locally stored content remains
 plaintext like every other locked note. Web preserves and exports reminder
 settings but cannot schedule a device notification.
 
+Plain-note bodies and reminder descriptions open as non-input previews. A
+double-tap replaces the selected preview with the editable input and focuses it;
+normal taps and scroll gestures therefore do not summon the keyboard or place a
+cursor. Screen-reader activation enters editing directly. Plain-note attachment
+drag and resize controls are also available only after the body enters editing.
+
 Checklist notes use `checklist` and store ordered `{id, text, completed}` items
 as versioned JSON in `content`. `ChecklistEditorScreen` supports inline editing,
 checkbox toggles, drag-handle reordering, item deletion, progress, PDF/image
