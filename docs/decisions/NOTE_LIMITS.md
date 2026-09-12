@@ -1,13 +1,21 @@
 # Note Character Limits
 
-## Normal notes
+## Plain notes
 
 | Field | Limit |
 | --- | ---: |
 | Note body | 50,000 characters |
+| Inline images | 20 per note |
+| Selected source image | 5 MB maximum |
+| Stored or uploaded image | Strictly below 1 MB after optimization |
 
-The limit applies to the editable body of a normal plaintext note. The title is
+The character limit applies to the editable body of a plain note. The title is
 separate and is not included in the body count.
+
+Images are inserted at the current text cursor and stored separately from the
+plain-text body, so they do not count toward the 50,000-character limit. Each
+accepted image is converted to JPEG and resized/compressed locally before it is
+saved.
 
 The editor shows a `Character limit reached` dialog at the maximum. React
 Native's `TextInput.maxLength` prevents typing or pasting beyond 50,000
@@ -39,7 +47,7 @@ accept another item until their item count is below 100.
 The reminder editor shows a `Character limit reached` dialog at the maximum.
 Existing longer reminder descriptions remain unchanged until edited.
 
-## Expense notes
+## Expense Records
 
 | Field | Limit |
 | --- | ---: |
@@ -55,7 +63,7 @@ with `TextInput.maxLength` on Android, iOS, and web.
 
 ## Storage context
 
-Before this application-level limit was added, LockNote did not cap normal note
+Before this application-level limit was added, LockNote did not cap plain-note
 content. Native notes use SQLite `TEXT`, whose storage ceiling is much larger
 than a practical mobile editor should accept, while web notes use AsyncStorage.
 The 50,000-character rule is therefore a product and performance limit rather

@@ -22,6 +22,7 @@ import CollaborationFooter from '../components/CollaborationFooter';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
 import NoteBackgroundLayer from '../components/note-background-layer';
+import NoteAttachmentGallery from '../components/note-attachment-gallery';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { collaborationService } from '../services/collaborationService';
 import { lockPasswordService } from '../services/lockPasswordService';
@@ -44,6 +45,16 @@ import { noteColorPreference } from '../utils/note-color-preference';
 import { noteBackgroundPreference } from '../utils/note-background-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import { isReadOnlyCollaborativeNote } from '../utils/collaboration-note.mjs';
+import { attachmentRepo } from '../db/attachmentRepo';
+import { pickNoteAttachments } from '../utils/note-attachment-picker';
+import {
+  MAX_NOTE_ATTACHMENTS,
+  moveInlineAttachment,
+  normalizeAttachmentDisplayWidthRatio,
+  placeInlineAttachment,
+  replaceInlineTextBlock,
+} from '../utils/note-attachment.mjs';
+import { attachmentCloudService } from '../services/attachmentCloudService';
 
 const NoteEditorScreen = ({ route, navigation }) => {
   const colors = useTheme();
@@ -64,14 +75,16 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
-  const [initialContentSelection, setInitialContentSelection] = useState({ start: 0, end: 0 });
   const saveTimeout = useRef(null);
   const loadCompletedRef = useRef(false);
-  const contentRef = useRef(null);
+  const contentEditorRef = useRef(null);
   const contentLimitDialogShown = useRef(false);
+  const insertionOffsetRef = useRef(0);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
-  const latest = useRef({ title: '', content: '', hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, backgroundUri: null, cloudId: null, readOnly: false, deleted: false });
+  const latest = useRef({ noteId, title: '', content: '', attachments: [], hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, backgroundUri: null, attachmentCount: 0, cloudId: null, readOnly: false, deleted: false });
   const {
     canRedo,
     canUndo,
@@ -86,9 +99,10 @@ const NoteEditorScreen = ({ route, navigation }) => {
     try {
       const note = await noteRepo.getById(noteId);
       if (note) {
-        const [localColor, localBackgroundUri] = await Promise.all([
+        const [localColor, localBackgroundUri, localAttachments] = await Promise.all([
           noteColorPreference.load(noteId),
           noteBackgroundPreference.load(noteId),
+          attachmentRepo.listByNoteId(noteId),
         ]);
         setTitle(note.title);
         setContent(note.content);
@@ -96,6 +110,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         setIsPinned(!!note.is_pinned);
         setNoteColor(localColor);
         setNoteBackgroundUri(localBackgroundUri);
+        setAttachments(localAttachments);
         const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note);
         setIsReadOnly(readOnly);
         if (readOnly) {
@@ -106,17 +121,29 @@ const NoteEditorScreen = ({ route, navigation }) => {
         }
         latest.current = {
           ...latest.current,
+          noteId,
           title: note.title,
           content: note.content,
+          attachments: localAttachments,
           hasPassword: !!note.password,
           isPinned: !!note.is_pinned,
           color: localColor,
           backgroundUri: localBackgroundUri,
+          attachmentCount: localAttachments.length,
           cloudId: note.cloud_id,
           readOnly,
         };
         loadCompletedRef.current = true;
+        insertionOffsetRef.current = note.content.length;
         clearUndo();
+        attachmentCloudService.syncNote(note)
+          .then((syncedAttachments) => {
+            if (!loadCompletedRef.current || latest.current.noteId !== noteId) return;
+            setAttachments(syncedAttachments);
+            latest.current.attachments = syncedAttachments;
+            latest.current.attachmentCount = syncedAttachments.length;
+          })
+          .catch(() => {});
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to load note');
@@ -148,6 +175,16 @@ const NoteEditorScreen = ({ route, navigation }) => {
         saveTimeout.current = null;
         try {
           await collaborationService.save(noteId, { title: newTitle, content: newContent });
+          const layout = latest.current.attachments;
+          for (const attachment of layout) {
+            await attachmentRepo.update(attachment.id, {
+              anchor_offset: attachment.anchor_offset,
+              display_order: attachment.display_order,
+              display_width_ratio: attachment.display_width_ratio,
+            });
+          }
+          const note = await noteRepo.getById(noteId);
+          await attachmentCloudService.reorder(note, layout).catch(() => {});
         } catch (error) {
           console.error('Auto-save failed:', error);
         }
@@ -158,16 +195,13 @@ const NoteEditorScreen = ({ route, navigation }) => {
 
   const handleTitleChange = (text) => {
     if (latest.current.readOnly) return;
-    remember(
-      { title: latest.current.title, content: latest.current.content },
-      'title'
-    );
+    remember(getHistorySnapshot(), 'title');
     setTitle(text);
     latest.current.title = text;
-    autoSave(text, content);
+    autoSave(text, latest.current.content);
   };
 
-  const handleContentChange = (text) => {
+  const handleContentChange = (text, nextAttachments = latest.current.attachments, groupKey = 'content') => {
     if (latest.current.readOnly) return;
     const limited = constrainNormalNoteContent(text);
     if (limited.limitReached && !contentLimitDialogShown.current) {
@@ -181,27 +215,60 @@ const NoteEditorScreen = ({ route, navigation }) => {
     }
     if (limited.value === latest.current.content) return;
 
-    remember(
-      { title: latest.current.title, content: latest.current.content },
-      'content'
-    );
+    remember(getHistorySnapshot(), groupKey);
     setContent(limited.value);
+    setAttachments(nextAttachments);
     latest.current.content = limited.value;
-    autoSave(title, limited.value);
+    latest.current.attachments = nextAttachments;
+    autoSave(latest.current.title, limited.value);
   };
 
-  const getHistorySnapshot = () => ({
-    title: latest.current.title,
-    content: latest.current.content,
-  });
+  const handleTextBlockChange = (block, value) => {
+    const next = replaceInlineTextBlock(
+      latest.current.content,
+      latest.current.attachments,
+      block,
+      value
+    );
+    insertionOffsetRef.current = block.start + value.length;
+    handleContentChange(next.content, next.attachments, block.id);
+  };
+
+  const handleTextSelection = (block, selection) => {
+    insertionOffsetRef.current = Math.max(
+      block.start,
+      Math.min(block.end, block.start + (Number(selection?.start) || 0))
+    );
+  };
+
+  function getHistorySnapshot() {
+    return {
+      title: latest.current.title,
+      content: latest.current.content,
+      attachmentLayout: latest.current.attachments.map((item) => ({
+        id: item.id,
+        anchor_offset: item.anchor_offset,
+        display_order: item.display_order,
+        display_width_ratio: item.display_width_ratio,
+      })),
+    };
+  }
 
   const restoreHistorySnapshot = (snapshot) => {
     if (!snapshot || latest.current.readOnly) return;
 
     setTitle(snapshot.title);
     setContent(snapshot.content);
+    const layoutById = new Map((snapshot.attachmentLayout || []).map((item) => [item.id, item]));
+    const restoredAttachments = latest.current.attachments.map((item) => ({
+      ...item,
+      ...(layoutById.get(item.id) || {}),
+    }));
+    setAttachments(restoredAttachments);
     latest.current.title = snapshot.title;
     latest.current.content = snapshot.content;
+    latest.current.attachments = restoredAttachments;
+    insertionOffsetRef.current = Math.min(insertionOffsetRef.current, snapshot.content.length);
     autoSave(snapshot.title, snapshot.content);
   };
 
@@ -256,6 +323,167 @@ const NoteEditorScreen = ({ route, navigation }) => {
     latest.current.backgroundUri = uri;
   };
 
+  const reloadAttachments = async () => {
+    const next = await attachmentRepo.listByNoteId(noteId);
+    setAttachments(next);
+    latest.current.attachments = next;
+    latest.current.attachmentCount = next.length;
+    return next;
+  };
+
+  const handleAddAttachments = async () => {
+    if (latest.current.readOnly || attachmentBusy) return;
+    if (latest.current.attachmentCount >= MAX_NOTE_ATTACHMENTS) {
+      Alert.alert('Image limit reached', 'A plain note can contain up to 20 images.');
+      return;
+    }
+    setAttachmentBusy(true);
+    try {
+      const result = await pickNoteAttachments(
+        noteId,
+        latest.current.attachmentCount,
+        Math.min(latest.current.content.length, insertionOffsetRef.current)
+      );
+      if (!result.canceled) {
+        await reloadAttachments();
+        await noteRepo.update(noteId, { title: latest.current.title });
+        await attachmentCloudService.syncNote(noteId);
+        await reloadAttachments();
+      }
+    } catch (error) {
+      const message = error?.code === 'ATTACHMENT_SOURCE_TOO_LARGE'
+        ? 'Choose images that are 5 MB or smaller.'
+        : error?.code === 'ATTACHMENT_LIMIT_REACHED'
+          ? error.message
+          : error?.code === 'ATTACHMENT_OPTIMIZE_FAILED'
+            ? 'One selected image could not be resized below 1 MB. Choose another image.'
+            : 'LockNote could not add the selected images.';
+      Alert.alert('Images not added', message);
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
+
+  const handleMoveAttachment = async (attachmentId, direction) => {
+    if (latest.current.readOnly || attachmentBusy) return;
+    const currentAttachments = latest.current.attachments;
+    const next = moveInlineAttachment(latest.current.content, currentAttachments, attachmentId, direction);
+    const signature = (items) => items.map((item) => `${item.id}:${item.anchor_offset}:${item.display_order}`).join('|');
+    if (signature(next) === signature(currentAttachments)) return;
+    remember(getHistorySnapshot());
+    setAttachments(next);
+    latest.current.attachments = next;
+    setAttachmentBusy(true);
+    try {
+      for (const attachment of next) {
+        await attachmentRepo.update(attachment.id, {
+          anchor_offset: attachment.anchor_offset,
+          display_order: attachment.display_order,
+          display_width_ratio: attachment.display_width_ratio,
+        });
+      }
+      const saved = await attachmentRepo.reorder(noteId, next.map((item) => item.id));
+      setAttachments(saved);
+      latest.current.attachments = saved;
+      await noteRepo.update(noteId, { title: latest.current.title });
+      const note = await noteRepo.getById(noteId);
+      attachmentCloudService.reorder(note, saved).catch(() => {});
+    } catch {
+      await reloadAttachments();
+      Alert.alert('Image not moved', 'LockNote could not change the image order.');
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
+
+  const handleDropAttachment = async (attachmentId, target) => {
+    if (latest.current.readOnly || attachmentBusy) return;
+    const currentAttachments = latest.current.attachments;
+    const next = placeInlineAttachment(
+      latest.current.content,
+      currentAttachments,
+      attachmentId,
+      target
+    );
+    const signature = (items) => items
+      .map((item) => `${item.id}:${item.anchor_offset}:${item.display_order}`)
+      .join('|');
+    if (signature(next) === signature(currentAttachments)) return;
+    remember(getHistorySnapshot());
+    setAttachments(next);
+    latest.current.attachments = next;
+    setAttachmentBusy(true);
+    try {
+      for (const attachment of next) {
+        await attachmentRepo.update(attachment.id, {
+          anchor_offset: attachment.anchor_offset,
+          display_order: attachment.display_order,
+          display_width_ratio: attachment.display_width_ratio,
+        });
+      }
+      const saved = await attachmentRepo.reorder(noteId, next.map((item) => item.id));
+      setAttachments(saved);
+      latest.current.attachments = saved;
+      const note = await noteRepo.getById(noteId);
+      attachmentCloudService.reorder(note, saved).catch(() => {});
+    } catch {
+      await reloadAttachments();
+      Alert.alert('Image not moved', 'LockNote could not move the image.');
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
+
+  const handleResizeAttachment = async (attachmentId, widthRatio) => {
+    if (latest.current.readOnly || attachmentBusy) return;
+    const normalizedRatio = normalizeAttachmentDisplayWidthRatio(widthRatio);
+    const selected = latest.current.attachments.find((item) => item.id === attachmentId);
+    if (!selected || Math.abs(selected.display_width_ratio - normalizedRatio) < 0.005) return;
+    remember(getHistorySnapshot());
+    const next = latest.current.attachments.map((item) => item.id === attachmentId
+      ? { ...item, display_width_ratio: normalizedRatio }
+      : item);
+    setAttachments(next);
+    latest.current.attachments = next;
+    try {
+      await attachmentRepo.update(attachmentId, { display_width_ratio: normalizedRatio });
+      const note = await noteRepo.getById(noteId);
+      attachmentCloudService.reorder(note, next).catch(() => {});
+    } catch {
+      await reloadAttachments();
+      Alert.alert('Image not resized', 'LockNote could not save the image size.');
+    }
+  };
+
+  const handleRemoveAttachment = (attachment) => {
+    if (!attachment || latest.current.readOnly || attachmentBusy) return;
+    Alert.alert(
+      'Remove this image?',
+      '',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setAttachmentBusy(true);
+            try {
+              const note = await noteRepo.getById(noteId);
+              await attachmentCloudService.remove(note, attachment);
+              await attachmentRepo.remove(attachment.id);
+              await reloadAttachments();
+              await noteRepo.update(noteId, { title: latest.current.title });
+            } catch {
+              Alert.alert('Image not removed', 'LockNote could not remove this image.');
+            } finally {
+              setAttachmentBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const deleteNote = async () => {
     try {
       if (saveTimeout.current) {
@@ -291,15 +519,18 @@ const NoteEditorScreen = ({ route, navigation }) => {
   };
 
   useEffect(() => {
-    setInitialContentSelection({ start: 0, end: 0 });
-    contentRef.current?.blur();
+    loadCompletedRef.current = false;
+    latest.current.noteId = noteId;
     Keyboard.dismiss();
     loadNote();
+    return () => {
+      loadCompletedRef.current = false;
+    };
   }, [noteId]);
 
   const needsExitCleanup = useCallback(() => {
-    const { title, content, hasPassword, isPinned, color, backgroundUri, cloudId, deleted } = latest.current;
-    const empty = !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR && !backgroundUri;
+    const { title, content, hasPassword, isPinned, color, backgroundUri, attachmentCount, cloudId, deleted } = latest.current;
+    const empty = !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR && !backgroundUri && !attachmentCount;
     return getEditorExitDisposition({
       loadCompleted: loadCompletedRef.current,
       isNewDraft,
@@ -311,11 +542,11 @@ const NoteEditorScreen = ({ route, navigation }) => {
 
   const finalizeExit = useCallback(async () => {
     const pending = saveTimeout.current;
-    const { title, content, hasPassword, isPinned, color, backgroundUri, cloudId, deleted } = latest.current;
+    const { title, content, hasPassword, isPinned, color, backgroundUri, attachmentCount, cloudId, deleted } = latest.current;
     const disposition = getEditorExitDisposition({
       loadCompleted: loadCompletedRef.current,
       isNewDraft,
-      isEmpty: !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR && !backgroundUri,
+      isEmpty: !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR && !backgroundUri && !attachmentCount,
       isDeleted: deleted,
       hasPendingSave: !!pending,
     });
@@ -326,11 +557,22 @@ const NoteEditorScreen = ({ route, navigation }) => {
     if (latest.current.readOnly) return;
 
     if (disposition === 'delete') {
+      await attachmentRepo.removeAll(noteId);
       await noteRepo.hardDelete(noteId);
       await noteColorPreference.remove(noteId);
       await noteBackgroundPreference.removeQuietly(noteId);
     } else {
       await collaborationService.save(noteId, { title, content });
+      const layout = latest.current.attachments;
+      for (const attachment of layout) {
+        await attachmentRepo.update(attachment.id, {
+          anchor_offset: attachment.anchor_offset,
+          display_order: attachment.display_order,
+          display_width_ratio: attachment.display_width_ratio,
+        });
+      }
+      const note = await noteRepo.getById(noteId);
+      await attachmentCloudService.reorder(note, layout).catch(() => {});
     }
   }, [isNewDraft, noteId]);
 
@@ -374,7 +616,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
             onBlur={() => setIsTitleFocused(false)}
             blurOnSubmit
             returnKeyType="next"
-            onSubmitEditing={() => contentRef.current?.focus()}
+            onSubmitEditing={() => contentEditorRef.current?.focus()}
             accessibilityLabel="Note title"
             accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Edits the title of this note'}
           />
@@ -405,26 +647,19 @@ const NoteEditorScreen = ({ route, navigation }) => {
       </View>
 
       <View style={[styles.contentArea, { backgroundColor: noteBackgroundUri ? 'transparent' : noteColorTheme.surface }]}>
-        <TextInput
-          ref={contentRef}
-          style={[
-            styles.contentInput,
-            { paddingBottom: Math.max(insets.bottom, 16) },
-          ]}
-          placeholder="Start writing..."
-          placeholderTextColor={colors.textTertiary}
-          value={content}
-          editable={!isReadOnly}
-          onChangeText={handleContentChange}
-          onFocus={() => setInitialContentSelection(undefined)}
-          onPressIn={() => setInitialContentSelection(undefined)}
+        <NoteAttachmentGallery
+          ref={contentEditorRef}
+          content={content}
+          attachments={attachments}
+          busy={attachmentBusy}
+          readOnly={isReadOnly}
           maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS}
-          multiline
-          autoFocus={false}
-          selection={initialContentSelection}
-          textAlignVertical="top"
-          accessibilityLabel="Note content"
-          accessibilityHint={isReadOnly ? 'This shared note is view only' : `Maximum ${NORMAL_NOTE_CONTENT_MAX_CHARACTERS.toLocaleString()} characters`}
+          onChangeTextBlock={handleTextBlockChange}
+          onSelectionChange={handleTextSelection}
+          onMove={handleMoveAttachment}
+          onDrop={handleDropAttachment}
+          onResize={handleResizeAttachment}
+          onRemove={handleRemoveAttachment}
         />
       </View>
 
@@ -451,6 +686,18 @@ const NoteEditorScreen = ({ route, navigation }) => {
             style={[styles.actionsMenu, { top: insets.top + 60 }]}
             accessibilityViewIsModal
           >
+            <Pressable
+              style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
+              onPress={() => { setShowActionsMenu(false); handleAddAttachments(); }}
+              disabled={isReadOnly || attachmentBusy || attachments.length >= MAX_NOTE_ATTACHMENTS}
+              accessibilityRole="button"
+              accessibilityLabel="Insert images at the text cursor"
+              accessibilityState={{ disabled: isReadOnly || attachmentBusy || attachments.length >= MAX_NOTE_ATTACHMENTS }}
+            >
+              <Ionicons name="images-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.actionsMenuText}>Insert images</Text>
+            </Pressable>
+
             <Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowShareModal(true); }}
@@ -568,6 +815,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         onClose={() => setShowExportModal(false)}
         title={title}
         content={content}
+        attachments={attachments}
       />
       <NoteColorModal
         visible={showColorModal}
@@ -668,14 +916,6 @@ const makeStyles = (colors) =>
     },
     contentArea: {
       flex: 1,
-    },
-    contentInput: {
-      flex: 1,
-      fontSize: 16,
-      paddingHorizontal: 20,
-      paddingTop: 16,
-      color: colors.text,
-      lineHeight: 25,
     },
     actionsMenuOverlay: {
       flex: 1,

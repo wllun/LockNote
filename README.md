@@ -9,7 +9,11 @@ A local-first note-taking app with folder organization, password protection, opt
 - Auto-save while editing (debounced)
 - Full-text search across notes (native)
 - Soft delete (items are flagged, not immediately purged)
+- Plain-note inline images inserted between text blocks, with wrapping multi-image rows, long-press drag/drop, and proportional resizing (up to 20 per note)
+- Checklist, Expense Record, and reminder note types
+- Archive, 30-day Trash recovery, PDF/image export, and Undo/Redo
 - Manual two-way account sync across iOS, Android, and web
+- Per-email note sharing with View only or Can edit access
 - Portable JSON backup export and validated merge/replace restore
 - Runs on iOS, Android, and web
 
@@ -51,8 +55,9 @@ disabled on restore.
 
 Account login, offline features, PDF/image export, and portable local backup
 remain Free. LockNote Plus is planned to add cloud sync and collaboration with a
-100 MB cloud-note quota. LockNote Pro adds planned image features with a 2 GB
-cloud-attachment quota. If a paid plan expires, local notes remain editable and
+100 MB cloud-note quota. Inline image attachments are implemented, while their
+planned LockNote Pro gating and 2 GB cloud-attachment quota are not yet enforced.
+If a paid plan expires, local notes remain editable and
 existing cloud data remains read-only and downloadable; expiry never deletes
 notes.
 
@@ -76,7 +81,9 @@ src/
 │   ├── folderRepo.js      # Folder CRUD (native, SQLite)
 │   ├── folderRepo.web.js  # Folder CRUD (web, AsyncStorage)
 │   ├── noteRepo.js        # Note CRUD + search (native, SQLite)
-│   └── noteRepo.web.js    # Note CRUD + search (web, AsyncStorage)
+│   ├── noteRepo.web.js    # Note CRUD + search (web, AsyncStorage)
+│   ├── attachmentRepo.js  # Inline image metadata/files (native)
+│   └── attachmentRepo.web.js # Inline images in IndexedDB (web)
 ├── navigation/
 │   └── AppNavigator.js    # Bottom tabs (Home stack + Settings)
 ├── screens/               # Home, Folder, NoteEditor, Settings

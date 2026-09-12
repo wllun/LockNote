@@ -22,6 +22,7 @@ The first beta should validate the features that already provide user value:
 - local password gates, with clear wording that they are not encryption;
 - archive and trash;
 - PDF/image export;
+- inline images inside plain-note text, including reopen and export order;
 - portable backup export and restore;
 - account registration and login;
 - manual Sync Notes and explicit note sharing, labelled as beta if enabled.
@@ -36,6 +37,7 @@ Do not charge testers for Plus or Pro during the first closed beta.
 | Supabase backend | Migrations and RPC-based sync exist in the repository | Deploy every required migration and Edge Function to the production project; verify with two separate accounts |
 | Synchronization | Manual two-way sync exists | Finish lifecycle/connectivity-triggered sync or clearly advertise synchronization as manual |
 | Collaboration | Roles, Realtime updates, revisions, and editing leases are implemented | Verify owner, view-only, editor, revocation, conflict, lease-expiry, offline, and reconnect cases with two devices |
+| Inline images | Local-first storage, resize/compression, cursor anchors, export, and optional cloud reconciliation are implemented | Deploy both attachment migrations, then verify insert/reopen/sync/delete with two devices and shared Viewer/Editor roles |
 | Authentication email | Production SMTP and LockNote branding are not configured | Connect custom SMTP, verify SPF/DKIM, preserve template callback variables, and test every email template |
 | Account deletion | No complete account-deletion flow was found | Add an easy-to-find in-app deletion path; Google Play also requires a web deletion-request URL |
 | Purchases | RevenueCat client UI is implemented | Configure store products and RevenueCat entitlements, then verify purchase, restore, upgrade, cancellation, expiration, and refund behaviour |
@@ -69,7 +71,7 @@ Purpose: catch installation, configuration, native API, and crash issues before 
 - [ ] Upload it to Google Play Internal testing.
 - [ ] Test installation and upgrade over an older LockNote build.
 - [ ] Test on at least one older, one mid-range, and one recent Android device.
-- [ ] Verify navigation-bar safe areas, keyboard layouts, notifications, exports, Gallery/Documents permissions, and deep links.
+- [ ] Verify navigation-bar safe areas, keyboard layouts, notifications, inline-image insertion, exports, Gallery/Documents permissions, and deep links.
 - [ ] Confirm that ordinary local notes remain available when the device is offline or Supabase is unavailable.
 - [ ] Confirm that production builds contain the correct public Supabase and RevenueCat keys.
 

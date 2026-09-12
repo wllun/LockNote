@@ -1,6 +1,6 @@
 # LockNote Roadmap
 
-_Snapshot: 2026-08-31. Current app version: 1.1.0._
+_Snapshot: 2026-09-12. Current app version: 1.1.0._
 
 This file describes the product direction and major delivery phases. For detailed implementation status and technical caveats, see [PROJECT_STATE.md](PROJECT_STATE.md). For the current architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
@@ -8,7 +8,7 @@ This file describes the product direction and major delivery phases. For detaile
 
 - LockNote remains offline-first: local storage is authoritative while editing, and core note features work without an account.
 - Cloud features are opt-in. Private data is uploaded only when a signed-in user runs Sync Notes; shared notes use the collaboration backend.
-- Account login, local portable backup, and recovery downloads remain Free. LockNote Plus targets active cloud sync and collaboration with 100 MB of cloud note storage; LockNote Pro adds planned media features with 2 GB of cloud attachment storage.
+- Account login, local portable backup, and recovery downloads remain Free. LockNote Plus targets active cloud sync and collaboration with 100 MB of cloud note storage. Inline image attachments are implemented; LockNote Pro gating and its 2 GB cloud attachment quota remain pending.
 - LockNote Plus and LockNote Pro checkout is implemented through RevenueCat, with actual localized prices supplied by the configured stores. Store products, public SDK keys, and production payment testing still require external setup. Feature gating, quota enforcement, and server-side downgrade handling are not implemented.
 - Subscription expiry must not delete notes. Local editing continues while cloud writes pause and existing cloud data remains read-only and downloadable.
 - Password protection is an access gate, not encryption. Local and synchronized note content is not end-to-end encrypted.
@@ -64,11 +64,16 @@ This file describes the product direction and major delivery phases. For detaile
 - [ ] Show clear last-success and retry/error state for automatic synchronization.
 - [ ] Implement and validate LockNote Plus entitlement, the 100 MB note quota, read-only expiry recovery, and owner-funded collaboration.
 
-## Phase 3 — Attachments — planned for LockNote Pro
+## Phase 3 — Attachments — implemented, Pro gating pending
 
-- [ ] Add image attachments to notes.
-- [X] Define the initial target as a 2 GB cloud attachment quota with a 10 MB maximum per uploaded image; local backup remains separate and Free.
-- [ ] Implement attachment storage, compression, backup behavior, deletion cleanup, collaboration behavior, and LockNote Pro entitlement.
+- [X] Add up to 20 images to plain notes at the current text cursor, with text continuing below each image.
+- [X] Accept source images up to 5 MB and resize/compress saved JPEGs to strictly below 1 MB.
+- [X] Implement native/web local storage, cursor-anchor persistence, one-second long-press drag/drop, proportional display resizing, inline Undo/Redo and export rendering, cloud upload/download reconciliation, shared-note role checks, and local deletion cleanup.
+- [X] Enforce the 20-image and 2 GB owner-funded cloud limits in the Supabase migration; local JSON backup remains separate and excludes binary media.
+- [X] Queue offline cloud-image deletions and retry them on the next signed-in attachment sync.
+- [X] Add a follow-up migration that upgrades already-deployed gallery metadata to inline character-offset anchors.
+- [X] Add a follow-up migration for synchronized proportional image display widths.
+- [ ] Implement and validate LockNote Pro entitlement gating.
 
 ## Phase 4 — Export and portability — shipped
 
@@ -93,7 +98,7 @@ This file describes the product direction and major delivery phases. For detaile
 - [X] Session undo/redo and debounced auto-save across all four editors.
 - [X] PDF/image export for every note type.
 
-See [NOTE_LIMITS.md](NOTE_LIMITS.md) for text limits and [MONTHLY_EXPENSE_CHECKLIST.md](decisions/MONTHLY_EXPENSE_CHECKLIST.md) for the expense commitment design.
+See [NOTE_LIMITS.md](decisions/NOTE_LIMITS.md) for text and image limits and [MONTHLY_EXPENSE_CHECKLIST.md](decisions/MONTHLY_EXPENSE_CHECKLIST.md) for the expense commitment design.
 
 ## Additional backlog
 

@@ -5,7 +5,7 @@ import {
 
 const DATABASE_NAME = 'locknote-local-media';
 const STORE_NAME = 'note-backgrounds';
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const activeUrls = new Map();
 let databasePromise = null;
 
@@ -21,8 +21,16 @@ const openDatabase = () => {
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         database.createObjectStore(STORE_NAME, { keyPath: 'noteId' });
       }
+      if (!database.objectStoreNames.contains('note-attachments')) {
+        const attachments = database.createObjectStore('note-attachments', { keyPath: 'id' });
+        attachments.createIndex('noteId', 'note_id', { unique: false });
+      }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      request.result.onversionchange = () => request.result.close();
+      resolve(request.result);
+    };
+    request.onblocked = () => reject(new Error('Close other LockNote tabs, then try again.'));
     request.onerror = () => reject(request.error || new Error('Local image storage could not be opened.'));
   });
   return databasePromise;

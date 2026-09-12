@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,6 +25,7 @@ import {
 } from '../utils/expense-record.mjs';
 import { radius, shadow, useTheme } from '../theme';
 import { formatReminderSchedule, normalizeReminder } from '../utils/reminder-note.mjs';
+import { buildInlineNoteBlocks, groupInlineNoteBlocks } from '../utils/note-attachment.mjs';
 
 const NoteExportModal = ({
   visible,
@@ -40,6 +41,7 @@ const NoteExportModal = ({
   checklistItems,
   type = 'note',
   reminder,
+  attachments = [],
 }) => {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
@@ -66,6 +68,7 @@ const NoteExportModal = ({
     checklistItems,
     type,
     reminder,
+    attachments,
   };
   const visibleRows = getExpenseExportRows(rows);
   const visibleCategories = getExpenseExportCategories(categories);
@@ -76,6 +79,7 @@ const NoteExportModal = ({
   const visibleSummaryNote = typeof summaryNote === 'string' ? summaryNote.trim() : '';
   const hasMonthlySummary = visibleCategories.length > 0 || visibleSummaryNote.length > 0;
   const visibleReminder = normalizeReminder(reminder);
+  const inlineNoteBlocks = groupInlineNoteBlocks(buildInlineNoteBlocks(content, attachments));
   const exportFormats = [
     {
       format: 'pdf',
@@ -271,7 +275,29 @@ const NoteExportModal = ({
                   )}
                 </>
               ) : (
-                <Text style={styles.previewBody}>{content || 'This note is empty.'}</Text>
+                <>
+                  {inlineNoteBlocks.map((block) => block.type === 'text' ? (
+                    block.text ? <Text key={block.id} style={styles.previewBody}>{block.text}</Text> : null
+                  ) : (
+                    <View key={block.id} style={styles.attachmentPreviewRow}>
+                      {block.blocks.map((imageBlock) => (
+                        <Image
+                          key={imageBlock.id}
+                          source={{ uri: imageBlock.attachment.local_uri }}
+                          style={[
+                            styles.attachmentPreviewImage,
+                            {
+                              width: `${Math.max(1, imageBlock.attachment.display_width_ratio * 100 - 1)}%`,
+                              aspectRatio: imageBlock.attachment.width / imageBlock.attachment.height,
+                            },
+                          ]}
+                          resizeMode="contain"
+                        />
+                      ))}
+                    </View>
+                  ))}
+                  {!content && !attachments.length && <Text style={styles.previewBody}>This note is empty.</Text>}
+                </>
               )}
               <Text style={styles.brand}>Exported from LockNote</Text>
             </View>
@@ -399,6 +425,8 @@ const makeStyles = (colors) => StyleSheet.create({
   previewTitle: { color: '#172033', fontSize: 24, lineHeight: 30, fontWeight: '800' },
   accent: { height: 3, backgroundColor: '#5b67f1', borderRadius: radius.full, marginTop: 14, marginBottom: 20 },
   previewBody: { color: '#30384c', fontSize: 15, lineHeight: 23 },
+  attachmentPreviewRow: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: 6, marginVertical: 10 },
+  attachmentPreviewImage: { maxWidth: '100%', borderRadius: 10, backgroundColor: '#eef0f5' },
   reminderPreview: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, marginBottom: 18, borderWidth: 1, borderColor: '#c7cdfd', borderRadius: 12, backgroundColor: '#f1f2ff' },
   reminderPreviewIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff' },
   reminderPreviewText: { flex: 1 }, reminderPreviewTitle: { color: '#30384c', fontSize: 14, fontWeight: '800' }, reminderPreviewSchedule: { color: '#687086', fontSize: 12, lineHeight: 17, marginTop: 2 },

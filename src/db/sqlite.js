@@ -70,10 +70,38 @@ export const initDB = async () => {
       PRIMARY KEY (entity_type, entity_id)
     );
 
+    CREATE TABLE IF NOT EXISTS note_attachments (
+      id TEXT PRIMARY KEY NOT NULL,
+      note_id TEXT NOT NULL,
+      local_uri TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'image/jpeg',
+      width INTEGER NOT NULL,
+      height INTEGER NOT NULL,
+      byte_size INTEGER NOT NULL,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      anchor_offset INTEGER NOT NULL DEFAULT 0,
+      display_width_ratio REAL NOT NULL DEFAULT 1,
+      cloud_path TEXT,
+      sync_status TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_notes_folder_id ON notes(folder_id);
     CREATE INDEX IF NOT EXISTS idx_notes_is_deleted ON notes(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_folders_is_deleted ON folders(is_deleted);
+    CREATE INDEX IF NOT EXISTS idx_note_attachments_note_id
+      ON note_attachments(note_id, display_order);
   `);
+
+  const attachmentColumns = await db.getAllAsync('PRAGMA table_info(note_attachments)');
+  if (!attachmentColumns.some((column) => column.name === 'anchor_offset')) {
+    await db.execAsync('ALTER TABLE note_attachments ADD COLUMN anchor_offset INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!attachmentColumns.some((column) => column.name === 'display_width_ratio')) {
+    await db.execAsync('ALTER TABLE note_attachments ADD COLUMN display_width_ratio REAL NOT NULL DEFAULT 1');
+  }
 
   // Migrate is_pinned onto DBs created before this column existed.
   // ponytail: pragma-guarded ALTER TABLE — no migration framework for a two-table app.

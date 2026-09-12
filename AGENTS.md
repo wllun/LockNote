@@ -1,6 +1,9 @@
 # Working in LockNote
 
-LockNote is an offline Expo / React Native notes app. All data is stored locally; there is no backend.
+LockNote is a local-first Expo / React Native notes app. Editing works offline
+and local storage remains authoritative; optional Supabase services provide
+account authentication, manual sync, collaboration, force-update policy, and
+signed-in inline-image synchronization.
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making structural changes and [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the current status and planned work.
 
@@ -11,7 +14,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making structural chang
 
 ## Hard rules
 
-- **Keep native and web repositories in sync.** `folderRepo.js` and `noteRepo.js` use SQLite, while their `.web.js` counterparts use AsyncStorage. Both implementations must expose identical method signatures and return the same object shapes. When one changes, update the other.
+- **Keep native and web repositories in sync.** `folderRepo.js` and `noteRepo.js` use SQLite, while their `.web.js` counterparts use AsyncStorage. `attachmentRepo.js` uses SQLite plus managed files, while `attachmentRepo.web.js` uses IndexedDB. Each native/web pair must expose identical method signatures and return the same object shapes. When one changes, update the other.
 - **Filter soft-deleted rows from reads.** Every new query must include `is_deleted = 0` on native or `!x.is_deleted` on web. UI deletion paths must call `softDelete()`, not `hardDelete()`.
 - **Preserve root-note semantics.** `folder_id IS NULL` means that a note lives at the root level. Preserve this behavior when changing note queries or move operations.
 - **Never store or compare plaintext passwords.** Passwords are SHA-256 hashes produced by `src/utils/crypto.js`. Note content is not encrypted, so never describe password protection as encryption or secure storage.
@@ -32,5 +35,5 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making structural chang
 
 ## Avoid
 
-- Do not add Supabase or other network code without explicit direction. The Supabase dependency and environment variables are vestigial; see [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
+- Do not add or expand Supabase or other network behavior without explicit direction. Existing account, sync, collaboration, force-update, and attachment-cloud paths are intentional; see [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
 - Do not introduce a state library, navigation redesign, or new storage abstraction for hypothetical future needs. Match the existing architecture and the scope of the requested change.

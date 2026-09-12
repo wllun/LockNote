@@ -8,9 +8,9 @@ Editable vector source: [monthly-expense-checklist-option-c.svg](../../assets/de
 
 ## Decision
 
-Add a separate **Monthly commitments** checklist to an expense note. This is an additive section and must not replace or weaken the current expense workflow.
+Add a separate **Monthly commitments** checklist to an Expense Record. This is an additive section and must not replace or weaken the current expense workflow.
 
-The existing expense note keeps:
+The existing Expense Record keeps:
 
 - its total summary and Summary action;
 - the Day, Remark, and currency-aware expense table;
@@ -67,7 +67,7 @@ The example totals are:
 - Checking a commitment does not automatically create an expense-table row, preventing duplicate amounts.
 - `Add monthly bill` adds a commitment without affecting existing expense rows.
 - `Save for next note` stores a reusable copy of the current bill names, due days, and amounts in local app storage. Paid state and note-specific IDs are not stored in the reusable copy.
-- When an expense note has no monthly commitments, `Apply` offers the last saved bill list. Applying creates new local IDs and marks every copied bill unpaid without changing the source expense note.
+- When an Expense Record has no monthly commitments, `Apply` offers the last saved bill list. Applying creates new local IDs and marks every copied bill unpaid without changing the source Expense Record.
 - Reordering and deletion reuse the existing expense-row gestures: a full-width insertion gap previews the drop position, and releasing over the large recycle-bin target opens a confirmation before deleting the bill.
 - There is no long-press-to-delete interaction.
 - Checkbox and row actions must keep at least a 44 × 44 point touch target and have descriptive accessibility labels.
@@ -75,7 +75,7 @@ The example totals are:
 
 ## Data shape for implementation
 
-Store commitments inside the expense note's versioned JSON payload, independently from `rows`:
+Store commitments inside the Expense Record's versioned JSON payload, independently from `rows`:
 
 ```json
 {
@@ -94,9 +94,9 @@ Store commitments inside the expense note's versioned JSON payload, independentl
 
 Payload version 6 defaults `monthlyCommitments` to an empty array and `currency` to `USD` for existing notes. No new repository methods are required because expense-note content remains versioned JSON. Commitments also appear in expense PDF and image exports.
 
-Settings stores the default currency for newly created expense notes. Changing
+Settings stores the default currency for newly created Expense Records. Changing
 that setting asks whether to keep existing notes unchanged or apply the new
-currency metadata to all active private/owned expense notes. A note can still
+currency metadata to all active private/owned Expense Records. A record can still
 override the setting by pressing its amount-column header. These actions relabel
 the stored amounts only; they do not calculate exchange rates or change numbers.
 Both entry points use the searchable, complete current ISO 4217 Currency & Funds
@@ -113,7 +113,7 @@ The Grand total shown by the editor and expense-note cards combines daily expens
 ## Paid-state reset
 
 - Paid state is kept per note and a confirmed `Reset paid status` action marks every commitment unpaid.
-- Applying the last saved bill list to another expense note always starts with every checkbox reset.
+- Applying the last saved bill list to another Expense Record always starts with every checkbox reset.
 - Avoid silently resetting checkboxes by calendar date because a user may still be finishing the previous month's note.
 
 ## Out of scope for the first implementation

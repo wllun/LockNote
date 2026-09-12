@@ -66,7 +66,7 @@ export default {
       [
         "expo-image-picker",
         {
-          photosPermission: "Allow LockNote to select a local note background image.",
+          photosPermission: "Allow LockNote to select images for note backgrounds and attachments.",
           cameraPermission: false,
           microphonePermission: false,
         },

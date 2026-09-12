@@ -33,9 +33,9 @@ not implemented yet.
 | Cloud note storage quota | None | 100 MB | 100 MB |
 | Multi-device use | No | Yes | Yes |
 | Share notes and collaborate | No | Yes | Yes |
-| Image attachments | No | No | Planned |
+| Inline image attachments | No | No | Yes (implemented; gating pending) |
 | Custom note backgrounds | No | No | Planned |
-| Cloud attachment storage | None | None | 2 GB planned |
+| Cloud attachment storage | None | None | 2 GB (gating pending) |
 
 LockNote Plus or Pro is required for the owner to create or actively synchronize
 a shared note. An invited person only needs a free LockNote account and follows
@@ -73,7 +73,9 @@ separate explicit actions.
   storage rather than database rows.
 - Reject new cloud writes when an account is over quota without blocking local
   editing or recovery downloads.
-- Compress images before upload and target a maximum of 10 MB per uploaded image.
+- Accept source images up to 5 MB, then resize/compress locally so every uploaded
+  JPEG is strictly below 1 MB. Allow up to 20 cursor-positioned images per plain
+  note, with the inline order preserved during sync and export.
 - Exclude local portable backups from all cloud quota calculations.
 - Show current usage, the plan limit, and a clear over-quota recovery action in
   the Premium module before enforcement is enabled.
@@ -86,7 +88,7 @@ user UUID becomes the RevenueCat App User ID. The screen displays the localized
 store price and changes from Free to the active Plus or Pro entitlement after a
 verified purchase.
 
-The app still allows manual sync and sharing without premium entitlement checks.
+The app still allows manual sync, sharing, and inline image attachments without premium entitlement checks.
 Server-owned entitlement records, quota tracking, feature gating, downgrade
 enforcement, and read-only recovery remain future work. See
 [Subscription Payment Setup](SUBSCRIPTION_SETUP.md) for the external dashboard,

@@ -84,7 +84,8 @@ _Snapshot: 2026-08-31. Check off items as they land._
 
 ### Phase 3 — LockNote Pro attachments — proposed RM9.99/month
 
-- [ ] Image attachments and optional cloud sync for local custom note backgrounds, with a planned 2 GB cloud attachment quota and a 10 MB maximum per image.
+- [X] Plain-note inline image attachments — up to 20 images per note, inserted at the current text cursor, maximum 5 MB source, locally resized/compressed to strictly below 1 MB, local-first native/web storage, wrapping multi-image rows, one-second long-press two-axis drag/drop, aspect-ratio-preserving display resize, preview/removal, Undo/Redo layout restoration, matching inline PDF/image export, and optional signed-in Supabase Storage reconciliation. Multi-select starts images at half width so two fit per row. Deploy attachment migrations through `202609120003_attachment_display_layout.sql` before cloud attachment sync. Premium entitlement gating is intentionally pending.
+- [ ] Optional cloud sync for local custom note backgrounds.
 
 ### Phase 4 — Export
 
@@ -106,8 +107,8 @@ When the user presses the Add button, let them choose one of these note types:
 - [X] Expense Record — titled multi-row table with direct date/remark/amount entry, row add/delete/reorder controls, total, local persistence, list summaries, password/pin support, and 800 ms autosave
 - [X] Expense Record monthly summaries — named categories support multiple case-insensitive remark keywords with automatically updated totals, same-name updates, and one shared auto-saved summary note
 - [X] Expense Record monthly commitments checklist — Option C paid-status section with progress, remaining amount, add/edit/reset, drag reorder, recycle-bin delete, version 6 persistence, and exports. See [MONTHLY_EXPENSE_CHECKLIST.md](decisions/MONTHLY_EXPENSE_CHECKLIST.md)
-- [X] Expense Record reusable monthly commitments — save a local bill template and apply it to an empty expense note with fresh IDs and every bill unpaid
-- [X] Expense Record currency selection — Settings provides a searchable selector containing all 178 current ISO 4217 Currency & Funds codes, stores the default for new notes (USD/$ initially), and prompts whether a change should also update all existing private/owned expense notes without converting amounts. Each note keeps its own currency code, which can also be changed from the amount-column header and is consistently applied to summaries, Home/Folder cards, and exports.
+- [X] Expense Record reusable monthly commitments — save a local bill template and apply it to an empty Expense Record with fresh IDs and every bill unpaid
+- [X] Expense Record currency selection — Settings provides a searchable selector containing all 178 current ISO 4217 Currency & Funds codes, stores the default for new Expense Records (USD/$ initially), and prompts whether a change should also update all existing private/owned Expense Records without converting amounts. Each record keeps its own currency code, which can also be changed from the amount-column header and is consistently applied to summaries, Home/Folder cards, and exports.
 - [X] Reminder — plaintext note body with a 5,000-character limit, one-time/daily/weekly/monthly local notification settings, list previews, Undo, pin/password/delete handling, notification-tap navigation with password gating, and PDF/image export
 
 ### Additional / backlog (unphased)

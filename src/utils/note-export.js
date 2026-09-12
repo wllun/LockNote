@@ -66,12 +66,25 @@ const copyToNamedCacheFile = async ({ uri, fileName, mimeType }) => {
   return { uri: destination.uri, fileName, mimeType };
 };
 
+const embedLocalAttachments = async (data = {}) => ({
+  ...data,
+  attachments: await Promise.all((Array.isArray(data.attachments) ? data.attachments : []).map(async (item) => {
+    if (!item?.local_uri || item.data_uri) return item;
+    const file = new File(item.local_uri);
+    if (!file.exists) return item;
+    return {
+      ...item,
+      data_uri: `data:${item.mime_type || 'image/jpeg'};base64,${await file.base64()}`,
+    };
+  })),
+});
+
 const createNotePdf = async (data) => {
   const printToFileAsync = requireFunction(
     Print.printToFileAsync,
     'PDF export is unavailable in this app build.'
   );
-  const result = await printToFileAsync({ html: buildNoteExportHtml(data) });
+  const result = await printToFileAsync({ html: buildNoteExportHtml(await embedLocalAttachments(data)) });
   if (typeof result?.uri !== 'string' || !result.uri.trim()) {
     throw new Error('The PDF file could not be created.');
   }

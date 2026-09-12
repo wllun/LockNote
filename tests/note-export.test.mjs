@@ -96,6 +96,25 @@ test('escapes note text and preserves line breaks in PDF HTML', () => {
   assert.doesNotMatch(html, /<script>alert/);
 });
 
+test('renders plain-note image attachments in PDF HTML', () => {
+  const html = buildNoteExportHtml({
+    type: 'note',
+    title: 'Receipts',
+    content: 'BeforeAfter',
+    attachments: [
+      { id: 'image-1', anchor_offset: 6, display_width_ratio: 0.6, data_uri: 'data:image/jpeg;base64,abc123' },
+      { id: 'ignored' },
+    ],
+  });
+
+  assert.match(html, /class="inline-attachment"/);
+  assert.match(html, /data:image\/jpeg;base64,abc123/);
+  assert.match(html, /class="inline-attachment-row"/);
+  assert.match(html, /style="width:calc\(60% - 6px\)"/);
+  assert.match(html, /Before<\/div><div class="inline-attachment-row"><img[^>]+><\/div><div class="content">After/);
+  assert.doesNotMatch(html, /This note is empty/);
+});
+
 test('builds PDF HTML when String.replaceAll is unavailable', () => {
   const originalReplaceAll = String.prototype.replaceAll;
   try {

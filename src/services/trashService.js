@@ -4,11 +4,15 @@ import { cancelNoteReminder } from '../utils/reminder-cleanup';
 import { isTrashExpired } from '../utils/trash.mjs';
 import { noteBackgroundPreference } from '../utils/note-background-preference';
 import { noteColorPreference } from '../utils/note-color-preference';
+import { attachmentRepo } from '../db/attachmentRepo';
+import { attachmentCloudService } from './attachmentCloudService';
 
 const isVisibleTrashNote = (note) => note?.share_origin !== 'incoming';
 
 const permanentlyDeleteNote = async (note) => {
   await cancelNoteReminder(note);
+  try { await attachmentCloudService.removeAll(note); } catch {}
+  await attachmentRepo.removeAll(note.id);
   await noteRepo.hardDelete(note.id);
   await noteColorPreference.remove(note.id);
   await noteBackgroundPreference.removeQuietly(note.id);

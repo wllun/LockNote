@@ -1,4 +1,5 @@
 import { noteRepo } from '../db/noteRepo';
+import { attachmentRepo } from '../db/attachmentRepo';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 import {
   SHARE_ORIGIN_INCOMING,
@@ -446,6 +447,7 @@ export const collaborationService = {
     if (!note?.cloud_id) return;
     const { error } = await supabase.rpc('leave_shared_note', { p_note_id: note.cloud_id });
     if (error) throw error;
+    await attachmentRepo.removeAll(noteId);
     await noteRepo.softDelete(noteId);
   },
 

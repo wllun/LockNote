@@ -11,6 +11,7 @@ export const createBackupService = ({
   folderRepo,
   noteRepo,
   fileAdapter,
+  attachmentRepo,
   appVersion = 'unknown',
   now = () => new Date(),
 }) => {
@@ -59,6 +60,7 @@ export const createBackupService = ({
         const validated = validateBackupDocument(selection?.backup || selection);
         const { folders, notes } = validated.backup;
         if (mode === 'replace') {
+          await attachmentRepo?.clearAll?.();
           await folderRepo.replaceBackupSnapshot(folders.records, folders.tombstones);
           await noteRepo.replaceBackupSnapshot(notes.records, notes.tombstones);
         } else {

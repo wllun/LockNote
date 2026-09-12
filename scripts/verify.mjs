@@ -83,7 +83,7 @@ for (const file of sourceFiles) {
 }
 if (!syntaxFailed) pass(`Parsed ${sourceFiles.length} JavaScript files`);
 
-for (const repoName of ['folderRepo', 'noteRepo']) {
+for (const repoName of ['folderRepo', 'noteRepo', 'attachmentRepo']) {
   const nativeFile = path.join(root, 'src', 'db', `${repoName}.js`);
   const webFile = path.join(root, 'src', 'db', `${repoName}.web.js`);
   try {

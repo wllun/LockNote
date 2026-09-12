@@ -78,8 +78,9 @@ proration amount; the platform purchase sheet provides the authoritative price.
 Account login, local portable backup, and one-way recovery of existing cloud data
 are Free capabilities. LockNote Plus adds active
 cloud note sync, multi-device use, and owner-funded collaboration with a 100 MB
-cloud note quota. LockNote Pro adds planned media features with a 2 GB cloud
-attachment quota.
+cloud note quota. Inline image attachments are implemented locally and in the
+optional cloud path; LockNote Pro entitlement gating and its 2 GB cloud
+attachment quota remain planned.
 
 Expiry must downgrade the account to Free without deleting local or cloud note
 data. Local editing continues, while new cloud writes, two-way sync, and
@@ -132,13 +133,13 @@ folder/note IDs and deletion timestamps. Normal reads still filter deleted rows;
 the sync path uploads tombstones so an older copy on another device cannot
 resurrect a deleted item.
 
-`note_type` defaults to `note` for existing/plaintext notes. Expense notes use
+`note_type` defaults to `note` for existing/plaintext notes. Expense Records use
 `expense`; their editable table rows (`date`, `remark`, and `amount`) are stored
 as versioned JSON in `content` and edited by `ExpenseRecordEditorScreen`. Version
 4 also stores named monthly-summary categories and one shared summary note in the
 same payload. Version 5 adds an independent monthly-commitment checklist with a
 bill name, optional due day, amount, and paid state. Version 6 stores a supported
-currency code per expense note. The searchable selector contains the complete
+currency code per Expense Record. The searchable selector contains the complete
 current ISO 4217 Currency & Funds list (SIX List One, published 2026-01-01);
 missing or unsupported codes safely default to USD (`$`). The selected symbol is
 presentation metadata and does not convert stored amounts. Categories contain multiple
@@ -167,10 +168,41 @@ Background images are device-local and excluded from note rows, backups,
 private sync, and shared-note collaboration; deleting the note also removes its
 managed local image. A background makes an otherwise empty new draft meaningful.
 
+Plain notes can contain up to 20 image attachments. The picker accepts source
+images up to 5 MB, then `expo-image-manipulator` converts each image to JPEG and
+reduces it to strictly below 1 MB before persistence. Native builds store the
+optimized files under `note-attachments/<note-id>/` and keep metadata in the
+SQLite `note_attachments` table. Web stores the optimized Blob and matching
+metadata in the `note-attachments` object store of the shared
+`locknote-local-media` IndexedDB database. The native and web attachment
+repositories expose the same API. Each attachment stores a character offset
+that anchors it between plain-text blocks, allowing a note to flow as text,
+image, then more text without changing the searchable plain-text `content`
+format. Text edits shift later anchors, and Undo/Redo and PDF/image exports
+preserve the inline order. A one-second long-press activates drag-and-drop at
+paragraph boundaries or around another image. `display_width_ratio` stores the
+chosen presentation width from 0.35 to 1 while rendered height is always derived
+from the optimized source dimensions, so resizing does not distort or rewrite
+the image. Consecutive images at the same character anchor render in a wrapping
+row; selecting several images together starts them at half width, while each
+image keeps its own independently resizable width. Dragging left or right within
+a row changes the saved display order. Attachments also make an otherwise empty
+draft meaningful.
+
+When account services and a signed-in session are available, the attachment
+service uploads optimized JPEGs to the private Supabase `note-attachments`
+bucket and stores access-controlled metadata in `public.note_attachments`.
+Opening a note reconciles missing local/cloud copies; shared-note access follows
+the note's Viewer/Editor role. The server migration enforces 20 images per note,
+files below 1 MB, and a 2 GB owner-funded quota. Deploy attachment migrations
+through `202609120003_attachment_display_layout.sql` so shared image dimensions
+and drag order reconcile correctly. Portable JSON backups continue to exclude
+binary attachments.
+
 The device-level default expense currency is stored in AsyncStorage under
-`@locknote_expense_currency` and is read when a new, still-empty expense note is
+`@locknote_expense_currency` and is read when a new, still-empty Expense Record is
 opened. Settings can change that default for future notes or explicitly rewrite
-the currency metadata of every active private/owned expense note. The bulk action
+the currency metadata of every active private/owned Expense Record. The bulk action
 uses normal note save paths (including collaboration saves for owned shared notes),
 excludes Shared-with-me caches, and never performs exchange-rate conversion.
 
@@ -193,7 +225,7 @@ remains searchable because repository search already checks the serialized
 `content` field.
 
 Users can explicitly save the current commitment list for reuse in another
-expense note. This app-level template is stored locally in AsyncStorage under
+Expense Record. This app-level template is stored locally in AsyncStorage under
 `@locknote_monthly_commitment_template`, excludes paid state and note-specific
 IDs, and creates fresh unpaid commitments when applied.
 
@@ -272,7 +304,7 @@ fallback for non-navigation teardown. Normal note bodies are limited to 50,000
 characters; checklist items are limited to 500 characters and active checklists
 to 100 items, while legacy oversized checklists are preserved; reminder
 descriptions are limited to 5,000 characters; see
-[Note Character Limits](NOTE_LIMITS.md).
+[Note Character Limits](decisions/NOTE_LIMITS.md).
 
 All four editors also keep bounded, in-memory undo and redo history for the
 current editing session. Consecutive typing is grouped into short bursts, while

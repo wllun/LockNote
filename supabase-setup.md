@@ -107,7 +107,7 @@ The following limits were checked on **11 September 2026**. Review the [Supabase
 | Active projects | 2 | Enough for development and production, but leaves little room for a separate staging project. |
 | Database size | 500 MB per project | Suitable for development and a small beta, but not a large note-sync service. |
 | Monthly active users | 50,000 | More than enough for LockNote's initial authentication needs. |
-| File storage | 1 GB | Will become important when image attachments are implemented. |
+| File storage | 1 GB | Stores optimized inline-note images when signed-in attachment sync is used. LockNote's planned per-owner quota is larger, so the Free project is for development or a small beta only. |
 | Egress | 5 GB per month | Syncing notes and downloading attachments consumes this allowance. |
 | Edge Function invocations | 500,000 per month | Sharing-by-email and other server functions consume these calls. |
 | Realtime messages | 2 million per month | Shared-note collaboration consumes these messages. |

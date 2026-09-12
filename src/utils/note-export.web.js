@@ -12,6 +12,7 @@ import {
 } from './note-export.mjs';
 import { getExpenseCurrency } from './expense-record.mjs';
 import { formatReminderSchedule, normalizeReminder } from './reminder-note.mjs';
+import { buildInlineNoteBlocks, groupInlineNoteBlocks } from './note-attachment.mjs';
 
 const callBrowserMethod = (target, method, errorMessage, ...args) => {
   if (!target || typeof target[method] !== 'function') {
@@ -124,6 +125,46 @@ const wrapText = (context, text, maxWidth) => {
   return lines;
 };
 
+const loadCanvasImage = (uri) => new Promise((resolve) => {
+  if (!uri) return resolve(null);
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => resolve(null);
+  image.src = uri;
+});
+
+const drawContainedImage = (context, image, x, y, width, height) => {
+  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  context.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+};
+
+const createCanvasImageRowLayout = (blocks, availableWidth) => {
+  const gap = 18;
+  const items = [];
+  let cursorX = 0;
+  let cursorY = 0;
+  let lineHeight = 0;
+  for (const block of blocks) {
+    let imageWidth = Math.max(40, availableWidth * block.attachment.display_width_ratio - gap / 2);
+    let imageHeight = imageWidth * block.attachment.height / block.attachment.width;
+    if (imageHeight > 620) {
+      imageWidth *= 620 / imageHeight;
+      imageHeight = 620;
+    }
+    if (cursorX > 0 && cursorX + imageWidth > availableWidth) {
+      cursorY += lineHeight + gap;
+      cursorX = 0;
+      lineHeight = 0;
+    }
+    items.push({ ...block, x: cursorX, y: cursorY, imageWidth, imageHeight });
+    cursorX += imageWidth + gap;
+    lineHeight = Math.max(lineHeight, imageHeight);
+  }
+  return { items, rowHeight: cursorY + lineHeight };
+};
+
 export const exportNoteImage = async (_viewRef, data) => {
   data = data ?? {};
   const canvas = document.createElement('canvas');
@@ -140,11 +181,23 @@ export const exportNoteImage = async (_viewRef, data) => {
   const isChecklist = data.type === 'checklist' || Array.isArray(data.checklistItems);
   const isReminder = data.type === 'reminder';
   const checklistItems = getChecklistExportItems(data.checklistItems);
+  const attachmentRecords = (!isExpense && !isChecklist && !isReminder && Array.isArray(data.attachments))
+    ? data.attachments.filter((item) => item?.local_uri).slice(0, 20)
+    : [];
   const summaryNote = typeof data.summaryNote === 'string' ? data.summaryNote.trim() : '';
   const hasMonthlySummary = categories.length > 0 || summaryNote.length > 0;
   const contentLines = rows || isChecklist
     ? []
-    : wrapText(context, data.content || 'This note is empty.', width - padding * 2);
+    : wrapText(context, data.content || (attachmentRecords.length ? '' : 'This note is empty.'), width - padding * 2);
+  const plainLayout = groupInlineNoteBlocks(buildInlineNoteBlocks(data.content || '', attachmentRecords)).map((block) => {
+    if (block.type === 'text') {
+      return { ...block, lines: block.text ? wrapText(context, block.text, width - padding * 2) : [] };
+    }
+    return { ...block, ...createCanvasImageRowLayout(block.blocks, width - padding * 2) };
+  });
+  const plainHeight = plainLayout.reduce((sum, block) => (
+    sum + (block.type === 'image-row' ? block.rowHeight + 18 : block.lines.length * 46)
+  ), 0);
   const checklistLines = checklistItems.map((item) => ({
     ...item,
     lines: wrapText(context, item.text, width - padding * 2 - 70),
@@ -166,7 +219,7 @@ export const exportNoteImage = async (_viewRef, data) => {
       ? expenseHeight + commitmentHeight + summaryHeight + 120
       : isChecklist
         ? 250 + checklistLines.reduce((sum, item) => sum + Math.max(58, item.lines.length * 38 + 20), 0)
-        : 210 + contentLines.length * 46 + (isReminder ? 110 : 0)
+        : 210 + (isReminder ? contentLines.length * 46 + 110 : Math.max(46, plainHeight))
   );
   const preferredScale = 2;
   const maxScaleForMemory = Math.sqrt(24000000 / (width * height));
@@ -275,7 +328,33 @@ export const exportNoteImage = async (_viewRef, data) => {
       context.fillText(exportedReminder.enabled ? formatReminderSchedule(exportedReminder) : 'No notification scheduled', padding + 22, y + 40, width - padding * 2 - 44);
       y += 110; context.fillStyle = '#172033'; context.font = '32px sans-serif';
     }
-    contentLines.forEach((line) => { context.fillText(line, padding, y); y += 46; });
+    if (isReminder) {
+      contentLines.forEach((line) => { context.fillText(line, padding, y); y += 46; });
+    } else if (!data.content && !attachmentRecords.length) {
+      context.fillText('This note is empty.', padding, y);
+    } else {
+      for (const block of plainLayout) {
+        if (block.type === 'text') {
+          block.lines.forEach((line) => { context.fillText(line, padding, y); y += 46; });
+        } else {
+          const rowOffsetX = (width - (width - padding * 2)) / 2;
+          for (const imageBlock of block.items) {
+            const image = await loadCanvasImage(imageBlock.attachment.local_uri);
+            if (image) {
+              drawContainedImage(
+                context,
+                image,
+                rowOffsetX + imageBlock.x,
+                y + imageBlock.y,
+                imageBlock.imageWidth,
+                imageBlock.imageHeight
+              );
+            }
+          }
+          y += block.rowHeight + 18;
+        }
+      }
+    }
   }
   const download = await getCanvasDownload(canvas);
   const link = document.createElement('a');

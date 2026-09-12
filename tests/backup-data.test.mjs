@@ -217,7 +217,8 @@ test('backup service restores folders before notes in merge and replace modes', 
     applySyncSnapshot: async () => calls.push('merge-notes'),
     replaceBackupSnapshot: async () => calls.push('replace-notes'),
   };
-  const service = createBackupService({ folderRepo, noteRepo, fileAdapter: {} });
+  const attachmentRepo = { clearAll: async () => calls.push('clear-attachments') };
+  const service = createBackupService({ folderRepo, noteRepo, attachmentRepo, fileAdapter: {} });
   const document = makeDocument();
 
   await service.restoreBackup(document, 'merge');
@@ -225,6 +226,7 @@ test('backup service restores folders before notes in merge and replace modes', 
   assert.deepEqual(calls, [
     'merge-folders',
     'merge-notes',
+    'clear-attachments',
     'replace-folders',
     'replace-notes',
   ]);
