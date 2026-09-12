@@ -94,6 +94,7 @@ test('escapes note text and preserves line breaks in PDF HTML', () => {
   assert.match(html, /&lt;Personal &amp; private&gt;/);
   assert.match(html, /First line<br>&lt;script&gt;alert\(&quot;no&quot;\)&lt;\/script&gt;/);
   assert.doesNotMatch(html, /<script>alert/);
+  assert.doesNotMatch(html, /Exported from LockNote/);
 });
 
 test('renders plain-note image attachments in PDF HTML', () => {

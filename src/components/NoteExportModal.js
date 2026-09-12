@@ -299,7 +299,6 @@ const NoteExportModal = ({
                   {!content && !attachments.length && <Text style={styles.previewBody}>This note is empty.</Text>}
                 </>
               )}
-              <Text style={styles.brand}>Exported from LockNote</Text>
             </View>
           </ScrollView>
 
@@ -460,7 +459,6 @@ const makeStyles = (colors) => StyleSheet.create({
   summaryNoteCard: { marginTop: 18, padding: 14, borderLeftWidth: 4, borderLeftColor: '#5b67f1', backgroundColor: '#f6f7fb' },
   summaryNoteLabel: { color: '#30384c', fontSize: 11, fontWeight: '800', marginBottom: 5 },
   summaryNoteText: { color: '#30384c', fontSize: 12, lineHeight: 18 },
-  brand: { color: '#8a91a3', fontSize: 10, marginTop: 28 },
   actions: { gap: 10 },
   saveAction: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg },
   saveIcon: { width: 44, height: 44, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.primarySoft },
