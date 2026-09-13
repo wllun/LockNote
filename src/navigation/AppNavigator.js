@@ -20,6 +20,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 import ProfileTabScreen from '../screens/ProfileTabScreen';
 import SharedScreen from '../screens/SharedScreen';
 import PremiumScreen from '../screens/PremiumScreen';
+import LegalDocumentScreen from '../screens/LegalDocumentScreen';
 import TrashScreen from '../screens/TrashScreen';
 import ArchiveScreen from '../screens/ArchiveScreen';
 import PasswordModal from '../components/PasswordModal';
@@ -124,6 +125,16 @@ const PremiumStack = ({ screenOptions }) => (
       name="PremiumMain"
       component={PremiumScreen}
       options={{ title: 'Premium' }}
+    />
+    <Stack.Screen
+      name="PrivacyPolicy"
+      component={LegalDocumentScreen}
+      options={{ title: 'Privacy Policy' }}
+    />
+    <Stack.Screen
+      name="TermsOfService"
+      component={LegalDocumentScreen}
+      options={{ title: 'Terms of Service' }}
     />
   </Stack.Navigator>
 );

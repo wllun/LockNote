@@ -67,6 +67,11 @@ Supabase user UUID is also the RevenueCat App User ID, allowing the same purchas
 to be restored to the same LockNote account. `SubscriptionProvider` owns purchase
 state and account identity changes, while `subscriptionService` owns the SDK.
 The app does not gate features with that entitlement yet.
+The Premium footer opens Privacy Policy and Terms of Service routes inside the
+Premium stack. Their shared app copy lives in `src/content/legalDocuments.js`,
+so it remains readable offline. Matching static HTML copies under `docs/legal/`
+are ready for free GitHub Pages hosting and app-store metadata; keep both copies
+aligned whenever the wording changes.
 
 On Android, an in-app Plus-to-Pro purchase includes the active Plus product ID
 as Google Play replacement information and uses `WITH_TIME_PRORATION`. Google

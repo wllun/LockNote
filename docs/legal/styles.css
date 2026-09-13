@@ -1,0 +1,78 @@
+:root {
+  color-scheme: light dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f4f5fa;
+  color: #1a1d29;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #f4f5fa;
+  color: #1a1d29;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+a { color: #4338ca; }
+a:focus-visible { outline: 3px solid #4f46e5; outline-offset: 3px; }
+
+main {
+  width: min(100% - 32px, 760px);
+  margin: 0 auto;
+  padding: 32px 0 56px;
+}
+
+header, article {
+  background: #ffffff;
+  border: 1px solid #e8eaf0;
+  border-radius: 20px;
+}
+
+header { padding: 28px; }
+article { margin-top: 16px; padding: 4px 28px; }
+
+.brand {
+  margin: 0 0 12px;
+  color: #4f46e5;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+h1 { margin: 0; font-size: clamp(2rem, 7vw, 2.75rem); line-height: 1.15; }
+h2 { margin: 0 0 10px; font-size: 1.2rem; line-height: 1.35; }
+p, ul { margin: 10px 0 0; }
+ul { padding-left: 24px; }
+.updated { color: #6b7280; font-size: 0.9rem; }
+.summary { max-width: 62ch; font-weight: 600; }
+
+section { padding: 24px 0; }
+section + section { border-top: 1px solid #e8eaf0; }
+
+nav { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 16px; }
+nav a { min-height: 44px; display: inline-flex; align-items: center; font-weight: 700; }
+
+@media (max-width: 480px) {
+  main { width: min(100% - 24px, 760px); padding-top: 16px; }
+  header, article { border-radius: 16px; }
+  header { padding: 22px 20px; }
+  article { padding: 2px 20px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root, body { background: #151923; color: #f5f7fc; }
+  header, article { background: #1c2233; border-color: #353e54; }
+  section + section { border-color: #353e54; }
+  .updated { color: #acb4c8; }
+  a { color: #aab0ff; }
+}
+
+@media print {
+  :root, body { background: #fff; color: #000; }
+  main { width: 100%; padding: 0; }
+  header, article { border: 0; border-radius: 0; }
+  nav { display: none; }
+}
+

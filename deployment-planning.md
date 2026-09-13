@@ -58,6 +58,9 @@ Apple requires apps that support account creation to let users initiate account 
 - [ ] Configure production SMTP and branded authentication templates.
 - [ ] Implement account deletion and associated cloud-data cleanup.
 - [ ] Publish a privacy policy, terms of use, support page, and account-deletion webpage.
+  - Review and finalize the in-app wording in `src/content/legalDocuments.js`.
+  - Publish the matching files in `docs/legal/` with free GitHub Pages, then use those HTTPS URLs in App Store Connect, Google Play Console, and RevenueCat.
+  - Add the final public operator name and a monitored support contact before publishing.
 - [ ] Complete Google Play Data Safety and Apple privacy declarations accurately.
 - [ ] Configure RevenueCat, Google Play, and App Store products if subscriptions are included.
 - [ ] Prepare store name, descriptions, screenshots, icon, feature graphic, category, age rating, and support contact.

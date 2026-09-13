@@ -393,6 +393,25 @@ const PremiumScreen = ({ navigation }) => {
           Subscriptions renew automatically until cancelled. The payment provider confirms
           the final price and billing period before payment.
         </Text>
+
+        <View style={styles.legalLinks}>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Open Privacy Policy"
+            onPress={() => navigation.navigate('PrivacyPolicy')}
+            style={({ pressed }) => [styles.legalLink, pressed && styles.pressed]}
+          >
+            <Text style={styles.legalLinkText}>Privacy Policy</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Open Terms of Service"
+            onPress={() => navigation.navigate('TermsOfService')}
+            style={({ pressed }) => [styles.legalLink, pressed && styles.pressed]}
+          >
+            <Text style={styles.legalLinkText}>Terms of Service</Text>
+          </Pressable>
+        </View>
       </View>
     </ScrollView>
   );
@@ -781,6 +800,27 @@ const makeStyles = (colors) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 14,
     paddingHorizontal: 16,
+  },
+  legalLinks: {
+    minHeight: 52,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  legalLink: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  legalLinkText: {
+    color: colors.primary,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });
 
