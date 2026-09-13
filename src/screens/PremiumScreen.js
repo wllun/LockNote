@@ -21,7 +21,6 @@ import { useSubscription } from '../context/SubscriptionContext';
 import {
   FREE_PLAN_ID,
   getPurchaseErrorMessage,
-  getRenewalCopy,
   isPurchaseCancelled,
 } from '../utils/subscription.mjs';
 
@@ -32,7 +31,6 @@ const PremiumScreen = ({ navigation }) => {
   const useWideLayout = width >= 760;
   const { session } = useAuth();
   const {
-    activeEntitlement,
     activePlanId,
     configured,
     loading,
@@ -164,9 +162,9 @@ const PremiumScreen = ({ navigation }) => {
           </View>
           <Text style={styles.eyebrow}>LOCKNOTE PREMIUM</Text>
           <Text style={styles.heroTitle}>Choose what fits you</Text>
-          <Text style={styles.heroText}>
+          {/* <Text style={styles.heroText}>
             Your notes stay yours. Premium plans add cloud services and storage.
-          </Text>
+          </Text> */}
           <View style={styles.previewNotice}>
             {loading ? (
               <ActivityIndicator size="small" color={colors.primary} />
@@ -211,11 +209,6 @@ const PremiumScreen = ({ navigation }) => {
           </View>
           <View style={styles.currentCopy}>
             <Text style={styles.currentTitle}>{activePlan?.name ?? 'Free'}</Text>
-            <Text style={styles.currentText}>
-              {isPremium
-                ? getRenewalCopy(activeEntitlement)
-                : 'Offline features, account access and backup · RM 0'}
-            </Text>
           </View>
           <View style={styles.currentBadge}>
             <Text style={styles.currentBadgeText}>{isPremium ? 'Premium' : 'Current'}</Text>
@@ -535,12 +528,6 @@ const makeStyles = (colors) => StyleSheet.create({
     fontSize: 17,
     lineHeight: 23,
     fontWeight: '800',
-  },
-  currentText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 2,
   },
   currentBadge: {
     minHeight: 30,
