@@ -25,6 +25,80 @@ import { radius, shadow, useTheme } from '../theme';
 const DRAG_ACTIVATION_DELAY_MS = 1000;
 const SETTLE_SPRING = { duration: 400, dampingRatio: 0.8, reduceMotion: ReduceMotion.System };
 const IMAGE_ROW_GAP = 8;
+const PREVIEW_TEXT_VERTICAL_PADDING = 8;
+
+const getCharacterWidthWeight = (character) => {
+  if (/\s/u.test(character)) return 0.35;
+  if (/[ilI1.,'`:;|!]/u.test(character)) return 0.32;
+  if (/[mwMW@#%&]/u.test(character)) return 0.95;
+  if (/[A-Z0-9]/u.test(character)) return 0.65;
+  if ((character.codePointAt(0) || 0) > 0x02ff) return 1;
+  return 0.55;
+};
+
+const getLineCursorOffset = (lineText, horizontalRatio) => {
+  const characters = Array.from(lineText);
+  if (!characters.length || horizontalRatio <= 0) return 0;
+  if (horizontalRatio >= 1) return lineText.length;
+
+  const totalWeight = characters.reduce((sum, character) => sum + getCharacterWidthWeight(character), 0);
+  const targetWeight = horizontalRatio * totalWeight;
+  let traversedWeight = 0;
+  let stringOffset = 0;
+
+  for (const character of characters) {
+    const characterWeight = getCharacterWidthWeight(character);
+    if (targetWeight < traversedWeight + characterWeight / 2) return stringOffset;
+    traversedWeight += characterWeight;
+    stringOffset += character.length;
+  }
+  return lineText.length;
+};
+
+const getPreviewCursorOffset = (textValue, lines, tapX, tapY) => {
+  const text = String(textValue ?? '');
+  if (!text.length || !Array.isArray(lines) || !lines.length) return 0;
+
+  const normalizedX = Number.isFinite(tapX) ? tapX : 0;
+  const normalizedY = Number.isFinite(tapY) ? tapY : 0;
+  const firstLine = lines[0];
+  const lastLine = lines[lines.length - 1];
+  if (normalizedY < firstLine.y) return 0;
+  if (normalizedY > lastLine.y + lastLine.height) return text.length;
+
+  let selectedLineIndex = 0;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  lines.forEach((line, index) => {
+    const distance = Math.abs(normalizedY - (line.y + line.height / 2));
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      selectedLineIndex = index;
+    }
+  });
+
+  let searchOffset = 0;
+  let selectedLineStart = 0;
+  lines.forEach((line, index) => {
+    const lineText = String(line.text ?? '');
+    const foundOffset = lineText ? text.indexOf(lineText, searchOffset) : searchOffset;
+    const lineStart = foundOffset >= 0 ? foundOffset : searchOffset;
+    if (index === selectedLineIndex) selectedLineStart = lineStart;
+    searchOffset = Math.min(text.length, lineStart + lineText.length);
+    if (text[searchOffset] === '\r') searchOffset += 1;
+    if (text[searchOffset] === '\n') searchOffset += 1;
+  });
+
+  const selectedLine = lines[selectedLineIndex];
+  const selectedLineText = String(selectedLine.text ?? '').replace(/[\r\n]+$/u, '');
+  const lineWidth = Math.max(0, Number(selectedLine.width) || 0);
+  const horizontalRatio = lineWidth > 0
+    ? Math.max(0, Math.min(1, (normalizedX - (Number(selectedLine.x) || 0)) / lineWidth))
+    : 0;
+  return Math.min(
+    text.length,
+    selectedLineStart + getLineCursorOffset(selectedLineText, horizontalRatio)
+  );
+};
 
 const getTextDropAnchor = (block, relativeY) => {
   const text = String(block?.text ?? '');
@@ -225,7 +299,8 @@ const NoteAttachmentGallery = forwardRef(({
   const [selectedId, setSelectedId] = useState(null);
   const [inputHeights, setInputHeights] = useState({});
   const inputRefs = useRef(new Map());
-  const pendingFocusBlockIdRef = useRef(null);
+  const pendingTextFocusRef = useRef(null);
+  const previewTextLinesRef = useRef(new Map());
   const blockLayoutsRef = useRef(new Map());
   const blocks = useMemo(() => buildInlineNoteBlocks(content, attachments), [content, attachments]);
   const renderBlocks = useMemo(() => groupInlineNoteBlocks(blocks), [blocks]);
@@ -243,33 +318,67 @@ const NoteAttachmentGallery = forwardRef(({
   const selected = selectedIndex >= 0 ? orderedAttachments[selectedIndex] : null;
   const baseImageWidth = Math.max(112, Math.min(width - 40, 720) - IMAGE_ROW_GAP);
 
-  const requestTextEditing = useCallback((blockId) => {
-    if (readOnly) return;
-    pendingFocusBlockIdRef.current = blockId;
+  const placeTextCursor = useCallback((blockId, cursorOffset) => {
+    const input = inputRefs.current.get(blockId);
+    if (!input) return;
+    input.focus?.();
+    if (!Number.isInteger(cursorOffset)) return;
+    if (typeof input.setSelectionRange === 'function') {
+      input.setSelectionRange(cursorOffset, cursorOffset);
+      return;
+    }
+    input.setNativeProps?.({ selection: { start: cursorOffset, end: cursorOffset } });
+  }, []);
+
+  const requestTextEditing = useCallback((block, cursorOffset = null) => {
+    if (readOnly || !block) return;
+    const normalizedCursorOffset = Number.isInteger(cursorOffset)
+      ? Math.max(0, Math.min(block.text.length, cursorOffset))
+      : null;
+    pendingTextFocusRef.current = { blockId: block.id, cursorOffset: normalizedCursorOffset };
+    if (normalizedCursorOffset !== null) {
+      onSelectionChange?.(block, {
+        start: normalizedCursorOffset,
+        end: normalizedCursorOffset,
+      });
+    }
     if (editing) {
-      inputRefs.current.get(blockId)?.focus();
+      placeTextCursor(block.id, normalizedCursorOffset);
+      pendingTextFocusRef.current = null;
       return;
     }
     onRequestEdit?.();
-  }, [editing, onRequestEdit, readOnly]);
+  }, [editing, onRequestEdit, onSelectionChange, placeTextCursor, readOnly]);
+
+  const requestTextEditingAtPoint = useCallback((blockId, tapX, tapY) => {
+    const block = blocks.find((item) => item.id === blockId && item.type === 'text');
+    if (!block) return;
+    const cursorOffset = getPreviewCursorOffset(
+      block.text,
+      previewTextLinesRef.current.get(block.id),
+      tapX,
+      tapY - PREVIEW_TEXT_VERTICAL_PADDING
+    );
+    requestTextEditing(block, cursorOffset);
+  }, [blocks, requestTextEditing]);
 
   useImperativeHandle(ref, () => ({
     focus: () => {
       const firstTextBlock = blocks.find((block) => block.type === 'text');
-      if (firstTextBlock) requestTextEditing(firstTextBlock.id);
+      if (firstTextBlock) requestTextEditing(firstTextBlock, 0);
     },
   }), [blocks, requestTextEditing]);
 
   useEffect(() => {
     if (!editing || readOnly) return undefined;
-    const blockId = pendingFocusBlockIdRef.current;
-    if (!blockId) return undefined;
+    const pendingFocus = pendingTextFocusRef.current;
+    if (!pendingFocus) return undefined;
     const frame = requestAnimationFrame(() => {
-      inputRefs.current.get(blockId)?.focus();
-      pendingFocusBlockIdRef.current = null;
+      placeTextCursor(pendingFocus.blockId, pendingFocus.cursorOffset);
+      pendingTextFocusRef.current = null;
     });
     return () => cancelAnimationFrame(frame);
-  }, [editing, readOnly]);
+  }, [editing, placeTextCursor, readOnly]);
 
   useEffect(() => {
     if (selectedId && !attachments.some((item) => item.id === selectedId)) setSelectedId(null);
@@ -382,8 +491,8 @@ const NoteAttachmentGallery = forwardRef(({
               gesture={Gesture.Tap()
                 .enabled(!readOnly)
                 .numberOfTaps(2)
-                .onEnd((_event, success) => {
-                  if (success) scheduleOnRN(requestTextEditing, block.id);
+                .onEnd((event, success) => {
+                  if (success) scheduleOnRN(requestTextEditingAtPoint, block.id, event.x, event.y);
                 })}
             >
               <View
@@ -396,9 +505,14 @@ const NoteAttachmentGallery = forwardRef(({
                 accessibilityRole={readOnly ? 'text' : 'button'}
                 accessibilityLabel={block.text || 'Empty note'}
                 accessibilityHint={readOnly ? 'This shared note is view only' : 'Double-tap to edit this note'}
-                onAccessibilityTap={() => requestTextEditing(block.id)}
+                onAccessibilityTap={() => requestTextEditing(block, 0)}
               >
-                <Text style={[styles.previewText, readOnly && styles.readOnlyText]}>
+                <Text
+                  style={[styles.previewText, readOnly && styles.readOnlyText]}
+                  onTextLayout={(event) => {
+                    previewTextLinesRef.current.set(block.id, event.nativeEvent.lines);
+                  }}
+                >
                   {block.text || (blocks.length === 1 ? 'Start writing...' : '')}
                 </Text>
               </View>

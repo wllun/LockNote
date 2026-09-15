@@ -544,11 +544,13 @@ const ExpenseSummaryModal = ({
             <>
               <View style={styles.categoryActionHeader}>
                 <View style={styles.categoryActionHeading}>
-                  <Text style={styles.categoryActionTitle} numberOfLines={1}>
-                    {activeCategory?.name}
+                  <Text style={styles.categoryActionTitle} numberOfLines={2}>
+                    {activeCategory?.name}{' '}
+                    <Text style={styles.categoryActionAmount}>
+                      ({formatExpenseMoney(activeCategory?.amount ?? 0, currency)})
+                    </Text>
                   </Text>
-                  <Text style={styles.categoryActionAmount}>
-                    {formatExpenseMoney(activeCategory?.amount ?? 0, currency)} ·{' '}
+                  <Text style={styles.categoryActionMeta}>
                     {activeCategory?.match_count ?? 0}{' '}
                     {(activeCategory?.match_count ?? 0) === 1 ? 'transaction' : 'transactions'}
                   </Text>
@@ -627,11 +629,13 @@ const ExpenseSummaryModal = ({
             <View style={styles.categoryTransactions}>
               <View style={styles.categoryActionHeader}>
                 <View style={styles.categoryActionHeading}>
-                  <Text style={styles.categoryActionTitle} numberOfLines={1}>
-                    {activeCategory?.name}
+                  <Text style={styles.categoryActionTitle} numberOfLines={2}>
+                    {activeCategory?.name}{' '}
+                    <Text style={styles.categoryActionAmount}>
+                      ({formatExpenseMoney(activeCategory?.amount ?? 0, currency)})
+                    </Text>
                   </Text>
-                  <Text style={styles.categoryActionAmount}>
-                    {formatExpenseMoney(activeCategory?.amount ?? 0, currency)} ·{' '}
+                  <Text style={styles.categoryActionMeta}>
                     {activeCategoryMatches.length}{' '}
                     {activeCategoryMatches.length === 1 ? 'transaction' : 'transactions'}
                   </Text>
@@ -829,7 +833,8 @@ const makeStyles = (colors) =>
     categoryActionHeader: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 18, paddingRight: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
     categoryActionHeading: { flex: 1, minWidth: 0 },
     categoryActionTitle: { color: colors.text, fontSize: 18, lineHeight: 23, fontWeight: '800' },
-    categoryActionAmount: { marginTop: 2, color: colors.textSecondary, fontSize: 12, lineHeight: 17, fontVariant: ['tabular-nums'] },
+    categoryActionAmount: { color: colors.textSecondary, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] },
+    categoryActionMeta: { marginTop: 2, color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
     categoryActionClose: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full },
     categoryActionItem: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, backgroundColor: colors.card },
     categoryActionItemPressed: { backgroundColor: colors.inputBg },
