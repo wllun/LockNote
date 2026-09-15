@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import {
 } from '../utils/note-export-adapter';
 import {
   formatExportMoney,
-  formatExpenseCategoryPeriod,
+  formatExpenseCategoryPeriodForDate,
   getExpenseExportCategories,
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
@@ -52,8 +52,6 @@ const NoteExportModal = ({
   const previewRef = useRef(null);
   const [exporting, setExporting] = useState(null);
   const [showShareOptions, setShowShareOptions] = useState(false);
-  const [exportMonth, setExportMonth] = useState(String(new Date().getMonth() + 1));
-  const [exportYear, setExportYear] = useState(String(new Date().getFullYear()));
 
   useEffect(() => {
     if (!visible) setShowShareOptions(false);
@@ -62,7 +60,7 @@ const NoteExportModal = ({
   if (!visible) return null;
 
   const isCategoryExport = type === 'expense-category' && !!categoryExport;
-  const period = isCategoryExport ? formatExpenseCategoryPeriod(exportMonth, exportYear) : null;
+  const period = isCategoryExport ? formatExpenseCategoryPeriodForDate() : null;
 
   const exportData = {
     title,
@@ -113,10 +111,6 @@ const NoteExportModal = ({
   ];
 
   const runExport = async (format, destination = 'save') => {
-    if (isCategoryExport && !period) {
-      Alert.alert('Select a month and year', 'Enter a month from 1 to 12 and a four-digit year before exporting.');
-      return;
-    }
     const actionKey = `${destination}:${format}`;
     setExporting(actionKey);
     try {
@@ -167,34 +161,6 @@ const NoteExportModal = ({
             </Pressable>
           </View>
 
-          {isCategoryExport && (
-            <View style={styles.periodSection}>
-              <Text style={styles.periodExplanation}>Choose the month and year to show on the export. Expense rows store the day only.</Text>
-              <View style={styles.periodFields}>
-                <View style={styles.periodField}>
-                  <Text style={styles.periodLabel}>Month (1-12)</Text>
-                  <TextInput
-                    value={exportMonth}
-                    onChangeText={(value) => setExportMonth(value.replace(/\D/g, '').slice(0, 2))}
-                    keyboardType="number-pad"
-                    style={styles.periodInput}
-                    accessibilityLabel="Export month"
-                  />
-                </View>
-                <View style={styles.periodField}>
-                  <Text style={styles.periodLabel}>Year</Text>
-                  <TextInput
-                    value={exportYear}
-                    onChangeText={(value) => setExportYear(value.replace(/\D/g, '').slice(0, 4))}
-                    keyboardType="number-pad"
-                    style={styles.periodInput}
-                    accessibilityLabel="Export year"
-                  />
-                </View>
-              </View>
-            </View>
-          )}
-
           <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
             <View ref={previewRef} collapsable={false} style={styles.preview}>
               <Text style={styles.previewTitle}>
@@ -206,7 +172,7 @@ const NoteExportModal = ({
               <View style={styles.accent} />
               {isCategoryExport ? (
                 <View style={styles.categoryExpenses}>
-                  <Text style={styles.summaryTitle}>{period || 'Select a month and year'}</Text>
+                  <Text style={styles.summaryTitle}>{period}</Text>
                   {!!recordTitle && <Text style={styles.categorySource}>Expense record: {recordTitle}</Text>}
                   <View style={[styles.tableRow, styles.tableHeader]}>
                     <Text style={[styles.headerCell, styles.dateCell]}>Day</Text>
@@ -373,18 +339,18 @@ const NoteExportModal = ({
             {exportFormats.map((item) => (
               <Pressable
                 key={item.format}
-                disabled={!!exporting || (isCategoryExport && !period)}
+                disabled={!!exporting}
                 style={({ pressed }) => [
                   styles.saveAction,
                   pressed && styles.pressed,
-                  (exporting || (isCategoryExport && !period)) && styles.disabled,
+                  exporting && styles.disabled,
                 ]}
                 onPress={() => runExport(item.format)}
                 accessibilityRole="button"
                 accessibilityLabel={item.label}
                 accessibilityHint={item.accessibilityHint}
                 accessibilityState={{
-                  disabled: !!exporting || (isCategoryExport && !period),
+                  disabled: !!exporting,
                   busy: exporting === `save:${item.format}`,
                 }}
               >
@@ -409,18 +375,18 @@ const NoteExportModal = ({
             {Platform.OS !== 'web' && (
               <>
                 <Pressable
-                  disabled={!!exporting || (isCategoryExport && !period)}
+                  disabled={!!exporting}
                   style={({ pressed }) => [
                     styles.shareToggle,
                     pressed && styles.pressed,
-                    (exporting || (isCategoryExport && !period)) && styles.disabled,
+                    exporting && styles.disabled,
                   ]}
                   onPress={() => setShowShareOptions((current) => !current)}
                   accessibilityRole="button"
                   accessibilityLabel="Share instead"
                   accessibilityHint={showShareOptions ? 'Hides sharing options' : 'Shows PDF and image sharing options'}
                   accessibilityState={{
-                    disabled: !!exporting || (isCategoryExport && !period),
+                    disabled: !!exporting,
                     expanded: showShareOptions,
                   }}
                 >
@@ -438,18 +404,18 @@ const NoteExportModal = ({
                     {exportFormats.map((item) => (
                       <Pressable
                         key={`share:${item.format}`}
-                        disabled={!!exporting || (isCategoryExport && !period)}
+                        disabled={!!exporting}
                         style={({ pressed }) => [
                           styles.shareOption,
                           pressed && styles.pressed,
-                          (exporting || (isCategoryExport && !period)) && styles.disabled,
+                          exporting && styles.disabled,
                         ]}
                         onPress={() => runExport(item.format, 'share')}
                         accessibilityRole="button"
                         accessibilityLabel={`Share ${item.format === 'pdf' ? 'PDF' : 'image'}`}
                         accessibilityHint="Opens the system share menu"
                         accessibilityState={{
-                          disabled: !!exporting || (isCategoryExport && !period),
+                          disabled: !!exporting,
                           busy: exporting === `share:${item.format}`,
                         }}
                       >
@@ -483,12 +449,6 @@ const makeStyles = (colors) => StyleSheet.create({
   eyebrow: { color: colors.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   title: { color: colors.text, fontSize: 21, fontWeight: '800', marginTop: 2 },
   closeButton: { width: 48, height: 48, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.inputBg },
-  periodSection: { gap: 10 },
-  periodExplanation: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
-  periodFields: { flexDirection: 'row', gap: 12 },
-  periodField: { flex: 1, minWidth: 0, gap: 5 },
-  periodLabel: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
-  periodInput: { minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg, color: colors.text, fontSize: 16 },
   pressed: { opacity: 0.72 },
   previewScroll: { maxHeight: 430, flexShrink: 1, borderRadius: radius.md, backgroundColor: colors.background },
   previewScrollContent: { padding: 12 },

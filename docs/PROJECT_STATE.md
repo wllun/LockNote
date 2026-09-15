@@ -90,7 +90,7 @@ _Snapshot: 2026-08-31. Check off items as they land._
 
 ### Phase 4 — Export
 
-- [X] Export PDF & image - note and expense editors provide a preview, native Gallery/Documents saving, and optional sharing; web prints/saves PDF and downloads PNG locally. Expense exports include saved monthly categories, categorized total, and the shared summary note. A saved category's View transactions dialog can export its matching rows separately, with a selectable month/year shown in the preview, PDF/image, and filename (the rows themselves store day only).
+- [X] Export PDF & image - note and expense editors provide a preview, native Gallery/Documents saving, and optional sharing; web prints/saves PDF and downloads PNG locally. Expense exports include saved monthly categories, categorized total, and the shared summary note. A saved category's View transactions dialog can export its matching rows separately, with the device's current month/year automatically shown in the preview, PDF/image, and filename (the rows themselves store day only).
 - [X] Portable backup export and import/restore for folders, private/owned notes, password hashes, pinned state, note types, root-note relationships, and deletion tombstones, with a versioned format, validation, preview, and explicit merge/replace confirmation. Reminder notification registrations are intentionally device-local; imported reminders are disabled.
 
 ### Phase 5 — Structure (not premium)

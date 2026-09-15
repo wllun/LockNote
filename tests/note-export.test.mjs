@@ -4,6 +4,7 @@ import {
   addExportFileCollisionSuffix,
   buildNoteExportHtml,
   formatExpenseCategoryPeriod,
+  formatExpenseCategoryPeriodForDate,
   formatExportFileTimestamp,
   getExpenseExportCategories,
   getExpenseExportCategoryDescription,
@@ -145,9 +146,9 @@ test('renders expense rows and the calculated total in PDF HTML', () => {
   assert.match(html, /\$ 18\.50/);
 });
 
-test('labels a saved category export with its selected month and year', () => {
+test('labels a saved category export with the automatic local month and year', () => {
   const exportedAt = new Date(2026, 7, 16, 14, 30);
-  const period = formatExpenseCategoryPeriod('8', '2026');
+  const period = formatExpenseCategoryPeriodForDate(exportedAt);
   const html = buildNoteExportHtml({
     title: 'Food & drinks',
     type: 'expense-category',
@@ -161,6 +162,7 @@ test('labels a saved category export with its selected month and year', () => {
   });
 
   assert.equal(period, 'August 2026');
+  assert.equal(formatExpenseCategoryPeriod('8', '2026'), period);
   assert.equal(formatExpenseCategoryPeriod('13', '2026'), null);
   assert.equal(formatExpenseCategoryPeriod('8', '26'), null);
   assert.match(html, /August 2026/);

@@ -44,6 +44,9 @@ export const formatExpenseCategoryPeriod = (month, year) => {
   return `${new Date(2000, numericMonth - 1, 1).toLocaleString('en', { month: 'long' })} ${numericYear}`;
 };
 
+export const formatExpenseCategoryPeriodForDate = (date = new Date()) =>
+  formatExpenseCategoryPeriod(date.getMonth() + 1, date.getFullYear());
+
 const padDatePart = (value) => String(value).padStart(2, '0');
 
 export const formatExportFileTimestamp = (exportedAt = new Date()) => {
