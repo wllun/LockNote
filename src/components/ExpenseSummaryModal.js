@@ -700,19 +700,7 @@ const ExpenseSummaryModal = ({
 
               <View style={styles.categoryTransactionsFooter}>
                 <Pressable
-                  style={({ pressed }) => [
-                    styles.categoryTransactionsBackButton,
-                    pressed && styles.pressed,
-                  ]}
-                  onPress={() => setCategoryActionMode('actions')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Back to category actions"
-                >
-                  <Ionicons name="arrow-back" size={18} color={colors.primary} />
-                  <Text style={styles.categoryTransactionsBackText}>Back to actions</Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.categoryTransactionsBackButton, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.categoryTransactionsExportButton, pressed && styles.pressed]}
                   onPress={() => {
                     if (!activeCategory) return;
                     setCategoryExport({
@@ -727,7 +715,7 @@ const ExpenseSummaryModal = ({
                   accessibilityLabel={`Export transactions for ${activeCategory?.name ?? 'category'}`}
                 >
                   <Ionicons name="download-outline" size={18} color={colors.primary} />
-                  <Text style={styles.categoryTransactionsBackText}>Export</Text>
+                  <Text style={styles.categoryTransactionsExportText}>Export</Text>
                 </Pressable>
               </View>
             </View>
@@ -887,9 +875,9 @@ const makeStyles = (colors) =>
     categoryTransactionsEmpty: { alignItems: 'center', paddingHorizontal: 20, paddingVertical: 28, gap: 7, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, borderRadius: radius.md },
     categoryTransactionsEmptyTitle: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
     categoryTransactionsEmptyText: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, textAlign: 'center' },
-    categoryTransactionsFooter: { flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: colors.border },
-    categoryTransactionsBackButton: { flex: 1, minWidth: 0, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, backgroundColor: colors.card },
-    categoryTransactionsBackText: { color: colors.primary, fontSize: 14, lineHeight: 19, fontWeight: '800' },
+    categoryTransactionsFooter: { padding: 12, borderTopWidth: 1, borderTopColor: colors.border },
+    categoryTransactionsExportButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, backgroundColor: colors.card },
+    categoryTransactionsExportText: { color: colors.primary, fontSize: 14, lineHeight: 19, fontWeight: '800' },
     categoryDeleteConfirmation: { alignItems: 'center', padding: 24 },
     categoryDeleteConfirmationIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full, backgroundColor: colors.dangerSoft },
     categoryDeleteConfirmationTitle: { marginTop: 16, color: colors.text, fontSize: 20, lineHeight: 26, fontWeight: '800', textAlign: 'center' },
