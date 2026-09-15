@@ -2472,6 +2472,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           categories={categories}
           summaryNote={summaryNote}
           currency={currency}
+          recordTitle={title}
           saveStatus={saveStatus}
           onSave={handleSaveCategory}
           onDelete={handleDeleteCategory}

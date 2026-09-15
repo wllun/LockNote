@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import {
 } from '../utils/note-export-adapter';
 import {
   formatExportMoney,
+  formatExpenseCategoryPeriod,
   getExpenseExportCategories,
   getExpenseExportCategorizedTotal,
   getExpenseExportCategoryDescription,
@@ -42,6 +43,8 @@ const NoteExportModal = ({
   type = 'note',
   reminder,
   attachments = [],
+  categoryExport = null,
+  recordTitle = '',
 }) => {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
@@ -49,6 +52,8 @@ const NoteExportModal = ({
   const previewRef = useRef(null);
   const [exporting, setExporting] = useState(null);
   const [showShareOptions, setShowShareOptions] = useState(false);
+  const [exportMonth, setExportMonth] = useState(String(new Date().getMonth() + 1));
+  const [exportYear, setExportYear] = useState(String(new Date().getFullYear()));
 
   useEffect(() => {
     if (!visible) setShowShareOptions(false);
@@ -56,8 +61,15 @@ const NoteExportModal = ({
 
   if (!visible) return null;
 
+  const isCategoryExport = type === 'expense-category' && !!categoryExport;
+  const period = isCategoryExport ? formatExpenseCategoryPeriod(exportMonth, exportYear) : null;
+
   const exportData = {
     title,
+    categoryExport,
+    recordTitle,
+    period,
+    fileTitle: isCategoryExport ? `${title} - ${period}` : title,
     content,
     rows,
     total,
@@ -71,6 +83,7 @@ const NoteExportModal = ({
     attachments,
   };
   const visibleRows = getExpenseExportRows(rows);
+  const visibleCategoryRows = getExpenseExportRows(categoryExport?.rows);
   const visibleCategories = getExpenseExportCategories(categories);
   const visibleCommitments = getExpenseExportMonthlyCommitments(monthlyCommitments);
   const selectedCurrency = getExpenseCurrency(currency);
@@ -100,6 +113,10 @@ const NoteExportModal = ({
   ];
 
   const runExport = async (format, destination = 'save') => {
+    if (isCategoryExport && !period) {
+      Alert.alert('Select a month and year', 'Enter a month from 1 to 12 and a four-digit year before exporting.');
+      return;
+    }
     const actionKey = `${destination}:${format}`;
     setExporting(actionKey);
     try {
@@ -140,7 +157,7 @@ const NoteExportModal = ({
         >
           <View style={styles.header}>
             <View>
-              <Text style={styles.eyebrow}>EXPORT NOTE</Text>
+              <Text style={styles.eyebrow}>{isCategoryExport ? 'EXPORT TRANSACTIONS' : 'EXPORT NOTE'}</Text>
               <Text style={styles.title}>
                 {Platform.OS === 'web' ? 'Choose a format' : 'Save a copy'}
               </Text>
@@ -150,11 +167,61 @@ const NoteExportModal = ({
             </Pressable>
           </View>
 
+          {isCategoryExport && (
+            <View style={styles.periodSection}>
+              <Text style={styles.periodExplanation}>Choose the month and year to show on the export. Expense rows store the day only.</Text>
+              <View style={styles.periodFields}>
+                <View style={styles.periodField}>
+                  <Text style={styles.periodLabel}>Month (1-12)</Text>
+                  <TextInput
+                    value={exportMonth}
+                    onChangeText={(value) => setExportMonth(value.replace(/\D/g, '').slice(0, 2))}
+                    keyboardType="number-pad"
+                    style={styles.periodInput}
+                    accessibilityLabel="Export month"
+                  />
+                </View>
+                <View style={styles.periodField}>
+                  <Text style={styles.periodLabel}>Year</Text>
+                  <TextInput
+                    value={exportYear}
+                    onChangeText={(value) => setExportYear(value.replace(/\D/g, '').slice(0, 4))}
+                    keyboardType="number-pad"
+                    style={styles.periodInput}
+                    accessibilityLabel="Export year"
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
           <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
             <View ref={previewRef} collapsable={false} style={styles.preview}>
-              <Text style={styles.previewTitle}>{getExportTitle(title, type)}</Text>
+              <Text style={styles.previewTitle}>
+                {getExportTitle(title, type)}
+                {isCategoryExport && (
+                  <Text style={styles.previewCategoryAmount}> ({formatExportMoney(categoryExport.amount, currency)})</Text>
+                )}
+              </Text>
               <View style={styles.accent} />
-              {type === 'reminder' ? (
+              {isCategoryExport ? (
+                <View style={styles.categoryExpenses}>
+                  <Text style={styles.summaryTitle}>{period || 'Select a month and year'}</Text>
+                  {!!recordTitle && <Text style={styles.categorySource}>Expense record: {recordTitle}</Text>}
+                  <View style={[styles.tableRow, styles.tableHeader]}>
+                    <Text style={[styles.headerCell, styles.dateCell]}>Day</Text>
+                    <Text style={[styles.headerCell, styles.remarkCell]}>Remark</Text>
+                    <Text style={[styles.headerCell, styles.amountCell]}>{selectedCurrency.symbol}</Text>
+                  </View>
+                  {visibleCategoryRows.length ? visibleCategoryRows.map((row, index) => (
+                    <View key={row.id || index} style={[styles.tableRow, index % 2 === 0 && styles.altRow]}>
+                      <Text style={[styles.cell, styles.dateCell]}>{row.date || '-'}</Text>
+                      <Text style={[styles.cell, styles.remarkCell]}>{row.remark || 'No remark'}</Text>
+                      <Text style={[styles.cell, styles.amountCell]}>{row.amount || '0.00'}</Text>
+                    </View>
+                  )) : <Text style={styles.previewBody}>No matching transactions</Text>}
+                </View>
+              ) : type === 'reminder' ? (
                 <>
                   <View style={styles.reminderPreview}>
                     <View style={styles.reminderPreviewIcon}>
@@ -306,18 +373,18 @@ const NoteExportModal = ({
             {exportFormats.map((item) => (
               <Pressable
                 key={item.format}
-                disabled={!!exporting}
+                disabled={!!exporting || (isCategoryExport && !period)}
                 style={({ pressed }) => [
                   styles.saveAction,
                   pressed && styles.pressed,
-                  exporting && styles.disabled,
+                  (exporting || (isCategoryExport && !period)) && styles.disabled,
                 ]}
                 onPress={() => runExport(item.format)}
                 accessibilityRole="button"
                 accessibilityLabel={item.label}
                 accessibilityHint={item.accessibilityHint}
                 accessibilityState={{
-                  disabled: !!exporting,
+                  disabled: !!exporting || (isCategoryExport && !period),
                   busy: exporting === `save:${item.format}`,
                 }}
               >
@@ -342,18 +409,18 @@ const NoteExportModal = ({
             {Platform.OS !== 'web' && (
               <>
                 <Pressable
-                  disabled={!!exporting}
+                  disabled={!!exporting || (isCategoryExport && !period)}
                   style={({ pressed }) => [
                     styles.shareToggle,
                     pressed && styles.pressed,
-                    exporting && styles.disabled,
+                    (exporting || (isCategoryExport && !period)) && styles.disabled,
                   ]}
                   onPress={() => setShowShareOptions((current) => !current)}
                   accessibilityRole="button"
                   accessibilityLabel="Share instead"
                   accessibilityHint={showShareOptions ? 'Hides sharing options' : 'Shows PDF and image sharing options'}
                   accessibilityState={{
-                    disabled: !!exporting,
+                    disabled: !!exporting || (isCategoryExport && !period),
                     expanded: showShareOptions,
                   }}
                 >
@@ -371,18 +438,18 @@ const NoteExportModal = ({
                     {exportFormats.map((item) => (
                       <Pressable
                         key={`share:${item.format}`}
-                        disabled={!!exporting}
+                        disabled={!!exporting || (isCategoryExport && !period)}
                         style={({ pressed }) => [
                           styles.shareOption,
                           pressed && styles.pressed,
-                          exporting && styles.disabled,
+                          (exporting || (isCategoryExport && !period)) && styles.disabled,
                         ]}
                         onPress={() => runExport(item.format, 'share')}
                         accessibilityRole="button"
                         accessibilityLabel={`Share ${item.format === 'pdf' ? 'PDF' : 'image'}`}
                         accessibilityHint="Opens the system share menu"
                         accessibilityState={{
-                          disabled: !!exporting,
+                          disabled: !!exporting || (isCategoryExport && !period),
                           busy: exporting === `share:${item.format}`,
                         }}
                       >
@@ -416,11 +483,19 @@ const makeStyles = (colors) => StyleSheet.create({
   eyebrow: { color: colors.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   title: { color: colors.text, fontSize: 21, fontWeight: '800', marginTop: 2 },
   closeButton: { width: 48, height: 48, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.inputBg },
+  periodSection: { gap: 10 },
+  periodExplanation: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
+  periodFields: { flexDirection: 'row', gap: 12 },
+  periodField: { flex: 1, minWidth: 0, gap: 5 },
+  periodLabel: { color: colors.textSecondary, fontSize: 13, fontWeight: '700' },
+  periodInput: { minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.inputBg, color: colors.text, fontSize: 16 },
   pressed: { opacity: 0.72 },
   previewScroll: { maxHeight: 430, flexShrink: 1, borderRadius: radius.md, backgroundColor: colors.background },
   previewScrollContent: { padding: 12 },
   preview: { width: '100%', minHeight: 260, padding: 24, backgroundColor: '#ffffff', borderRadius: radius.md },
   previewTitle: { color: '#172033', fontSize: 24, lineHeight: 30, fontWeight: '800' },
+  previewCategoryAmount: { color: '#4854dc', fontSize: 19, lineHeight: 30, fontWeight: '800' },
+  categorySource: { color: '#687086', fontSize: 13, lineHeight: 18, marginBottom: 12 },
   accent: { height: 3, backgroundColor: '#5b67f1', borderRadius: radius.full, marginTop: 14, marginBottom: 20 },
   previewBody: { color: '#30384c', fontSize: 15, lineHeight: 23 },
   attachmentPreviewRow: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: 6, marginVertical: 10 },
@@ -444,6 +519,7 @@ const makeStyles = (colors) => StyleSheet.create({
   dateCell: { width: 64 }, remarkCell: { flex: 1 }, amountCell: { width: 92, textAlign: 'right' },
   total: { color: '#4854dc', textAlign: 'right', fontSize: 17, fontWeight: '800', marginTop: 18 },
   dailyExpenses: { marginTop: 28, paddingTop: 20, borderTopWidth: 2, borderTopColor: '#dfe3ee' },
+  categoryExpenses: { marginTop: 0 },
   monthlySummary: { marginTop: 28, paddingTop: 20, borderTopWidth: 2, borderTopColor: '#dfe3ee' },
   firstExpenseSection: { marginTop: 0, paddingTop: 0, borderTopWidth: 0 },
   summaryTitle: { color: '#172033', fontSize: 18, lineHeight: 23, fontWeight: '800', marginBottom: 10 },

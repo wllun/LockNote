@@ -23,7 +23,7 @@ const callBrowserMethod = (target, method, errorMessage, ...args) => {
 
 export const exportNotePdf = async (data) => {
   data = data ?? {};
-  const fileName = getExportFileName(data?.title, 'pdf', data?.type);
+  const fileName = getExportFileName(data?.fileTitle || data?.title, 'pdf', data?.type);
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     throw new Error('Allow pop-ups to print or save this note as a PDF.');
@@ -170,6 +170,62 @@ export const exportNoteImage = async (_viewRef, data) => {
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   if (!context) throw new Error('The browser could not create the export image.');
+  if (data?.type === 'expense-category' && data.categoryExport) {
+    const categoryRows = getExpenseExportRows(data.categoryExport.rows);
+    const width = 1080;
+    const padding = 72;
+    const currency = getExpenseCurrency(data.currency);
+    context.font = '28px sans-serif';
+    const rowLayouts = categoryRows.map((row) => ({
+      ...row,
+      lines: wrapText(context, row.remark || 'No remark', 470),
+    }));
+    const rowHeights = rowLayouts.map((row) => Math.max(68, row.lines.length * 38 + 22));
+    const height = Math.max(450, 360 + (data.recordTitle ? 36 : 0) + rowHeights.reduce((sum, value) => sum + value, 0));
+    const scale = Math.min(2, Math.sqrt(24000000 / (width * height)), 28000 / height);
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    context.scale(scale, scale);
+    context.fillStyle = '#ffffff'; context.fillRect(0, 0, width, height);
+    context.fillStyle = '#172033'; context.font = 'bold 48px sans-serif';
+    context.fillText(`${getExportTitle(data.title, data.type)} (${formatExportMoney(data.categoryExport.amount, currency.code)})`, padding, 90, width - padding * 2);
+    context.fillStyle = '#5b67f1'; context.fillRect(padding, 125, width - padding * 2, 4);
+    context.fillStyle = '#172033'; context.font = 'bold 34px sans-serif';
+    context.fillText(data.period || 'Period not selected', padding, 185);
+    let y = 218;
+    if (data.recordTitle) {
+      context.fillStyle = '#687086'; context.font = '22px sans-serif';
+      context.fillText(`Expense record: ${data.recordTitle}`, padding, y, width - padding * 2);
+      y += 36;
+    }
+    context.fillStyle = '#30384c'; context.font = 'bold 28px sans-serif';
+    context.fillText('Day', padding, y + 34);
+    context.fillText('Remark', 200, y + 34);
+    context.textAlign = 'right'; context.fillText(currency.symbol, width - padding, y + 34);
+    context.textAlign = 'left'; y += 58;
+    if (!rowLayouts.length) {
+      context.font = '26px sans-serif'; context.fillText('No matching transactions', padding, y + 30);
+      y += 68;
+    }
+    rowLayouts.forEach((row, index) => {
+      const rowHeight = rowHeights[index];
+      if (index % 2 === 0) {
+        context.fillStyle = '#f6f7fb'; context.fillRect(padding, y, width - padding * 2, rowHeight);
+      }
+      context.fillStyle = '#30384c'; context.font = '26px sans-serif';
+      context.fillText(row.date || '-', padding + 8, y + 35, 100);
+      row.lines.forEach((line, lineIndex) => context.fillText(line, 200, y + 35 + lineIndex * 38, 470));
+      context.textAlign = 'right'; context.fillText(row.amount || '0.00', width - padding - 8, y + 35);
+      context.textAlign = 'left'; y += rowHeight;
+    });
+    const download = await getCanvasDownload(canvas);
+    const link = document.createElement('a');
+    link.download = getExportFileName(data.fileTitle || data.title, 'png', data.type);
+    link.href = download.url;
+    clickDownloadLink(link);
+    if (download.release) window.setTimeout(download.release, 0);
+    return { canceled: false };
+  }
   const width = 1080;
   const padding = 72;
   context.font = '32px sans-serif';
@@ -358,7 +414,7 @@ export const exportNoteImage = async (_viewRef, data) => {
   }
   const download = await getCanvasDownload(canvas);
   const link = document.createElement('a');
-  link.download = getExportFileName(data?.title, 'png', data?.type);
+  link.download = getExportFileName(data?.fileTitle || data?.title, 'png', data?.type);
   link.href = download.url;
   clickDownloadLink(link);
   if (download.release) window.setTimeout(download.release, 0);

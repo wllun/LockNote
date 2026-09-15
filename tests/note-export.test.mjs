@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   addExportFileCollisionSuffix,
   buildNoteExportHtml,
+  formatExpenseCategoryPeriod,
   formatExportFileTimestamp,
   getExpenseExportCategories,
   getExpenseExportCategoryDescription,
@@ -142,6 +143,36 @@ test('renders expense rows and the calculated total in PDF HTML', () => {
   assert.match(html, /<table>/);
   assert.match(html, /Lunch &amp; coffee/);
   assert.match(html, /\$ 18\.50/);
+});
+
+test('labels a saved category export with its selected month and year', () => {
+  const exportedAt = new Date(2026, 7, 16, 14, 30);
+  const period = formatExpenseCategoryPeriod('8', '2026');
+  const html = buildNoteExportHtml({
+    title: 'Food & drinks',
+    type: 'expense-category',
+    period,
+    recordTitle: 'August <expenses>',
+    currency: 'MYR',
+    categoryExport: {
+      amount: 18.5,
+      rows: [{ date: '12', remark: 'Lunch & coffee', amount: '18.50' }],
+    },
+  });
+
+  assert.equal(period, 'August 2026');
+  assert.equal(formatExpenseCategoryPeriod('13', '2026'), null);
+  assert.equal(formatExpenseCategoryPeriod('8', '26'), null);
+  assert.match(html, /August 2026/);
+  assert.match(html, /Expense record: August &lt;expenses&gt;/);
+  assert.match(html, /Lunch &amp; coffee/);
+  assert.match(html, /Food &amp; drinks <span[^>]+>\(RM 18\.50\)<\/span>/);
+  assert.doesNotMatch(html, /Category total/);
+  assert.match(html, /RM 18\.50/);
+  assert.equal(
+    getExportFileName('Food & drinks - August 2026', 'pdf', 'expense-category', exportedAt),
+    'Food & drinks - August 2026 - Expense Category - 2026-08-16 1430.pdf'
+  );
 });
 
 test('renders monthly categories and the summary note in expense PDF HTML', () => {

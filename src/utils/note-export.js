@@ -90,7 +90,7 @@ const createNotePdf = async (data) => {
   }
   return copyToNamedCacheFile({
     uri: result.uri,
-    fileName: getExportFileName(data?.title, 'pdf', data?.type),
+    fileName: getExportFileName(data?.fileTitle || data?.title, 'pdf', data?.type),
     mimeType: 'application/pdf',
   });
 };
@@ -113,7 +113,7 @@ const createNoteImage = async (viewRef, data) => {
   }
   return copyToNamedCacheFile({
     uri,
-    fileName: getExportFileName(data?.title, 'png', data?.type),
+    fileName: getExportFileName(data?.fileTitle || data?.title, 'png', data?.type),
     mimeType: 'image/png',
   });
 };
