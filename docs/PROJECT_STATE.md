@@ -15,7 +15,7 @@ _Snapshot: 2026-08-31. Check off items as they land._
 - [X] Folder names can be renamed from Home actions or by tapping the editable title inside an open folder.
 - [X] Expense-note cards show the grand total of daily entries plus checked monthly commitments on Home, search results, and inside folders.
 - [X] Note, checklist, expense, and reminder editors provide session-based undo and redo for grouped text edits and individual editing actions, with restored state auto-saved normally and new edits clearing the redo stack.
-- [X] Plain-note bodies and reminder descriptions open in preview mode so scrolling does not place a cursor or open the keyboard. Double-tapping the content activates editing and focuses the selected text area; screen-reader activation remains supported.
+- [X] Existing plain-note bodies and reminder descriptions open in preview mode so scrolling does not place a cursor or open the keyboard. Double-tapping the content activates editing and focuses the selected text area; screen-reader activation remains supported. Newly created plain-note drafts instead open with an editable body, so a single tap can place the cursor without forcing the keyboard on creation.
 
 ## To do
 

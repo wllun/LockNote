@@ -78,7 +78,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [attachments, setAttachments] = useState([]);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
-  const [isContentEditing, setIsContentEditing] = useState(false);
+  const [isContentEditing, setIsContentEditing] = useState(isNewDraft && !shared);
   const saveTimeout = useRef(null);
   const loadCompletedRef = useRef(false);
   const contentEditorRef = useRef(null);
@@ -524,13 +524,13 @@ const NoteEditorScreen = ({ route, navigation }) => {
   useEffect(() => {
     loadCompletedRef.current = false;
     latest.current.noteId = noteId;
-    setIsContentEditing(false);
+    setIsContentEditing(isNewDraft && !shared);
     Keyboard.dismiss();
     loadNote();
     return () => {
       loadCompletedRef.current = false;
     };
-  }, [noteId]);
+  }, [noteId, isNewDraft, shared]);
 
   const needsExitCleanup = useCallback(() => {
     const { title, content, hasPassword, isPinned, color, backgroundUri, attachmentCount, cloudId, deleted } = latest.current;
