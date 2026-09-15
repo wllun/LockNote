@@ -51,20 +51,22 @@ const PremiumScreen = ({ navigation }) => {
     navigation.getParent()?.navigate('Profile');
   };
 
-  const requireAccount = () => {
+  const requireAccount = (action) => {
     Alert.alert(
-      'Sign in to subscribe',
-      'Use a free LockNote account so your subscription can be restored on your other devices.',
+      'Sign in required',
+      action === 'restore'
+        ? 'Sign in to restore your purchases.'
+        : 'Sign in to choose a Premium plan.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign In', onPress: openProfile },
+        { text: 'Sign in', onPress: openProfile },
       ]
     );
   };
 
   const handlePlanPress = async (plan) => {
     if (!session) {
-      requireAccount();
+      requireAccount('subscribe');
       return;
     }
     const isUpgrade = activePlanId === 'plus' && plan.id === 'pro';
@@ -99,7 +101,7 @@ const PremiumScreen = ({ navigation }) => {
 
   const handleRestore = async () => {
     if (!session) {
-      requireAccount();
+      requireAccount('restore');
       return;
     }
     if (!configured) {

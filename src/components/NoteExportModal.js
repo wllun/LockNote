@@ -85,7 +85,7 @@ const NoteExportModal = ({
       format: 'pdf',
       icon: 'document-text-outline',
       label: Platform.OS === 'web' ? 'Print / save PDF' : 'Save as PDF',
-      description: Platform.OS === 'web'
+      accessibilityHint: Platform.OS === 'web'
         ? 'Open the print or PDF save dialog'
         : 'Choose a folder in Documents',
     },
@@ -93,7 +93,7 @@ const NoteExportModal = ({
       format: 'image',
       icon: 'image-outline',
       label: Platform.OS === 'web' ? 'Download image' : 'Save as image',
-      description: Platform.OS === 'web'
+      accessibilityHint: Platform.OS === 'web'
         ? 'Download a clear PNG file'
         : 'Add a clear PNG to Gallery',
     },
@@ -315,7 +315,7 @@ const NoteExportModal = ({
                 onPress={() => runExport(item.format)}
                 accessibilityRole="button"
                 accessibilityLabel={item.label}
-                accessibilityHint={item.description}
+                accessibilityHint={item.accessibilityHint}
                 accessibilityState={{
                   disabled: !!exporting,
                   busy: exporting === `save:${item.format}`,
@@ -332,7 +332,6 @@ const NoteExportModal = ({
                   <Text style={styles.saveTitle}>
                     {exporting === `save:${item.format}` ? 'Preparing...' : item.label}
                   </Text>
-                  <Text style={styles.saveDescription}>{item.description}</Text>
                 </View>
                 {exporting !== `save:${item.format}` && (
                   <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
@@ -464,7 +463,6 @@ const makeStyles = (colors) => StyleSheet.create({
   saveIcon: { width: 44, height: 44, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.primarySoft },
   saveCopy: { flex: 1, minWidth: 0 },
   saveTitle: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: '800' },
-  saveDescription: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 },
   shareToggle: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: radius.md },
   shareToggleText: { color: colors.primary, fontSize: 14, fontWeight: '800' },
   shareOptions: { flexDirection: 'row', gap: 10 },

@@ -35,7 +35,7 @@ export const PREMIUM_PLANS = [
 
 export const FREE_FEATURES = [
   'Notes, checklists, expenses and reminders',
-  'Account login and cloud recovery access',
+  'Account sign-in and cloud recovery access',
   'Folders, search, pinning and note colors',
   'Archive, Trash and local password locks',
   'PDF, image and local backup import or export',

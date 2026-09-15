@@ -111,7 +111,7 @@ const SharedScreen = ({ navigation }) => {
           <Ionicons name="people-outline" size={34} color={colors.primary} />
         </View>
         <Text style={styles.emptyTitle}>Shared with me</Text>
-        <Text style={styles.emptyText}>Please log in to your account.</Text>
+        <Text style={styles.emptyText}>Sign in to your account.</Text>
       </View>
     );
   }
