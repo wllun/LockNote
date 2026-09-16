@@ -80,12 +80,12 @@ handles the same upgrade through the products' shared subscription group and
 service-level ranking. LockNote never calculates or displays an estimated
 proration amount; the platform purchase sheet provides the authoritative price.
 
-Account login, local portable backup, and one-way recovery of existing cloud data
-are Free capabilities. LockNote Plus adds active
-cloud note sync, multi-device use, and owner-funded collaboration with a 100 MB
-cloud note quota. Inline image attachments are implemented locally and in the
-optional cloud path; LockNote Pro entitlement gating and its 2 GB cloud
-attachment quota remain planned.
+Account login, local portable backup, manual multi-device sync, and a 25 MB
+cloud quota are Free capabilities. LockNote Plus adds PDF/image export,
+owner-funded collaboration, planned automatic sync, and a 75 MB cloud quota.
+LockNote Pro includes every Plus capability and adds image attachments, note
+backgrounds, nested folders, and a 750 MB combined note-and-image quota.
+Entitlement gating and plan-aware quota enforcement remain planned.
 
 Expiry must downgrade the account to Free without deleting local or cloud note
 data. Local editing continues, while new cloud writes, two-way sync, and
@@ -199,7 +199,9 @@ service uploads optimized JPEGs to the private Supabase `note-attachments`
 bucket and stores access-controlled metadata in `public.note_attachments`.
 Opening a note reconciles missing local/cloud copies; shared-note access follows
 the note's Viewer/Editor role. The server migration enforces 20 images per note,
-files below 1 MB, and a 2 GB owner-funded quota. Deploy attachment migrations
+files below 1 MB, and a legacy 2 GB owner-funded technical cap. The subscription
+policy now targets a plan-aware 750 MB combined Pro quota, so a follow-up server
+quota migration is still required. Deploy attachment migrations
 through `202609120003_attachment_display_layout.sql` so shared image dimensions
 and drag order reconcile correctly. Portable JSON backups continue to exclude
 binary attachments.
@@ -363,10 +365,10 @@ stored per account in AsyncStorage.
 LockNote does not end-to-end encrypt note content before upload. Password fields
 remain SHA-256 access-gate hashes; they are never uploaded as plaintext.
 
-The current sync implementation does not yet check subscription entitlement or
-the planned 100 MB cloud-note quota. Those checks must be server-authoritative;
-an expired or over-quota account must retain one-way recovery access while new
-cloud writes are rejected.
+The current sync implementation does not yet apply the plan-aware 25 MB Free,
+75 MB Plus, or 750 MB Pro cloud quotas. Those checks must be server-authoritative;
+an expired or over-quota account must retain recovery access while new cloud
+writes above the applicable limit are rejected.
 
 ## Portable backup and restore
 

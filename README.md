@@ -54,10 +54,11 @@ disabled on restore.
 
 ## Planned subscriptions
 
-Account login, offline features, PDF/image export, and portable local backup
-remain Free. LockNote Plus is planned to add cloud sync and collaboration with a
-100 MB cloud-note quota. Inline image attachments are implemented, while their
-planned LockNote Pro gating and 2 GB cloud-attachment quota are not yet enforced.
+Account login, offline features, portable local backup, and manual sync within a
+25 MB cloud quota remain Free. LockNote Plus is planned to add PDF/image export,
+collaboration, automatic sync, and a 75 MB cloud quota. LockNote Pro adds a
+750 MB combined note-and-image quota, image attachments, note backgrounds, and
+nested folders. Premium gating and plan-aware quota enforcement are not yet implemented.
 If a paid plan expires, local notes remain editable and
 existing cloud data remains read-only and downloadable; expiry never deletes
 notes.

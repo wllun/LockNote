@@ -6,12 +6,11 @@ export const PREMIUM_PLANS = [
     name: 'LockNote Plus',
     price: 'RM 4.90',
     period: 'per month',
-    description: 'Keep your notes available across your devices and work with others.',
+    description: 'Export your notes and work with others.',
     badge: 'Most popular',
     features: [
-      '100 MB cloud note storage',
-      'Manual cloud sync',
-      'Use notes across devices',
+      '75 MB cloud storage (about 1,000 long notes)',
+      'PDF and image export',
       'Share and edit notes together',
       'Automatic background sync (planned)',
     ],
@@ -23,22 +22,24 @@ export const PREMIUM_PLANS = [
     name: 'LockNote Pro',
     price: 'RM 9.99',
     period: 'per month',
-    description: 'Everything in LockNote Plus, plus richer ways to personalize your notes.',
+    description: 'Everything in LockNote Plus, plus richer notes and organization.',
     features: [
       'Everything in LockNote Plus',
-      '2 GB cloud attachment storage',
-      'Image attachments (planned)',
-      'Custom note backgrounds (planned)',
+      '750 MB cloud storage for notes and images',
+      'Image attachments',
+      'Custom note backgrounds',
+      'Nested folders',
     ],
   },
 ];
 
 export const FREE_FEATURES = [
   'Notes, checklists, expenses and reminders',
-  'Account sign-in and cloud recovery access',
+  '25 MB cloud storage and manual sync',
+  'Use notes across devices',
   'Folders, search, pinning and note colors',
   'Archive, Trash and local password locks',
-  'PDF, image and local backup import or export',
+  'Portable backup import and export',
 ];
 
 export const EXPIRED_PLAN_BEHAVIOR = [

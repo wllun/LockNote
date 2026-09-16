@@ -13,8 +13,8 @@ not implemented yet.
 - Users pay for ongoing cloud services and storage, not ownership of their notes.
 - Ending a subscription never deletes local notes or automatically deletes the
   account's existing cloud note data.
-- Account login, local backup, and recovery access to existing cloud data remain
-  available on the Free plan.
+- Account login, manual multi-device sync within a 25 MB cloud quota, local
+  backup, and recovery access remain available on the Free plan.
 - A portable backup is a local JSON file selected by the user. It does not consume
   LockNote server storage and remains free.
 
@@ -25,17 +25,20 @@ not implemented yet.
 | Proposed monthly price | RM 0 | RM 4.90 | RM 9.99 |
 | Core offline notes and folders | Yes | Yes | Yes |
 | Search, note colors, Archive, Trash and locks | Yes | Yes | Yes |
-| PDF and image export | Yes | Yes | Yes |
+| PDF and image export | No | Yes | Yes |
 | Local backup import and export | Yes | Yes | Yes |
 | Account login | Yes | Yes | Yes |
 | Download or restore existing cloud data | Yes | Yes | Yes |
-| Cloud note sync | No | Yes | Yes |
-| Cloud note storage quota | None | 100 MB | 100 MB |
-| Multi-device use | No | Yes | Yes |
+| Manual cloud sync | Yes | Yes | Yes |
+| Automatic background sync | No | Planned | Planned |
+| Cloud storage quota | 25 MB | 75 MB | 750 MB |
+| Approximate long-note capacity | 300 | 1,000 | 10,000 text notes; fewer with images |
+| Multi-device use | Yes | Yes | Yes |
 | Share notes and collaborate | No | Yes | Yes |
 | Inline image attachments | No | No | Yes (implemented; gating pending) |
-| Custom note backgrounds | No | No | Planned |
-| Cloud attachment storage | None | None | 2 GB (gating pending) |
+| Custom note backgrounds | No | No | Yes (implemented; gating pending) |
+| Nested folders | No | No | Yes (implemented; gating pending) |
+| Image attachment storage | None | None | Included in the 750 MB Pro quota |
 
 LockNote Plus or Pro is required for the owner to create or actively synchronize
 a shared note. An invited person only needs a free LockNote account and follows
@@ -52,7 +55,8 @@ After the paid period expires:
 
 - The account returns to Free.
 - All local notes remain available and editable.
-- New cloud uploads, two-way sync, and owner-funded collaboration pause.
+- New cloud writes above the 25 MB Free quota, automatic sync, and
+  owner-funded collaboration pause.
 - Existing cloud note data remains read-only and available for download or
   one-way recovery.
 - Existing shared notes remain readable, but remote edits and new invitations
@@ -68,7 +72,8 @@ separate explicit actions.
 
 ## Storage Controls
 
-- Enforce cloud quotas on the server rather than trusting the client.
+- Enforce the 25 MB, 75 MB, and 750 MB cloud quotas on the server rather than
+  trusting the client.
 - Store note and folder records in the database; store attachment files in object
   storage rather than database rows.
 - Reject new cloud writes when an account is over quota without blocking local
@@ -77,6 +82,10 @@ separate explicit actions.
   JPEG is strictly below 1 MB. Allow up to 20 cursor-positioned images per plain
   note, with the inline order preserved during sync and export.
 - Exclude local portable backups from all cloud quota calculations.
+- Count note and folder records toward every plan's quota. For Pro, count image
+  attachment objects and metadata within the same 750 MB total.
+- Treat the displayed note counts as conservative estimates, not guarantees;
+  Pro capacity is lower when the user stores image attachments.
 - Show current usage, the plan limit, and a clear over-quota recovery action in
   the Premium module before enforcement is enabled.
 

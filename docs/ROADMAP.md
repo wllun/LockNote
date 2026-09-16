@@ -8,7 +8,7 @@ This file describes the product direction and major delivery phases. For detaile
 
 - LockNote remains offline-first: local storage is authoritative while editing, and core note features work without an account.
 - Cloud features are opt-in. Private data is uploaded only when a signed-in user runs Sync Notes; shared notes use the collaboration backend.
-- Account login, local portable backup, and recovery downloads remain Free. LockNote Plus targets active cloud sync and collaboration with 100 MB of cloud note storage. Inline image attachments are implemented; LockNote Pro gating and its 2 GB cloud attachment quota remain pending.
+- Account login, local portable backup, manual multi-device sync, and 25 MB of cloud storage remain Free. LockNote Plus targets export, collaboration, automatic sync, and 75 MB of cloud storage. LockNote Pro targets 750 MB of combined note-and-image storage plus image attachments, note backgrounds, and nested folders.
 - LockNote Plus and LockNote Pro checkout is implemented through RevenueCat, with actual localized prices supplied by the configured stores. Store products, public SDK keys, and production payment testing still require external setup. Feature gating, quota enforcement, and server-side downgrade handling are not implemented.
 - Subscription expiry must not delete notes. Local editing continues while cloud writes pause and existing cloud data remains read-only and downloadable.
 - Password protection is an access gate, not encryption. Local and synchronized note content is not end-to-end encrypted.
@@ -62,14 +62,14 @@ This file describes the product direction and major delivery phases. For detaile
 - [ ] Add queued offline retries and serialize automatic sync with manual sync and pending editor saves.
 - [ ] Add best-effort OS background sync only after foreground synchronization is reliable.
 - [ ] Show clear last-success and retry/error state for automatic synchronization.
-- [ ] Implement and validate LockNote Plus entitlement, the 100 MB note quota, read-only expiry recovery, and owner-funded collaboration.
+- [ ] Implement and validate the 25 MB Free, 75 MB Plus, and 750 MB Pro quotas, read-only over-quota recovery, and owner-funded collaboration.
 
 ## Phase 3 — Attachments — implemented, Pro gating pending
 
 - [X] Add up to 20 images to plain notes at the current text cursor, with text continuing below each image.
 - [X] Accept source images up to 5 MB and resize/compress saved JPEGs to strictly below 1 MB.
 - [X] Implement native/web local storage, cursor-anchor persistence, one-second long-press drag/drop, proportional display resizing, inline Undo/Redo and export rendering, cloud upload/download reconciliation, shared-note role checks, and local deletion cleanup.
-- [X] Enforce the 20-image and 2 GB owner-funded cloud limits in the Supabase migration; local JSON backup remains separate and excludes binary media.
+- [X] Enforce the 20-image and legacy 2 GB owner-funded technical cap in the Supabase migration; replace it with the plan-aware 750 MB combined Pro quota before enabling entitlement enforcement. Local JSON backup remains separate and excludes binary media.
 - [X] Queue offline cloud-image deletions and retry them on the next signed-in attachment sync.
 - [X] Add a follow-up migration that upgrades already-deployed gallery metadata to inline character-offset anchors.
 - [X] Add a follow-up migration for synchronized proportional image display widths.
