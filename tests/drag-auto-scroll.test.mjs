@@ -21,20 +21,44 @@ test('ramps auto-scroll speed as the pointer approaches an edge', () => {
   assert.equal(getDragAutoScrollVelocity({ pointerY: -20, ...options }), -800);
 });
 
-test('uses the dragged row edges to begin scrolling before the finger reaches an edge', () => {
+test('row edges cannot scroll while the finger is outside the edge zones', () => {
   const viewport = { viewportTop: 100, viewportHeight: 500, edgeSize: 120, maxSpeed: 900 };
-  assert.ok(getDragAutoScrollVelocity({
+  assert.equal(getDragAutoScrollVelocity({
     pointerY: 250,
     draggedTopY: 180,
     draggedBottomY: 240,
     ...viewport,
-  }) < 0);
-  assert.ok(getDragAutoScrollVelocity({
+  }), 0);
+  assert.equal(getDragAutoScrollVelocity({
     pointerY: 450,
     draggedTopY: 430,
     draggedBottomY: 540,
     ...viewport,
-  }) > 0);
+  }), 0);
+});
+
+test('a tall row cannot force downward scrolling when the finger is at the top', () => {
+  assert.ok(getDragAutoScrollVelocity({
+    pointerY: 130,
+    draggedTopY: 110,
+    draggedBottomY: 900,
+    viewportTop: 100,
+    viewportHeight: 500,
+  }) < 0);
+});
+
+test('does not scroll without a pointer or a measured viewport', () => {
+  assert.equal(getDragAutoScrollVelocity({
+    draggedTopY: 100,
+    draggedBottomY: 600,
+    viewportTop: 100,
+    viewportHeight: 500,
+  }), 0);
+  assert.equal(getDragAutoScrollVelocity({
+    pointerY: 590,
+    viewportTop: Number.NaN,
+    viewportHeight: 500,
+  }), 0);
 });
 
 test('provides useful speed shortly after entering an edge zone', () => {

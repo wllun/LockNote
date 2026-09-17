@@ -674,14 +674,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.itemId !== itemId) return;
     const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
-    const draggedHeight = itemHeightsRef.current[itemId] ?? CHECKLIST_ITEM_MIN_HEIGHT;
-    const draggedTopY = absoluteY - DRAG_PREVIEW_POINTER_OFFSET;
     dragTranslationYRef.current = translationY;
     dragAbsoluteXRef.current = absoluteX;
     dragAutoScroll.updateAutoScrollPointer(absoluteY, {
       blocked: overDelete,
-      draggedTopY,
-      draggedBottomY: draggedTopY + draggedHeight,
     });
     const effectiveTranslationY = dragAutoScroll.getEffectiveTranslation(translationY);
     applyChecklistDragPosition(

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
   clampDragScrollOffset,
+  DRAG_AUTO_SCROLL_ENTRY_DELAY_MS,
   getDragAutoScrollVelocity,
   getEffectiveDragTranslation,
 } from './drag-auto-scroll.mjs';
@@ -13,8 +14,10 @@ export const useDragAutoScroll = ({
   const activeRef = useRef(false);
   const blockedRef = useRef(false);
   const pointerYRef = useRef(Number.NaN);
-  const draggedBoundsRef = useRef({ top: Number.NaN, bottom: Number.NaN });
-  const viewportRef = useRef({ top: 0, height: 0 });
+  const viewportRef = useRef({ top: Number.NaN, height: 0 });
+  const viewportReadyRef = useRef(false);
+  const measurementVersionRef = useRef(0);
+  const edgeEntryRef = useRef({ direction: 0, timestamp: 0 });
   const contentHeightRef = useRef(0);
   const scrollOffsetRef = useRef(0);
   const dragStartOffsetRef = useRef(0);
@@ -24,17 +27,29 @@ export const useDragAutoScroll = ({
   onAutoScrollRef.current = onAutoScroll;
 
   const refreshViewportBounds = useCallback(() => {
-    const node = scrollRef.current;
+    const version = ++measurementVersionRef.current;
+    viewportReadyRef.current = false;
+    edgeEntryRef.current.direction = 0;
     requestAnimationFrame(() => {
+      if (version !== measurementVersionRef.current) return;
+      const list = scrollRef.current;
+      // FlatList is a composite wrapper; measure its actual scroll viewport.
+      const node = list?.getNativeScrollRef?.() ?? list;
+      const storeBounds = (top, height) => {
+        if (version !== measurementVersionRef.current ||
+          !Number.isFinite(top) || !Number.isFinite(height) || height <= 0) return;
+        viewportRef.current = { top, height };
+        viewportReadyRef.current = true;
+      };
       if (typeof node?.measureInWindow === 'function') {
         node.measureInWindow((_x, y, _width, height) => {
-          viewportRef.current = { top: y, height };
+          storeBounds(y, height);
         });
         return;
       }
       if (typeof node?.getBoundingClientRect === 'function') {
         const bounds = node.getBoundingClientRect();
-        viewportRef.current = { top: bounds.top, height: bounds.height };
+        storeBounds(bounds.top, bounds.height);
       }
     });
   }, [scrollRef]);
@@ -55,15 +70,17 @@ export const useDragAutoScroll = ({
     const elapsedSeconds = Math.min(0.034, Math.max(0, timestamp - previousTime) / 1000);
     previousFrameTimeRef.current = timestamp;
 
-    if (!blockedRef.current) {
+    if (!blockedRef.current && viewportReadyRef.current) {
       const velocity = getDragAutoScrollVelocity({
         pointerY: pointerYRef.current,
-        draggedTopY: draggedBoundsRef.current.top,
-        draggedBottomY: draggedBoundsRef.current.bottom,
         viewportTop: viewportRef.current.top,
         viewportHeight: viewportRef.current.height,
       });
-      if (velocity !== 0) {
+      const direction = Math.sign(velocity);
+      if (direction !== edgeEntryRef.current.direction) {
+        edgeEntryRef.current = { direction, timestamp };
+      }
+      if (direction !== 0 && timestamp - edgeEntryRef.current.timestamp >= DRAG_AUTO_SCROLL_ENTRY_DELAY_MS) {
         const nextOffset = clampDragScrollOffset(
           scrollOffsetRef.current + velocity * elapsedSeconds,
           contentHeightRef.current,
@@ -79,6 +96,8 @@ export const useDragAutoScroll = ({
           });
         }
       }
+    } else {
+      edgeEntryRef.current.direction = 0;
     }
     animationFrameRef.current = requestAnimationFrame((time) => tickRef.current?.(time));
   };
@@ -90,7 +109,7 @@ export const useDragAutoScroll = ({
     activeRef.current = true;
     blockedRef.current = false;
     pointerYRef.current = Number.NaN;
-    draggedBoundsRef.current = { top: Number.NaN, bottom: Number.NaN };
+    edgeEntryRef.current.direction = 0;
     dragStartOffsetRef.current = scrollOffsetRef.current;
     previousFrameTimeRef.current = null;
     refreshViewportBounds();
@@ -101,7 +120,8 @@ export const useDragAutoScroll = ({
     activeRef.current = false;
     blockedRef.current = false;
     pointerYRef.current = Number.NaN;
-    draggedBoundsRef.current = { top: Number.NaN, bottom: Number.NaN };
+    edgeEntryRef.current.direction = 0;
+    measurementVersionRef.current += 1;
     previousFrameTimeRef.current = null;
     if (animationFrameRef.current !== null) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -111,11 +131,8 @@ export const useDragAutoScroll = ({
 
   const updateAutoScrollPointer = useCallback((absoluteY, {
     blocked = false,
-    draggedTopY = Number.NaN,
-    draggedBottomY = Number.NaN,
   } = {}) => {
     pointerYRef.current = absoluteY;
-    draggedBoundsRef.current = { top: draggedTopY, bottom: draggedBottomY };
     blockedRef.current = blocked;
   }, []);
 

@@ -1479,16 +1479,10 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     const currentDrag = activeDragRef.current;
     if (!currentDrag || currentDrag.rowId !== rowId) return;
     const overDelete = isPointOverDeleteTarget(absoluteX, absoluteY);
-    const draggedHeight = currentDrag.kind === 'commitment'
-      ? dragRowLayoutsRef.current[rowId]?.height ?? MONTHLY_COMMITMENT_MIN_HEIGHT
-      : rowHeightsRef.current[rowId] ?? EXPENSE_ROW_MIN_HEIGHT;
-    const draggedTopY = absoluteY - DRAG_PREVIEW_POINTER_OFFSET;
     dragTranslationYRef.current = translationY;
     dragAbsoluteXRef.current = absoluteX;
     dragAutoScroll.updateAutoScrollPointer(absoluteY, {
       blocked: overDelete,
-      draggedTopY,
-      draggedBottomY: draggedTopY + draggedHeight,
     });
     applyDragPosition(
       rowId,
