@@ -5,7 +5,8 @@ can load offerings, complete purchases, restore purchases, open subscription
 management, and display the active RevenueCat entitlement. Store and RevenueCat
 dashboard configuration is still required before accepting payments. Premium
 feature restrictions, storage quotas, and server-side expiry enforcement are
-not implemented yet.
+implemented for Proposal 2. The new migration and authenticated RevenueCat
+webhook still require deployment and configuration.
 
 ## Product Principles
 
@@ -35,9 +36,9 @@ not implemented yet.
 | Approximate long-note capacity | 300 | 1,000 | 10,000 text notes; fewer with images |
 | Multi-device use | Yes | Yes | Yes |
 | Share notes and collaborate | No | Yes | Yes |
-| Inline image attachments | No | No | Yes (implemented; gating pending) |
-| Custom note backgrounds | No | No | Yes (implemented; gating pending) |
-| Nested folders | No | No | Yes (implemented; gating pending) |
+| Inline image attachments | No | No | Yes (up to 20 per plain note) |
+| Custom note backgrounds | No | No | Yes (device-local only) |
+| Nested folders | No | No | Yes (one subfolder layer) |
 | Image attachment storage | None | None | Included in the 750 MB Pro quota |
 
 LockNote Plus or Pro is required for the owner to create or actively synchronize
@@ -48,8 +49,9 @@ the View only or Can edit permission assigned by the owner.
 
 Cancelling renewal does not end access immediately. The user keeps the paid plan
 until the end of the already-paid billing period. If a renewal payment fails,
-the future billing implementation should honor the applicable store grace and
-billing-retry state before downgrading the account.
+the server honors RevenueCat's verified entitlement expiry and applicable
+grace-period expiry before downgrading the account. Billing retry without an
+active entitlement or unexpired grace period does not grant paid access.
 
 After the paid period expires:
 
@@ -63,6 +65,10 @@ After the paid period expires:
   pause when the owner's plan is no longer active.
 - Existing attachments remain viewable and downloadable; new attachment uploads
   require LockNote Pro.
+- Existing backgrounds, attachments and subfolders are never hidden or flattened.
+  Removal, un-nesting, local text editing, import and JSON backup remain available.
+  Notes containing existing images/backgrounds or residing in a subfolder can
+  still export PDF/images on Free as a premium-content recovery exception.
 - Resubscribing restores the relevant cloud features. Sync must reconcile newer
   local edits safely instead of overwriting them with an older cloud snapshot.
 
@@ -97,8 +103,28 @@ user UUID becomes the RevenueCat App User ID. The screen displays the localized
 store price and changes from Free to the active Plus or Pro entitlement after a
 verified purchase.
 
-The app still allows manual sync, sharing, and inline image attachments without premium entitlement checks.
-Server-owned entitlement records, quota tracking, feature gating, downgrade
-enforcement, and read-only recovery remain future work. See
+Action-level checks now gate export and owner sharing to Plus/Pro, and new images,
+background changes and nested-folder organization to Pro. Native/web folder APIs
+remain identical; sync and backup restoration bypass new-folder creation gates.
+Free invitees follow the owner's active plan and assigned permissions.
+
+`202609170001_premium_plan_2.sql` adds server-only `user_subscriptions`, plan-aware
+cloud-write triggers, serialized owner quotas, upload reservations and read-only
+recovery RPCs. Quotas use MiB (displayed as MB, 1 MB = 1,048,576 bytes), count UTF-8
+JSON note/folder/shared-note/attachment metadata and actual Storage file bytes,
+and count outstanding upload reservations. Deleted private-note bodies are not
+billed, but their tombstone metadata remains counted. Private and shared cloud
+copies are separate stored records and both count. A quota scan runs once per
+owner per deferred transaction snapshot rather than once per uploaded row.
+The Premium screen shows server usage/limit and a no-upload recovery action;
+over-quota sync automatically falls back to recovery while preserving newer
+local edits. An expired owner can edit locally without publishing; incoming
+shared notes remain view-only until the owner subscribes again.
+
+The webhook fetches canonical RevenueCat subscribers rather than trusting event
+ordering or a client plan. Duplicate events converge safely; stale snapshots
+cannot overwrite newer ones. Production ignores sandbox entitlements by default.
+Automatic/background sync and optional background-image cloud storage remain
+planned; no optional three-image Free/Plus trial has been enabled. See
 [Subscription Payment Setup](SUBSCRIPTION_SETUP.md) for the external dashboard,
 product, key, and testing steps.

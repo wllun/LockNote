@@ -233,6 +233,14 @@ export const collaborationService = {
     if (!local?.cloud_id) {
       return { collaborative: false, canEdit: true, reason: 'private' };
     }
+    const { data: ownerAccess, error: accessError } = await supabase.rpc('get_note_subscription_access', { p_note_id: local.cloud_id });
+    if (accessError) throw accessError;
+    if (ownerAccess?.plan === 'free') {
+      heldEditLeases.delete(noteId);
+      return local.share_origin === 'owned'
+        ? { collaborative: true, canEdit: true, reason: 'local', acquired: false }
+        : { collaborative: true, canEdit: false, reason: 'subscription' };
+    }
     if (isReadOnlyCollaborativeNote(local)) {
       return { collaborative: true, canEdit: false, reason: 'viewer' };
     }
@@ -270,6 +278,13 @@ export const collaborationService = {
       );
       if (draftsMatch(dirtyDrafts.get(noteId), updates)) dirtyDrafts.delete(noteId);
       if (!local?.cloud_id || !isSupabaseConfigured) return local;
+      if (local.share_origin === 'owned') {
+        const { data: access, error: accessError } = await supabase.rpc('get_note_subscription_access', { p_note_id: local.cloud_id });
+        if (accessError) return local;
+        // Keep editing the owner's local copy after downgrade; never silently
+        // publish it or discard the pending draft during a remote refresh.
+        if (access?.plan === 'free') return local;
+      }
       const releaseAfterSave = !heldEditLeases.has(noteId);
       try {
         const lease = await requestEditLease(local);

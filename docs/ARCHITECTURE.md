@@ -53,20 +53,22 @@ does not block access to locally stored notes.
 
 - **Home** (native stack): `HomeScreen` → `FolderScreen` → the note-type editor (`NoteEditorScreen`, `ChecklistEditorScreen`, `ExpenseRecordEditorScreen`, or `ReminderEditorScreen`)
 - **Shared** (native stack): `SharedScreen` → a shared note-type editor
-- **Premium** (native stack): `PremiumScreen`, the Free/Plus/Pro purchase and subscription-status screen backed by RevenueCat offerings and entitlements. Feature access is not gated yet.
+- **Premium** (native stack): `PremiumScreen`, the Free/Plus/Pro purchase, storage-usage and recovery screen backed by RevenueCat and server-verified entitlements. Proposal 2 action gates are implemented.
 - **Settings** (native stack): `SettingsScreen` → `ArchiveScreen` / `TrashScreen`; Archive can open an archived `FolderScreen` or any note-type editor
 - **Profile** (native stack): `ProfileTabScreen` → `AuthScreen` (logged out) or `ProfileScreen` (logged in), switched via `useAuth()`
 
 Screens reload their data on the navigation `focus` event (listener registered in `useEffect`, cleaned up on unmount) rather than holding shared state — so returning from the editor reflects edits without a store.
 
-### Planned subscription boundaries
+### Subscription boundaries
 
 The Premium module completes checkout and derives the displayed current plan
 from RevenueCat `CustomerInfo`; it does not store a local premium flag. A signed-in
 Supabase user UUID is also the RevenueCat App User ID, allowing the same purchase
 to be restored to the same LockNote account. `SubscriptionProvider` owns purchase
 state and account identity changes, while `subscriptionService` owns the SDK.
-The app does not gate features with that entitlement yet.
+`premiumAccessService` grants new paid actions from unexpired store entitlements
+or server-verified access. Account changes clear this in-memory state; it never
+stores a local premium toggle. Existing paid content is not gated from reads.
 The Premium footer opens Privacy Policy and Terms of Service routes inside the
 Premium stack. Their shared app copy lives in `src/content/legalDocuments.js`,
 so it remains readable offline. Matching static HTML copies under `docs/legal/`
@@ -85,11 +87,13 @@ cloud quota are Free capabilities. LockNote Plus adds PDF/image export,
 owner-funded collaboration, planned automatic sync, and a 75 MB cloud quota.
 LockNote Pro includes every Plus capability and adds image attachments, note
 backgrounds, nested folders, and a 750 MB combined note-and-image quota.
-Entitlement gating and plan-aware quota enforcement remain planned.
+Local action gating and server quota/expiry enforcement are implemented in
+`202609170001_premium_plan_2.sql`. Deploy/configure the RevenueCat webhook and
+backfill existing subscribers before releasing enforcement on a paid service.
 
 Expiry must downgrade the account to Free without deleting local or cloud note
-data. Local editing continues, while new cloud writes, two-way sync, and
-owner-funded collaboration pause. Existing cloud data remains read-only and
+data. Local editing continues; manual sync remains Free within 25 MB, while
+over-quota growth and owner-funded collaboration pause. Existing cloud data remains recoverable and
 downloadable, and resubscribing resumes cloud features after safe conflict
 reconciliation. Invited collaborators need a Free account, not their own paid
 plan. See [Subscription Plans](decisions/SUBSCRIPTION_PLANS.md) for the complete policy and
@@ -199,10 +203,10 @@ service uploads optimized JPEGs to the private Supabase `note-attachments`
 bucket and stores access-controlled metadata in `public.note_attachments`.
 Opening a note reconciles missing local/cloud copies; shared-note access follows
 the note's Viewer/Editor role. The server migration enforces 20 images per note,
-files below 1 MB, and a legacy 2 GB owner-funded technical cap. The subscription
-policy now targets a plan-aware 750 MB combined Pro quota, so a follow-up server
-quota migration is still required. Deploy attachment migrations
-through `202609120003_attachment_display_layout.sql` so shared image dimensions
+files below 1 MB, and a legacy 2 GB technical cap; the follow-up premium migration
+enforces the smaller 750 MB combined Pro quota. Storage uploads require an
+owner-funded reservation before accepting a file. Deploy migrations
+through `202609170001_premium_plan_2.sql` so shared image dimensions
 and drag order reconcile correctly. Portable JSON backups continue to exclude
 binary attachments.
 
@@ -365,10 +369,23 @@ stored per account in AsyncStorage.
 LockNote does not end-to-end encrypt note content before upload. Password fields
 remain SHA-256 access-gate hashes; they are never uploaded as plaintext.
 
-The current sync implementation does not yet apply the plan-aware 25 MB Free,
-75 MB Plus, or 750 MB Pro cloud quotas. Those checks must be server-authoritative;
-an expired or over-quota account must retain recovery access while new cloud
-writes above the applicable limit are rejected.
+Server triggers now apply 25 MB Free, 75 MB Plus and 750 MB Pro combined quotas,
+including Storage objects and outstanding upload reservations. An owner-level
+transaction lock serializes cloud writes; deferred checks inspect final snapshot
+growth once per owner. Over-quota sync falls back to the read-only
+`recover_private_data` RPC and reports that local changes were not uploaded.
+Premium also exposes explicit no-upload recovery. Normal repository timestamp
+handling preserves newer local edits. Cloud usage is requested only by Premium,
+not scanned on every local paid action.
+
+The authenticated `revenuecat-webhook` Edge Function refetches canonical RevenueCat
+subscriber state with a server-only secret API key and writes `user_subscriptions`
+through `apply_verified_subscription`. It verifies a configured Authorization
+secret, honors paid expiry/grace, handles transfers and duplicate/late events, and
+rejects stale snapshots. App users can read only their own subscription and cannot
+write it. Production excludes sandbox subscriptions by default. Owner-funded
+shared saves/leases/invitations pause on Free; owned local drafts remain editable
+and pending, while incoming shared notes remain readable/view-only online.
 
 ## Portable backup and restore
 
@@ -405,7 +422,7 @@ storage quota.
 
 ## Shared-note collaboration
 
-Release 1 shares individual notes by registered account email. The owner assigns each recipient either `editor` or `viewer` access and may change that role later. Viewers can read and export the note but cannot change its shared title or content; this is enforced in the editors and again by the save RPC. Once sharing begins, the local row stores a cloud ID, ownership/origin, collaborator count, server revision, sync state, role, and last-editor metadata. Note color is not part of the collaborative snapshot; each collaborator may color the cached note independently on their own device. Incoming notes are excluded from Home, folder, private-account sync, and search reads and appear only in the Shared tab.
+Release 1 shares individual notes by registered account email. The owner assigns each recipient either `editor` or `viewer` access and may change that role later. Viewers can read the note but cannot change its shared title or content; export follows the plan/recovery exception. Roles are enforced in editors and the save RPC. Once sharing begins, the local row stores a cloud ID, ownership/origin, collaborator count, server revision, sync state, role, and last-editor metadata. Note color is not part of the collaborative snapshot; each collaborator may color the cached note independently on their own device. Incoming notes are excluded from Home, folder, private-account sync, and search reads and appear only in the Shared tab.
 
 Supabase stores `profiles`, `shared_notes`, and `note_members`. Row-level security
 limits reads to the owner and current members, while `save_shared_note` permits

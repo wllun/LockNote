@@ -521,7 +521,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       </Modal>
 
       <ReminderScheduleModal visible={showSchedule} reminder={reminder} onClose={() => setShowSchedule(false)} onSave={handleScheduleSave} saving={scheduling} />
-      <NoteExportModal visible={showExport} onClose={() => setShowExport(false)} title={title} content={body} type="reminder" reminder={reminder} />
+      <NoteExportModal noteId={noteId} visible={showExport} onClose={() => setShowExport(false)} title={title} content={body} type="reminder" reminder={reminder} />
       <NoteShareModal visible={showShare} noteId={noteId} onClose={() => setShowShare(false)} onLeft={() => navigation.goBack()} />
       <NoteColorModal visible={showColor} value={noteColor} onClose={() => setShowColor(false)} onSelect={handleChangeColor} />
       <NoteBackgroundModal visible={showBackground} noteId={noteId} value={noteBackgroundUri} onClose={() => setShowBackground(false)} onChanged={handleBackgroundChanged} />

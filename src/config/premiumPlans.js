@@ -44,7 +44,7 @@ export const FREE_FEATURES = [
 
 export const EXPIRED_PLAN_BEHAVIOR = [
   'Local notes stay available and editable',
-  'Cloud sync, uploads and collaboration pause',
+  'Manual sync remains Free within 25 MB; premium uploads and collaboration pause',
   'Existing cloud data stays read-only and downloadable',
   'Resubscribing resumes cloud features',
 ];

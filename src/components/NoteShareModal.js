@@ -10,6 +10,7 @@ import { radius, shadow, useTheme } from '../theme';
 import KeyboardAwareModalContent from './keyboard-aware-modal-content';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { SHARE_ROLE_EDITOR, SHARE_ROLE_VIEWER } from '../utils/collaboration-note.mjs';
+import { premiumAccessService } from '../services/premiumAccessService';
 
 const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
   const colors = useTheme();
@@ -43,6 +44,7 @@ const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
     if (!email.trim()) return setError('Enter an account email.');
     setBusy(true); setError('');
     try {
+      await premiumAccessService.require('sharing');
       await collaborationService.shareByEmail(noteId, email, inviteRole);
       setEmail('');
       await load();

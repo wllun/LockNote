@@ -15,6 +15,7 @@ import { radius, shadow, useTheme } from '../theme';
 import { pickNoteBackground } from '../utils/note-background-picker';
 import { noteBackgroundPreference } from '../utils/note-background-preference';
 import NoteBackgroundLayer from './note-background-layer';
+import { premiumAccessService } from '../services/premiumAccessService';
 
 const NoteBackgroundModal = ({ visible, noteId, value, onClose, onChanged }) => {
   const colors = useTheme();
@@ -30,6 +31,7 @@ const NoteBackgroundModal = ({ visible, noteId, value, onClose, onChanged }) => 
     if (!noteId || busy) return;
     setBusy(true);
     try {
+      await premiumAccessService.require('backgrounds');
       const result = await pickNoteBackground(noteId);
       if (!result.canceled) {
         onChanged?.(result.uri);
@@ -38,7 +40,7 @@ const NoteBackgroundModal = ({ visible, noteId, value, onClose, onChanged }) => 
     } catch (error) {
       Alert.alert(
         'Background not changed',
-        error?.code === 'IMAGE_TOO_LARGE'
+        error?.code === 'PREMIUM_REQUIRED' ? error.message : error?.code === 'IMAGE_TOO_LARGE'
           ? 'Choose an image that is 10 MB or smaller.'
           : 'LockNote could not save that image. Try another image.'
       );

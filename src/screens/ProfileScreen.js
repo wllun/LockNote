@@ -47,8 +47,10 @@ const ProfileScreen = () => {
       const result = await syncService.syncAll();
       setLastSyncAt(result.syncedAt);
       Alert.alert(
-        'Sync complete',
-        `${result.notes} ${result.notes === 1 ? 'note' : 'notes'} and ${result.folders} ${result.folders === 1 ? 'folder' : 'folders'} are up to date.`,
+        result.recoveryOnly ? 'Cloud notes recovered' : 'Sync complete',
+        result.recoveryOnly
+          ? 'Cloud notes were downloaded. Your local changes are safe but were not uploaded because of your plan or storage limit. See Premium to resume full sync.'
+          : `${result.notes} ${result.notes === 1 ? 'note' : 'notes'} and ${result.folders} ${result.folders === 1 ? 'folder' : 'folders'} are up to date.`,
       );
     } catch (error) {
       Alert.alert('Sync failed', syncErrorMessage(error));

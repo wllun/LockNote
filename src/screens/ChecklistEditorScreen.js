@@ -1299,6 +1299,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       </Modal>
 
       <NoteExportModal
+        noteId={noteId}
         visible={showExportModal}
         onClose={() => setShowExportModal(false)}
         title={title}

@@ -47,6 +47,8 @@ import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import { isReadOnlyCollaborativeNote } from '../utils/collaboration-note.mjs';
 import { attachmentRepo } from '../db/attachmentRepo';
 import { pickNoteAttachments } from '../utils/note-attachment-picker';
+import { premiumAccessService } from '../services/premiumAccessService';
+import { supabase } from '../services/supabaseClient';
 import {
   MAX_NOTE_ATTACHMENTS,
   moveInlineAttachment,
@@ -342,6 +344,14 @@ const NoteEditorScreen = ({ route, navigation }) => {
     }
     setAttachmentBusy(true);
     try {
+      const stored = await noteRepo.getById(noteId);
+      if (stored?.share_origin !== 'incoming') await premiumAccessService.require('attachments');
+      else {
+        // Invited editors are funded by the owner's Pro plan, not their own.
+        const { data, error } = await supabase.rpc('can_add_note_images', { p_shared_note_id: stored.cloud_id });
+        if (error) throw error;
+        if (!data) { const error = new Error('Adding images requires an active Pro plan for the note owner.'); error.code = 'PREMIUM_REQUIRED'; throw error; }
+      }
       const result = await pickNoteAttachments(
         noteId,
         latest.current.attachmentCount,
@@ -354,7 +364,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         await reloadAttachments();
       }
     } catch (error) {
-      const message = error?.code === 'ATTACHMENT_SOURCE_TOO_LARGE'
+      const message = error?.code === 'PREMIUM_REQUIRED' ? error.message : error?.code === 'ATTACHMENT_SOURCE_TOO_LARGE'
         ? 'Choose images that are 5 MB or smaller.'
         : error?.code === 'ATTACHMENT_LIMIT_REACHED'
           ? error.message
@@ -817,6 +827,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
       </Modal>
 
       <NoteExportModal
+        noteId={noteId}
         visible={showExportModal}
         onClose={() => setShowExportModal(false)}
         title={title}

@@ -30,6 +30,7 @@ import NoteExportModal from './NoteExportModal';
 const cleanText = (value) => String(value ?? '').trim().replace(/\s+/g, ' ');
 
 const ExpenseSummaryModal = ({
+  noteId,
   visible,
   onClose,
   rows,
@@ -773,6 +774,7 @@ const ExpenseSummaryModal = ({
       </View>
     </Modal>
     <NoteExportModal
+      noteId={noteId}
       visible={!!categoryExport}
       onClose={() => setCategoryExport(null)}
       type="expense-category"

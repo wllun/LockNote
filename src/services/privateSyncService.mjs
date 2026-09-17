@@ -25,17 +25,25 @@ export const createPrivateSyncService = ({
     return data.session;
   };
 
-  const runSync = async () => {
+  const runSync = async (recoverOnly = false) => {
     const session = await requireSession();
     const [folderSnapshot, noteSnapshot] = await Promise.all([
       folderRepo.getSyncSnapshot(),
       noteRepo.getSyncSnapshot(),
     ]);
     const payload = buildSyncPayload(folderSnapshot, noteSnapshot);
-    const { data, error } = await supabase.rpc('sync_private_data', {
+    let { data, error } = recoverOnly ? await supabase.rpc('recover_private_data') : await supabase.rpc('sync_private_data', {
       p_folders: payload.folders,
       p_notes: payload.notes,
     });
+    let recoveryOnly = recoverOnly;
+    if (error?.message?.includes('CLOUD_QUOTA_EXCEEDED') || error?.message?.includes('Creating nested folders requires')) {
+      const recovered = await supabase.rpc('recover_private_data');
+      if (recovered.error) throw recovered.error;
+      data = recovered.data;
+      error = null;
+      recoveryOnly = true;
+    }
     if (error) throw error;
 
     const response = parseSyncResponse(data);
@@ -64,6 +72,7 @@ export const createPrivateSyncService = ({
     await storage.setItem(`${LAST_SYNC_PREFIX}${session.user.id}`, syncedAt);
     return {
       syncedAt,
+      recoveryOnly,
       folders: folderRecords.length,
       notes: noteRecords.length,
       deleted: folderTombstones.length + noteTombstones.length,
@@ -72,7 +81,13 @@ export const createPrivateSyncService = ({
 
   return {
     async syncAll() {
-      const operation = syncQueue.catch(() => {}).then(runSync);
+      const operation = syncQueue.catch(() => {}).then(() => runSync());
+      syncQueue = operation;
+      return await operation;
+    },
+
+    async recoverAll() {
+      const operation = syncQueue.catch(() => {}).then(() => runSync(true));
       syncQueue = operation;
       return await operation;
     },

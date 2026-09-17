@@ -27,9 +27,15 @@ import {
 import { radius, shadow, useTheme } from '../theme';
 import { formatReminderSchedule, normalizeReminder } from '../utils/reminder-note.mjs';
 import { buildInlineNoteBlocks, groupInlineNoteBlocks } from '../utils/note-attachment.mjs';
+import { premiumAccessService } from '../services/premiumAccessService';
+import { noteRepo } from '../db/noteRepo';
+import { folderRepo } from '../db/folderRepo';
+import { attachmentRepo } from '../db/attachmentRepo';
+import { noteBackgroundPreference } from '../utils/note-background-preference';
 
 const NoteExportModal = ({
   visible,
+  noteId,
   onClose,
   title,
   content = '',
@@ -114,6 +120,15 @@ const NoteExportModal = ({
     const actionKey = `${destination}:${format}`;
     setExporting(actionKey);
     try {
+      // Downgraded premium content must remain locally exportable.
+      const note = noteId ? await noteRepo.getById(noteId) : null;
+      const folder = note?.folder_id ? await folderRepo.getById(note.folder_id) : null;
+      const hasExistingImages = attachments.length > 0
+        || (noteId && (await attachmentRepo.listByNoteId(noteId)).length > 0);
+      const existingBackground = noteId && await noteBackgroundPreference.load(noteId);
+      if (!hasExistingImages && !existingBackground && !folder?.parent_id) {
+        await premiumAccessService.require('export');
+      }
       let result;
       if (destination === 'share') {
         if (format === 'pdf') result = await shareNotePdf(exportData);

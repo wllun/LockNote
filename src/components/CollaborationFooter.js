@@ -61,9 +61,14 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
     const sync = async ({ renewLease = true } = {}) => {
       if (syncing) return;
       syncing = true;
+      let local = null;
       try {
         const pauseForAvailability = () => {
           releaseLease();
+          if (local?.share_origin === 'owned') {
+            publishAccess({ collaborative: true, status: 'local', canEdit: true });
+            return;
+          }
           const inactiveStatus = onlineRef.current === false
             ? 'offline'
             : appStateRef.current !== 'active'
@@ -80,7 +85,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
           }
         };
 
-        const local = await noteRepo.getById(noteId);
+        local = await noteRepo.getById(noteId);
         if (!mounted) return;
         setNote(local);
         if (!local?.cloud_id) {
@@ -99,7 +104,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
           ? { collaborative: true, canEdit: true, reason: 'owner', acquired: true }
           : await collaborationService.acquireEditLease(noteId);
         if (!mounted) return;
-        ownsLeaseRef.current = lease.canEdit === true;
+        ownsLeaseRef.current = lease.acquired === true;
         if (onlineRef.current !== true || appStateRef.current !== 'active') {
           pauseForAvailability();
           return;
@@ -126,10 +131,11 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
       } catch (error) {
         if (!mounted) return;
         ownsLeaseRef.current = false;
+        const owned = local?.share_origin === 'owned';
         publishAccess({
           collaborative: true,
-          status: onlineRef.current === false ? 'offline' : 'unavailable',
-          canEdit: false,
+          status: owned ? 'local' : onlineRef.current === false ? 'offline' : 'unavailable',
+          canEdit: owned,
           message: error?.message || 'Shared editing is temporarily unavailable.',
         });
         noteRepo.getById(noteId).then((local) => {
@@ -172,6 +178,10 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
   const lockHolder = access.lock_user_email || 'Another collaborator';
   const statusMessage = access.status === 'offline'
     ? 'Connect to the internet to access shared editing'
+    : access.status === 'local'
+      ? 'Editing locally · Cloud collaboration is paused'
+    : access.status === 'subscription'
+      ? 'View only · The owner needs an active Plus or Pro plan'
     : access.status === 'paused'
       ? 'Shared editing is paused while LockNote is in the background'
       : access.status === 'locked'

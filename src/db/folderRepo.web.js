@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hashPassword } from '../utils/crypto';
+import { premiumAccessService } from '../services/premiumAccessService';
 import {
   flattenFolderHierarchy,
   getFolderDescendantIds,
@@ -106,6 +107,7 @@ export const folderRepo = {
     const passwordHash = password ? await hashPassword(password) : null;
     const stored = (await getStorage()).filter((folder) => !folder.is_deleted);
     if (parentId !== null) {
+      await premiumAccessService.require('nesting');
       const parent = stored.find((folder) => folder.id === parentId);
       if (!parent || parent.is_archived) throw new Error('The parent folder is unavailable.');
       if (getFolderPath(stored, parentId).length >= MAX_FOLDER_DEPTH) {
@@ -149,6 +151,8 @@ export const folderRepo = {
   },
 
   async move(id, parentId = null) {
+    const existing = await this.getById(id);
+    if (parentId !== null && existing?.parent_id !== parentId) await premiumAccessService.require('nesting');
     return await mutateStorage((folders) => {
       const active = folders.filter((folder) => !folder.is_deleted);
       const error = getFolderMoveError(active, id, parentId);

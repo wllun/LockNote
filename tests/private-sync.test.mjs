@@ -171,6 +171,7 @@ test('sync service pushes snapshots, then applies folders before notes', async (
   assert.deepEqual(events, [['folders', 1, 0], ['notes', 1, 0]]);
   assert.deepEqual(result, {
     syncedAt: '2026-08-24T11:00:00.000Z',
+    recoveryOnly: false,
     folders: 1,
     notes: 1,
     deleted: 0,
@@ -187,6 +188,29 @@ test('sync service requires configuration and a signed-in session', async () => 
     storage: {},
   });
   await assert.rejects(service.syncAll(), /not configured/i);
+});
+
+test('over-quota sync recovers cloud data without a second upload', async () => {
+  const calls = [];
+  const applied = [];
+  const service = createPrivateSyncService({
+    isConfigured: true,
+    supabase: {
+      auth: { getSession: async () => ({ data: { session: { user: { id: 'owner' } } } }) },
+      rpc: async (name) => {
+        calls.push(name);
+        return name === 'sync_private_data'
+          ? { error: { message: 'CLOUD_QUOTA_EXCEEDED: full' } }
+          : { data: { folders: [], notes: [noteRecordForCloud(localNote())] } };
+      },
+    },
+    folderRepo: { getSyncSnapshot: async () => ({ records: [], tombstones: [] }), applySyncSnapshot: async () => {} },
+    noteRepo: { getSyncSnapshot: async () => ({ records: [localNote()], tombstones: [] }), getById: async () => localNote(), applySyncSnapshot: async (records) => applied.push(...records) },
+    storage: { setItem: async () => {} },
+  });
+  assert.equal((await service.syncAll()).recoveryOnly, true);
+  assert.deepEqual(calls, ['sync_private_data', 'recover_private_data']);
+  assert.equal(applied[0].folder_id, null);
 });
 
 test('sync failures use actionable copy without claiming encryption', () => {

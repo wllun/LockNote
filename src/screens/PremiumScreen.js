@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -23,6 +23,8 @@ import {
   getPurchaseErrorMessage,
   isPurchaseCancelled,
 } from '../utils/subscription.mjs';
+import { syncService } from '../services/syncService';
+import { PLAN_LIMITS } from '../utils/premium-access.mjs';
 
 const PremiumScreen = ({ navigation }) => {
   const colors = useTheme();
@@ -32,6 +34,7 @@ const PremiumScreen = ({ navigation }) => {
   const { session } = useAuth();
   const {
     activePlanId,
+    cloudAccess,
     configured,
     loading,
     manage,
@@ -44,6 +47,22 @@ const PremiumScreen = ({ navigation }) => {
     restoring,
   } = useSubscription();
   const [refreshing, setRefreshing] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  useEffect(() => {
+    if (navigation.isFocused()) refresh(true).catch(() => {});
+    return navigation.addListener('focus', () => { refresh(true).catch(() => {}); });
+  }, [navigation, refresh]);
+  const quotaBytes = cloudAccess?.quota_bytes ?? PLAN_LIMITS[activePlanId] ?? PLAN_LIMITS.free;
+  const overQuota = cloudAccess && cloudAccess.used_bytes > quotaBytes;
+  const recoverCloud = async () => {
+    if (recovering) return;
+    setRecovering(true);
+    try {
+      await syncService.recoverAll();
+      Alert.alert('Cloud notes recovered', 'Cloud notes were downloaded without uploading local changes. Newer local edits are preserved.');
+    } catch (error) { Alert.alert('Recovery failed', error?.message || 'Check your connection and try again.'); }
+    finally { setRecovering(false); }
+  };
   const activePlan = PREMIUM_PLANS.find((plan) => plan.id === activePlanId);
   const isPremium = activePlanId !== FREE_PLAN_ID;
 
@@ -143,7 +162,7 @@ const PremiumScreen = ({ navigation }) => {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      await refresh();
+      await refresh(true);
     } catch {
       Alert.alert('Still unable to load plans', 'Check your connection and try again.');
     } finally {
@@ -218,6 +237,18 @@ const PremiumScreen = ({ navigation }) => {
         </View>
 
         <Text style={styles.sectionLabel}>PLANS</Text>
+        <View style={styles.freeCard}>
+          <Text selectable style={styles.featureText}>
+            {session
+              ? cloudAccess?.used_bytes != null ? `Cloud storage: ${(cloudAccess.used_bytes / 1024 / 1024).toFixed(2)} MB of ${(quotaBytes / 1024 / 1024).toFixed(0)} MB`
+                : 'Cloud storage usage is unavailable. Refresh when connected.'
+              : 'Sign in for Free manual sync with 25 MB cloud storage.'}
+          </Text>
+          {overQuota ? <Text style={styles.expiryText}>Storage is above your current plan limit. Local notes are safe; new cloud growth is paused.</Text> : null}
+          {session ? <Pressable onPress={recoverCloud} disabled={recovering} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityState={{ busy: recovering, disabled: recovering }}>
+            <Text style={styles.retryButtonText}>{recovering ? 'Recovering…' : 'Recover cloud notes without uploading'}</Text>
+          </Pressable> : null}
+        </View>
         <View style={[styles.planGrid, useWideLayout && styles.planGridWide]}>
           {PREMIUM_PLANS.map((plan) => {
             const storePackage = packagesByPlan[plan.id];

@@ -1,4 +1,5 @@
 import { getDB } from './sqlite';
+import { premiumAccessService } from '../services/premiumAccessService';
 import {
   flattenFolderHierarchy,
   getFolderDescendantIds,
@@ -80,6 +81,7 @@ export const folderRepo = {
     const passwordHash = password ? await hashPassword(password) : null;
 
     if (parentId !== null) {
+      await premiumAccessService.require('nesting');
       const folders = await getStoredFolders();
       const parent = folders.find((folder) => folder.id === parentId);
       if (!parent || parent.is_archived) throw new Error('The parent folder is unavailable.');
@@ -135,6 +137,8 @@ export const folderRepo = {
   },
 
   async move(id, parentId = null) {
+    const existing = await this.getById(id);
+    if (parentId !== null && existing?.parent_id !== parentId) await premiumAccessService.require('nesting');
     const db = getDB();
     const folders = await getStoredFolders();
     const error = getFolderMoveError(folders, id, parentId);

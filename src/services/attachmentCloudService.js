@@ -48,7 +48,10 @@ const uploadOne = async (session, note, attachment) => {
     await registerOne(note, attachment, attachment.cloud_path);
     return attachment;
   }
-  const path = `${session.user.id}/${note.cloud_id || note.id}/${attachment.id}.jpg`;
+  const { data: path, error: reserveError } = await supabase.rpc('reserve_attachment_upload', {
+    p_id: attachment.id, ...cloudNoteParams(note),
+  });
+  if (reserveError) throw reserveError;
   await attachmentRepo.update(attachment.id, { sync_status: 'uploading' });
   const body = await readAttachmentUploadBody(attachment.local_uri);
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, body, {
@@ -119,18 +122,31 @@ export const attachmentCloudService = {
       if (!session) return await attachmentRepo.listByNoteId(note.id);
       await attachmentDeleteQueue.flush(removeCloudRecord);
 
+      const { data: access } = note.cloud_id
+        ? await supabase.rpc('get_note_subscription_access', { p_note_id: note.cloud_id })
+        : await supabase.rpc('get_subscription_access', { p_include_usage: false });
+      const canWriteImages = access?.plan === 'pro' && note.share_role !== 'viewer';
+      const applyRemoteLayout = note.share_origin === 'incoming' || canWriteImages;
+
       let local = await attachmentRepo.listByNoteId(note.id);
-      for (const attachment of local) {
-        try { await uploadOne(session, note, attachment); } catch {}
+      if (canWriteImages) {
+        for (const attachment of local) {
+          try { await uploadOne(session, note, attachment); } catch {}
+        }
+        local = await attachmentRepo.listByNoteId(note.id);
+        if (local.some((item) => item.cloud_path && item.sync_status === 'pending')) {
+          try { await this.reorder(note, local, { queued: false }); } catch {}
+          local = await attachmentRepo.listByNoteId(note.id);
+        }
       }
       const { data, error } = await supabase.rpc('list_note_attachments', cloudNoteParams(note));
       if (!error && Array.isArray(data)) {
         const remoteIds = new Set(data.map((item) => item.id));
         const remoteById = new Map(data.map((item) => [item.id, item]));
         for (const attachment of local) {
-          if (attachment.cloud_path && !remoteIds.has(attachment.id)) {
+          if (applyRemoteLayout && attachment.sync_status !== 'pending' && attachment.cloud_path && !remoteIds.has(attachment.id)) {
             await attachmentRepo.remove(attachment.id);
-          } else if (attachment.cloud_path) {
+          } else if (applyRemoteLayout && attachment.sync_status !== 'pending' && attachment.cloud_path) {
             const remote = remoteById.get(attachment.id);
             if (remote && (
               remote.display_order !== attachment.display_order
@@ -147,7 +163,9 @@ export const attachmentCloudService = {
         }
         local = await attachmentRepo.listByNoteId(note.id);
         await downloadMissing(note, data, local);
-        await attachmentRepo.reorder(note.id, data.map((item) => item.id));
+        if (applyRemoteLayout && !local.some((item) => item.sync_status === 'pending')) {
+          await attachmentRepo.reorder(note.id, data.map((item) => item.id));
+        }
       }
       local = await attachmentRepo.listByNoteId(note.id);
       return local;
@@ -182,8 +200,9 @@ export const attachmentCloudService = {
     }
   },
 
-  async reorder(note, layout) {
-    return await enqueueCloud(async () => {
+  async reorder(note, layout, { queued = true } = {}) {
+    const run = async () => {
+      for (const item of layout || []) await attachmentRepo.update(item.id, { sync_status: 'pending' });
       if (!(await getSession())) return;
       const { error } = await supabase.rpc('reorder_note_attachments', {
         ...cloudNoteParams(note),
@@ -195,6 +214,11 @@ export const attachmentCloudService = {
         })),
       });
       if (error) throw error;
-    });
+      for (const item of layout || []) {
+        if (item.cloud_path) await attachmentRepo.update(item.id, { sync_status: 'synced' });
+      }
+    };
+    // syncNote already owns the queue; enqueuing again would deadlock it.
+    return queued ? await enqueueCloud(run) : await run();
   },
 };

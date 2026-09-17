@@ -24,6 +24,9 @@ Deno.serve(async (request) => {
     const admin = createClient(url, service);
     const { data: note } = await admin.from('shared_notes').select('id, owner_id').eq('id', noteId).is('deleted_at', null).single();
     if (!note || note.owner_id !== user.id) throw new Error('Only the note owner can invite collaborators.');
+    const { data: access, error: accessError } = await callerClient.rpc('get_note_subscription_access', { p_note_id: noteId });
+    if (accessError) throw accessError;
+    if (!access || access.plan === 'free') throw new Error('Sharing requires LockNote Plus or Pro. See Premium for plans.');
     const { data: target } = await admin.from('profiles').select('id, email').eq('email', normalizedEmail).single();
     if (!target) throw new Error('No LockNote account uses this email yet.');
     if (target.id === user.id) throw new Error('This note already belongs to you.');

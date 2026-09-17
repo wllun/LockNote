@@ -7,8 +7,9 @@ same LockNote account without sending the account email as the customer ID.
 
 The client purchase lifecycle is implemented. Real or sandbox payments still
 require the store products, RevenueCat project, and public SDK keys described
-below. Premium feature restrictions and cloud quotas are intentionally not
-enforced yet.
+below. Proposal 2 feature restrictions are now implemented; server-side quotas
+and owner-funded collaboration require deploying the premium migration and
+RevenueCat webhook before releasing the updated app.
 
 ## Required RevenueCat Identifiers
 
@@ -118,7 +119,8 @@ entitlement and Restore purchases returns the same plan.
 
 - A user must sign in before subscribing or restoring.
 - The store/provider checkout performs and confirms payment.
-- RevenueCat `CustomerInfo` is the source of truth for the displayed plan.
+- RevenueCat `CustomerInfo` supplies the store plan; devices without a configured
+  store SDK can display the server-verified subscription instead.
 - The Premium screen listens for subscription updates and refreshes when the app
   returns to the foreground.
 - Restore purchases uses the native store on iOS/Android. On web it refreshes
@@ -126,9 +128,55 @@ entitlement and Restore purchases returns the same plan.
 - Manage subscription opens the provider URL returned by RevenueCat.
 - The app does not store a local `isPremium` flag and does not trust a client
   toggle as proof of payment.
-- Sync, collaboration, quotas, and other features remain ungated for now.
+- Export and sharing require Plus/Pro; adding images, changing backgrounds, and
+  nesting folders require Pro. Existing premium content is retained on Free.
+- Manual sync remains Free within 25 MB. Plus gets 75 MB and Pro gets 750 MB
+  combined notes/images. The backend enforces these limits, not the client.
+- Web/devices without a configured store SDK can read their server-verified plan.
 
-Before server-side premium feature control is added, configure RevenueCat
-webhooks and a server-owned entitlement table. The Supabase backend must verify
-webhook signatures/events and must not trust an entitlement value sent by the
-app client.
+## 5. Deploy Proposal 2 Backend Enforcement
+
+1. Apply all migrations through `202609170001_premium_plan_2.sql` using
+   `npx supabase db push`. This immediately enables server gates, including for
+   older app versions. Plan the rollout before doing this on a live paid service.
+2. In Supabase Dashboard → Edge Functions → Secrets, add
+   `REVENUECAT_SECRET_API_KEY` (a secret RevenueCat v1 API key with subscriber
+   read access) and `REVENUECAT_WEBHOOK_AUTHORIZATION` (a long random full header
+   value, for example `Bearer <random-secret>`). Never put either in `.env`, Expo
+   public variables, app config, Git, screenshots or the app bundle.
+3. Deploy `npx supabase functions deploy revenuecat-webhook --no-verify-jwt`.
+   Its Supabase JWT check is disabled intentionally: the function itself verifies
+   the RevenueCat Authorization secret using a constant-time comparison.
+   Redeploy `npx supabase functions deploy share-note` too; it now checks the
+   owner's verified plan before account-email lookup/invitations.
+4. In RevenueCat → Integrations → Webhooks, add
+   `https://<project-ref>.supabase.co/functions/v1/revenuecat-webhook` and set
+   Authorization to exactly the secret value. Subscribe to all lifecycle and
+   transfer events. Confirm the integration is available for your RevenueCat plan.
+5. In a separate development/sandbox project only, set
+   `REVENUECAT_ALLOW_SANDBOX=true` to exercise sandbox and Test Store payments.
+   Leave it unset/false in production. Do not use a client premium toggle.
+6. During the rollout window, after applying the migration and before resuming
+   a live paid service or releasing the app, backfill existing subscribers'
+   canonical subscriptions by resending their RevenueCat webhook events to this
+   function. Check each paid UUID has the correct `user_subscriptions` row. The
+   table is read-self only; app users cannot set or change their plan.
+7. Verify purchases, renewals, cancellation-before-expiry, billing grace, refunds,
+   expiration, duplicate/late events and transfers. The function refetches current
+   subscriber state on every event; non-200 responses request a retry. A brief
+   delay between checkout and server entitlement activation is possible.
+8. Verify a Free invited editor can edit a Plus owner's note, and can add images
+   only for a Pro owner. After expiry verify shared reads/downloads still work,
+   owner local edits remain pending, and remote edits/new invitations pause.
+9. Verify quota growth rejects atomically; shrinking/deleting and read-only
+   recovery work without data deletion. Premium shows usage and recovery; Profile
+   reports when sync downloaded only instead of claiming local uploads succeeded.
+
+An isolated PostgreSQL fixture is available as
+`node scripts/verify-premium-db.mjs locknote-premium-plan2-check`, after starting
+a disposable container of that exact name. It intentionally cannot target an
+arbitrary hosted database. Real RevenueCat/Storage/device verification remains
+required before production release.
+
+Automatic/background sync is still planned, as labeled in Proposal 2. This
+implementation changes packaging/enforcement, not the sync scheduling model.

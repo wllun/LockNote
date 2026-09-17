@@ -12,10 +12,11 @@ npx supabase login
 npx supabase link --project-ref nhsomigoubtuajiloenc
 npx supabase db push
 npx supabase functions deploy share-note
+npx supabase functions deploy revenuecat-webhook --no-verify-jwt
 ```
 
 If Supabase is already logged in and this project is already linked, only run
-the final two commands.
+the deployment commands after linking.
 
 1. Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY` in the app environment.
 2. Link the Supabase CLI to the project and run `supabase db push`.
@@ -49,3 +50,13 @@ device.
 
 See [../FORCE_UPDATE.md](../FORCE_UPDATE.md) for the Android/iOS release and
 emergency rollback procedure.
+
+## Proposal 2 subscriptions
+
+Apply `202609170001_premium_plan_2.sql` for server-only subscription records,
+25/75/750 MB combined quotas, owner-funded collaboration and image-upload
+reservations. Configure the webhook's server secrets and RevenueCat integration
+before releasing the app, and backfill existing subscribers before enforcement.
+See [Subscription Payment Setup](../docs/decisions/SUBSCRIPTION_SETUP.md#5-deploy-proposal-2-backend-enforcement)
+for exact identifiers, deployment order and downgrade verification. Deploying
+the migration alone does not create paid subscriptions.

@@ -2460,6 +2460,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       {showSummaryModal && (
         <ExpenseSummaryModal
+          noteId={noteId}
           visible
           onClose={() => setShowSummaryModal(false)}
           rows={rows}
@@ -2486,6 +2487,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       />
 
       <NoteExportModal
+        noteId={noteId}
         visible={showExportModal}
         onClose={() => setShowExportModal(false)}
         title={title}
