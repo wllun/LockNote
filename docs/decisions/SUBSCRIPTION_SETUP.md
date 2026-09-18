@@ -44,13 +44,13 @@ charge a card.
 
 For production payments, create monthly auto-renewable subscriptions in App
 Store Connect and Google Play Console using the suggested product IDs above.
-Set the US/USD monthly price points to US$1.99 for Plus and US$3.99 for Pro,
+Set the US/USD monthly price points to $1.99 for Plus and $3.99 for Pro,
 then review each store's regional prices. The Premium screen displays the
 localized price returned by the store; the USD values in source code are only a
 fallback before store products load. Changing source code does not change the
 amount charged by the store.
 
-The agreed yearly prices are US$19.99 for Plus and US$39.99 for Pro. Yearly
+The agreed yearly prices are $19.99 for Plus and $39.99 for Pro. Yearly
 checkout is not implemented yet: annual store products/base plans, RevenueCat
 packages, and a billing-period selector with matching price/period labels must
 be added before offering yearly subscriptions. Do not attach an annual product

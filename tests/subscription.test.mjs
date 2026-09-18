@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import {
   FREE_PLAN_ID,
+  formatSubscriptionPrice,
   ANDROID_UPGRADE_REPLACEMENT_MODE,
   getActiveEntitlement,
   getActivePlan,
@@ -23,11 +24,20 @@ test('uses the agreed USD fallback prices without changing monthly package mappi
   assert.deepEqual(PREMIUM_PLANS.map(({ id, packageId, price, yearlyPrice, period }) => ({
     id, packageId, price, yearlyPrice, period,
   })), [
-    { id: 'plus', packageId: 'plus_monthly', price: 'US$1.99', yearlyPrice: 'US$19.99', period: 'per month' },
-    { id: 'pro', packageId: 'pro_monthly', price: 'US$3.99', yearlyPrice: 'US$39.99', period: 'per month' },
+    { id: 'plus', packageId: 'plus_monthly', price: '$1.99', yearlyPrice: '$19.99', period: 'per month' },
+    { id: 'pro', packageId: 'pro_monthly', price: '$3.99', yearlyPrice: '$39.99', period: 'per month' },
   ]);
   const screen = await readFile(new URL('../src/screens/PremiumScreen.js', import.meta.url), 'utf8');
   assert.ok(screen.includes('storePackage?.product?.priceString ?? plan.price'));
+  assert.ok(screen.includes('formatSubscriptionPrice(storePackage?.product?.priceString ?? plan.price)'));
+});
+
+test('simplifies US dollar price labels without changing prices or other currency labels', () => {
+  for (const [original, expected] of [
+    ['US$1.99', '$1.99'], ['US$19.99', '$19.99'], ['US$3.99', '$3.99'], ['US$39.99', '$39.99'],
+    ['US$ 1,99', '$ 1,99'], ['$1.99', '$1.99'], ['RM 7.90', 'RM 7.90'],
+    ['CA$2.99', 'CA$2.99'], ['AU$3.99', 'AU$3.99'], ['€1,99', '€1,99'],
+  ]) assert.equal(formatSubscriptionPrice(original), expected);
 });
 
 test('uses Free when no paid entitlement is active', () => {

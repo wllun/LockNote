@@ -10,7 +10,7 @@ _Snapshot: 2026-09-18. Check off items as they land._
 
 - [X] Plan-aware premium control visibility — all four editor menus and category transaction export hide unavailable paid actions. Free hides normal PDF/image Export and Share; Plus adds those, while Pro adds Insert images, background selection/change and subfolder creation. Home/Folder background actions follow the same rules. Existing backgrounds retain Remove background; existing shares retain Manage access (remove/leave, no new invitations or role changes on Free). Empty subfolder sections disappear without Pro, but existing child folders stay visible for read-only recovery/move-out; note creation in subfolders is hidden without Pro. Existing premium content retains its export recovery exception, and incoming shared-note image insertion follows the owner's verified Pro plan and editor/lease permissions. No data is deleted and action/server gates remain in place.
 
-- [X] Subscription pricing updated to USD — Plus US$1.99/month or US$19.99/year; Pro US$3.99/month or US$39.99/year; Free US$0. Monthly fallback labels and pricing/setup documents match. Live localized store prices remain authoritative; store price configuration and yearly checkout/packages remain pending.
+- [X] Subscription pricing updated to USD — Plus $1.99/month or $19.99/year; Pro $3.99/month or $39.99/year; Free $0. App labels use $ instead of US$, including live store USD price strings; other currency labels and checkout amounts are unchanged. Monthly fallback labels and pricing/setup documents match. Live localized store prices remain authoritative; store price configuration and yearly checkout/packages remain pending.
 
 - [X] Pro subfolder editing policy — existing folders and notes stay visible after expiry/downgrade, but plain, checklist, expense and reminder notes inside subfolders become read-only without Pro. Editors explain the restriction and offer Move note; moving to Home/top-level folders or moving the whole subfolder to Home restores editing. Nothing moves automatically. Creating notes/moving notes into subfolders requires Pro; pending Pro auto-saves may finish, exports/import/sync recovery remain available, and bulk currency changes skip read-only records. Renewing Pro restores editing; incoming shared-note access remains owner-funded.
 
@@ -87,7 +87,7 @@ _Snapshot: 2026-09-18. Check off items as they land._
 - [X] Set password (one shared password for note locks; individual folder passwords)
 - [X] Theme mode (light/dark, plus system)
 
-### Phase 2 — LockNote Plus — US$1.99/month or US$19.99/year
+### Phase 2 — LockNote Plus — $1.99/month or $19.99/year
 
 - [X] Login — Profile tab with real Supabase Auth (email/password sign up + sign in, session persisted via AsyncStorage). Account login remains Free.
 - [X] Sync DB — Profile pushes/pulls private/owned notes and folders through account-scoped Supabase RPCs. Deletions and root-note semantics are preserved. Proposal 2 server enforcement implements 25 MB Free, 75 MB Plus and 750 MB Pro combined notes/images, with read-only recovery above the limit.
@@ -95,7 +95,7 @@ _Snapshot: 2026-09-18. Check off items as they land._
 - [ ] Automatic/background sync — add lifecycle/network-triggered foreground sync first, followed by best-effort platform background execution with safe retry and conflict handling.
 - [X] Searchable — remains a Free offline feature.
 
-### Phase 3 — LockNote Pro attachments — US$3.99/month or US$39.99/year
+### Phase 3 — LockNote Pro attachments — $3.99/month or $39.99/year
 
 - [X] Plain-note inline image attachments — up to 20 cursor-positioned images per note, maximum 5 MB source optimized below 1 MB, native/web local-first storage, wrapping rows, two-axis drag/drop, proportional resizing, preview/removal, Undo/Redo, matching inline PDF/image export and optional Supabase reconciliation. Proposal 2 gates new images/cloud writes to the owner's Pro plan; existing images stay viewable/downloadable after downgrade. Deploy migrations through `202609170001_premium_plan_2.sql` and configure the webhook before cloud image writes.
 - [ ] Optional cloud sync for local custom note backgrounds.

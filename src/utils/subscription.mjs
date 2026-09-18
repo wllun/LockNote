@@ -1,6 +1,9 @@
 export const FREE_PLAN_ID = 'free';
 export const ANDROID_UPGRADE_REPLACEMENT_MODE = 'WITH_TIME_PRORATION';
 
+// Display only: retain store amounts/localization and other currency prefixes.
+export const formatSubscriptionPrice = (price) => String(price ?? '').replace(/US\$/g, '$');
+
 export const getAndroidUpgradeInfo = ({
   platform,
   currentPlanId,

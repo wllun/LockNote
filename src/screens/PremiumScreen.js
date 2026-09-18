@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import {
   FREE_PLAN_ID,
+  formatSubscriptionPrice,
   getPurchaseErrorMessage,
   isPurchaseCancelled,
 } from '../utils/subscription.mjs';
@@ -237,18 +238,17 @@ const PremiumScreen = ({ navigation }) => {
         </View>
 
         <Text style={styles.sectionLabel}>PLANS</Text>
-        <View style={styles.freeCard}>
+        {session ? <View style={styles.freeCard}>
           <Text selectable style={styles.featureText}>
-            {session
-              ? cloudAccess?.used_bytes != null ? `Cloud storage: ${(cloudAccess.used_bytes / 1024 / 1024).toFixed(2)} MB of ${(quotaBytes / 1024 / 1024).toFixed(0)} MB`
-                : 'Cloud storage usage is unavailable. Refresh when connected.'
-              : 'Sign in for Free manual sync with 25 MB cloud storage.'}
+            {cloudAccess?.used_bytes != null
+              ? `Cloud storage: ${(cloudAccess.used_bytes / 1024 / 1024).toFixed(2)} MB of ${(quotaBytes / 1024 / 1024).toFixed(0)} MB`
+              : 'Cloud storage usage is unavailable. Refresh when connected.'}
           </Text>
           {overQuota ? <Text style={styles.expiryText}>Storage is above your current plan limit. Local notes are safe; new cloud growth is paused.</Text> : null}
           {session ? <Pressable onPress={recoverCloud} disabled={recovering} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityState={{ busy: recovering, disabled: recovering }}>
             <Text style={styles.retryButtonText}>{recovering ? 'Recovering…' : 'Recover cloud notes without uploading'}</Text>
           </Pressable> : null}
-        </View>
+        </View> : null}
         <View style={[styles.planGrid, useWideLayout && styles.planGridWide]}>
           {PREMIUM_PLANS.map((plan) => {
             const storePackage = packagesByPlan[plan.id];
@@ -287,7 +287,7 @@ const PremiumScreen = ({ navigation }) => {
                   ) : null}
                 </View>
                 <View style={styles.priceRow}>
-                  <Text style={styles.price}>{storePackage?.product?.priceString ?? plan.price}</Text>
+                <Text style={styles.price}>{formatSubscriptionPrice(storePackage?.product?.priceString ?? plan.price)}</Text>
                   <Text style={styles.period}>{plan.period}</Text>
                 </View>
                 <Text style={styles.planDescription}>{plan.description}</Text>

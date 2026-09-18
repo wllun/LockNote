@@ -23,8 +23,8 @@ webhook still require deployment and configuration.
 
 | Feature | Free | LockNote Plus | LockNote Pro |
 | --- | ---: | ---: | ---: |
-| Proposed monthly price (USD) | US$0 | US$1.99 | US$3.99 |
-| Proposed yearly price (USD) | US$0 | US$19.99 | US$39.99 |
+| Proposed monthly price (USD) | $0 | $1.99 | $3.99 |
+| Proposed yearly price (USD) | $0 | $19.99 | $39.99 |
 | Core offline notes and folders | Yes | Yes | Yes |
 | Search, note colors, Archive, Trash and locks | Yes | Yes | Yes |
 | PDF and image export | No | Yes | Yes |
