@@ -1,10 +1,12 @@
 # Project State — TODO
 
-_Snapshot: 2026-09-17. Check off items as they land._
+_Snapshot: 2026-09-18. Check off items as they land._
 
 ## Done
 
-- [X] Premium Proposal 2 enforcement — Plus/Pro export and owner sharing; Pro image additions/cloud uploads, background changes and one-layer nested-folder organization. Existing premium content remains readable and locally exportable after downgrade; owners can keep editing local shared drafts while remote collaboration pauses. Free invitees are funded by the owner's plan. Server-owned subscriptions, authenticated canonical RevenueCat webhook, 25/75/750 MB combined quotas, serialized upload reservations, usage display and no-upload recovery are implemented. Deployment, secret configuration, existing-subscriber backfill and live payment/device verification remain pending; automatic/background sync remains planned.
+- [X] Pro subfolder editing policy — existing folders and notes stay visible after expiry/downgrade, but plain, checklist, expense and reminder notes inside subfolders become read-only without Pro. Editors explain the restriction and offer Move note; moving to Home/top-level folders or moving the whole subfolder to Home restores editing. Nothing moves automatically. Creating notes/moving notes into subfolders requires Pro; pending Pro auto-saves may finish, exports/import/sync recovery remain available, and bulk currency changes skip read-only records. Renewing Pro restores editing; incoming shared-note access remains owner-funded.
+
+- [X] Premium Proposal 2 enforcement — Plus/Pro export and owner sharing; Pro image additions/cloud uploads, background changes and one-layer nested-folder organization. Existing premium content remains readable and locally exportable after downgrade; owners can keep editing local shared drafts outside subfolders while remote collaboration pauses. Free invitees are funded by the owner's plan. Server-owned subscriptions, authenticated canonical RevenueCat webhook, 25/75/750 MB combined quotas, serialized upload reservations, usage display and no-upload recovery are implemented. Deployment, secret configuration, existing-subscriber backfill and live payment/device verification remain pending; automatic/background sync remains planned.
 
 - [X] Create/open/move/delete nested folders. Folders support one subfolder layer (Home → folder → subfolder) with cycle-safe subtree moves, breadcrumbs, descendant note counts, and recursive deletion. Subfolder screens omit the Folders section entirely.
 - [X] Create/open/delete notes, at root or inside a folder (soft delete)

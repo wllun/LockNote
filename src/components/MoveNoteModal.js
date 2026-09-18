@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, shadow, useTheme } from '../theme';
 import { buildNoteMoveDestinations } from '../utils/note-move.mjs';
+import { useSubscription } from '../context/SubscriptionContext';
 
 const MoveNoteModal = ({
   visible,
@@ -23,10 +24,14 @@ const MoveNoteModal = ({
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const { activePlanId } = useSubscription();
   const destinations = buildNoteMoveDestinations(folders, currentFolderId);
+  const needsPro = (destination) => destination.id !== null
+    && folders.some((folder) => folder.id === destination.id && folder.parent_id != null)
+    && activePlanId !== 'pro';
 
   const selectDestination = (destination) => {
-    if (destination.isCurrent) return;
+    if (destination.isCurrent || needsPro(destination)) return;
     onClose();
     onSelect(destination.id);
   };
@@ -88,20 +93,22 @@ const MoveNoteModal = ({
                 style={({ pressed }) => [
                   styles.destination,
                   destination.isCurrent && styles.destinationCurrent,
+                  !destination.isCurrent && needsPro(destination) && { opacity: 0.5 },
                   pressed &&
                     !destination.isCurrent &&
                     styles.destinationPressed,
                 ]}
                 onPress={() => selectDestination(destination)}
-                disabled={destination.isCurrent}
+                disabled={destination.isCurrent || needsPro(destination)}
                 accessibilityRole="button"
                 accessibilityLabel={
                   destination.id === null
                     ? 'Move note to Home'
                     : `Move note to ${destination.name}`
                 }
+                accessibilityHint={needsPro(destination) ? 'Moving into a subfolder requires Pro' : undefined}
                 accessibilityState={{
-                  disabled: destination.isCurrent,
+                  disabled: destination.isCurrent || needsPro(destination),
                   selected: destination.isCurrent,
                 }}
               >
@@ -136,6 +143,9 @@ const MoveNoteModal = ({
                   <View style={styles.currentBadge}>
                     <Text style={styles.currentBadgeText}>Current</Text>
                   </View>
+                )}
+                {!destination.isCurrent && needsPro(destination) && (
+                  <Text style={styles.currentBadgeText}>Pro</Text>
                 )}
               </Pressable>
             ))}

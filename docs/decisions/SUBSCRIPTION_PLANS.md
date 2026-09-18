@@ -56,7 +56,8 @@ active entitlement or unexpired grace period does not grant paid access.
 After the paid period expires:
 
 - The account returns to Free.
-- All local notes remain available and editable.
+- All local notes remain available. Notes in existing subfolders are read-only
+  without Pro; notes at Home or in top-level folders remain editable.
 - New cloud writes above the 25 MB Free quota, automatic sync, and
   owner-funded collaboration pause.
 - Existing cloud note data remains read-only and available for download or
@@ -66,11 +67,21 @@ After the paid period expires:
 - Existing attachments remain viewable and downloadable; new attachment uploads
   require LockNote Pro.
 - Existing backgrounds, attachments and subfolders are never hidden or flattened.
-  Removal, un-nesting, local text editing, import and JSON backup remain available.
+  Removal, un-nesting, import and JSON backup remain available. Users may move a
+  note to Home or a top-level folder (or move its whole subfolder to Home) to
+  resume editing without Pro. No folders or notes move automatically on expiry.
+  Creating notes or moving notes into a subfolder requires Pro. A Pro auto-save
+  already staged before expiry may finish, but no further content edits are allowed
+  inside the subfolder. All four editors show the read-only explanation and a
+  Move note action. Bulk currency changes skip these read-only expense records.
   Notes containing existing images/backgrounds or residing in a subfolder can
   still export PDF/images on Free as a premium-content recovery exception.
 - Resubscribing restores the relevant cloud features. Sync must reconcile newer
   local edits safely instead of overwriting them with an older cloud snapshot.
+- Renewing Pro also restores editing inside existing subfolders. Plus does not
+  include subfolder editing. Invited shared-note editors remain owner-funded;
+  this restriction concerns the owner's local folder organization, not the
+  invited person's independent subscription.
 
 Subscription expiry alone must never call a note, folder, attachment, or account
 deletion path. Normal user-requested deletion and account deletion remain

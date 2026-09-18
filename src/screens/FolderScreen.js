@@ -284,8 +284,8 @@ const FolderScreen = ({ route, navigation }) => {
       navigation.navigate(editorRouteFor(note), { noteId: note.id, isNewDraft: true });
     } catch (error) {
       Alert.alert(
-        'Error',
-        type === EXPENSE_NOTE_TYPE
+        error?.code === 'SUBFOLDER_READ_ONLY' ? 'Pro required' : 'Error',
+        error?.code === 'SUBFOLDER_READ_ONLY' ? error.message : type === EXPENSE_NOTE_TYPE
           ? 'Failed to create expense record'
           : type === CHECKLIST_NOTE_TYPE
             ? 'Failed to create checklist'
@@ -519,7 +519,7 @@ const FolderScreen = ({ route, navigation }) => {
       if (!movedNote) throw new Error('Note no longer exists');
       await loadNotes();
     } catch (error) {
-      Alert.alert('Error', 'Failed to move note');
+      Alert.alert('Cannot move note', error?.message || 'Failed to move note');
     }
   };
 

@@ -16,6 +16,7 @@ export const expenseCurrencyService = {
     let updatedCount = 0;
     let pendingCloudCount = 0;
     let failedCount = 0;
+    let skippedReadOnlyCount = 0;
 
     for (const note of expenseNotes) {
       const content = setExpenseNoteCurrency(
@@ -30,7 +31,9 @@ export const expenseCurrencyService = {
         });
         updatedCount += 1;
       } catch (error) {
-        if (error?.localSaved) {
+        if (error?.code === 'SUBFOLDER_READ_ONLY') {
+          skippedReadOnlyCount += 1;
+        } else if (error?.localSaved) {
           updatedCount += 1;
           pendingCloudCount += 1;
         } else {
@@ -45,6 +48,7 @@ export const expenseCurrencyService = {
       updatedCount,
       pendingCloudCount,
       failedCount,
+      skippedReadOnlyCount,
     };
   },
 };

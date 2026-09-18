@@ -131,10 +131,23 @@ export const SubscriptionProvider = ({ children }) => {
   }, [refresh, userId]);
 
   useEffect(() => {
-    // Re-evaluate cached expiry even if the app stays open across the paid end.
-    const timer = setInterval(() => setActivePlanId(premiumAccessService.getPlan()), 30000);
-    return () => clearInterval(timer);
-  }, []);
+    // Re-evaluate at the actual paid end, not up to 30 seconds later while an
+    // editor is still accepting input. Keep a bounded fallback for clock changes.
+    let timer;
+    const checkExpiry = () => {
+      setActivePlanId(premiumAccessService.getPlan());
+      const now = Date.now();
+      const expiries = [
+        ...Object.values(customerInfo?.entitlements?.active ?? {})
+          .map((entitlement) => entitlement.expirationDate),
+        cloudAccess?.expires_at,
+      ].map((date) => new Date(date).getTime()).filter((date) => Number.isFinite(date) && date > now);
+      const delay = Math.min(30000, ...expiries.map((date) => date - now + 1));
+      timer = setTimeout(checkExpiry, delay);
+    };
+    checkExpiry();
+    return () => clearTimeout(timer);
+  }, [customerInfo, cloudAccess, userId]);
 
   const purchase = useCallback(async (planId) => {
     if (!userId) throw new Error('Sign in before subscribing.');
