@@ -11,12 +11,16 @@ import KeyboardAwareModalContent from './keyboard-aware-modal-content';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { SHARE_ROLE_EDITOR, SHARE_ROLE_VIEWER } from '../utils/collaboration-note.mjs';
 import { premiumAccessService } from '../services/premiumAccessService';
+import { useSubscription } from '../context/SubscriptionContext';
+import { canUsePremiumFeature } from '../utils/premium-access.mjs';
 
 const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
+  const { activePlanId, loading } = useSubscription();
+  const canInvite = !loading && canUsePremiumFeature(activePlanId, 'sharing');
   const [note, setNote] = useState(null);
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState('');
@@ -91,7 +95,7 @@ const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
   const isViewer = incoming && note?.share_role === SHARE_ROLE_VIEWER;
   const subtitle = incoming
     ? (isViewer ? 'You can view this note.' : 'You can edit this note.')
-    : 'Choose what each person can do.';
+    : canInvite ? 'Choose what each person can do.' : 'Review or remove existing access.';
   return (
     <Modal
       visible={visible}
@@ -105,14 +109,14 @@ const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
       >
         <View style={[styles.panel, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.header}>
-            <View style={styles.headerCopy}><Text style={styles.title}>Share note</Text><Text style={styles.subtitle}>{subtitle}</Text></View>
+            <View style={styles.headerCopy}><Text style={styles.title}>{!incoming && canInvite ? 'Share note' : 'Manage access'}</Text><Text style={styles.subtitle}>{subtitle}</Text></View>
             <Pressable style={styles.iconButton} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close sharing"><Ionicons name="close" size={22} color={colors.textSecondary} /></Pressable>
           </View>
 
           {!isSupabaseConfigured ? <View style={styles.notice}><Ionicons name="cloud-offline-outline" size={20} color={colors.textSecondary} /><Text style={styles.noticeText}>Account services must be configured before notes can be shared.</Text></View>
           : !session ? <View style={styles.notice}><Ionicons name="person-circle-outline" size={20} color={colors.textSecondary} /><Text style={styles.noticeText}>Sign in from Profile before sharing a note.</Text></View>
           : <>
-            {!incoming && <View style={styles.inviteArea}>
+            {!incoming && canInvite && <View style={styles.inviteArea}>
               <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Account email address" placeholderTextColor={colors.textTertiary} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" returnKeyType="send" onSubmitEditing={share} accessibilityLabel="Collaborator email" />
               <View style={styles.inviteActions}>
                 <View style={styles.permissionControl} accessibilityRole="radiogroup" accessibilityLabel="Permission">
@@ -144,7 +148,7 @@ const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
                 <View style={styles.avatar}><Text style={styles.avatarText}>{member.email?.[0]?.toUpperCase() || '?'}</Text></View>
                 <View style={styles.memberCopy}><Text style={styles.memberEmail} numberOfLines={1}>{member.email}</Text><Text style={styles.memberRole}>{member.is_owner ? 'Owner' : member.role === SHARE_ROLE_VIEWER ? 'View only' : 'Can edit'}</Text></View>
                 {!incoming && !member.is_owner && <View style={styles.memberActions}>
-                  <Pressable style={[styles.roleButton, busy && styles.disabled]} onPress={() => chooseRole(member)} disabled={busy} accessibilityRole="button" accessibilityLabel={`Change access for ${member.email}. Current access: ${member.role === SHARE_ROLE_VIEWER ? 'view only' : 'can edit'}`}><Ionicons name={member.role === SHARE_ROLE_VIEWER ? 'eye-outline' : 'create-outline'} size={17} color={colors.primary} /><Ionicons name="chevron-down" size={15} color={colors.primary} /></Pressable>
+                  {canInvite && <Pressable style={[styles.roleButton, busy && styles.disabled]} onPress={() => chooseRole(member)} disabled={busy} accessibilityRole="button" accessibilityLabel={`Change access for ${member.email}. Current access: ${member.role === SHARE_ROLE_VIEWER ? 'view only' : 'can edit'}`}><Ionicons name={member.role === SHARE_ROLE_VIEWER ? 'eye-outline' : 'create-outline'} size={17} color={colors.primary} /><Ionicons name="chevron-down" size={15} color={colors.primary} /></Pressable>}
                   <Pressable style={[styles.iconButton, busy && styles.disabled]} onPress={() => remove(member)} disabled={busy} accessibilityRole="button" accessibilityLabel={`Remove ${member.email}`}><Ionicons name="close-circle-outline" size={22} color={colors.danger} /></Pressable>
                 </View>}
               </View>

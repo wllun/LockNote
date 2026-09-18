@@ -18,6 +18,7 @@ import { noteEditingAccessService } from '../services/noteEditingAccessService';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
 import NoteBackgroundLayer from '../components/note-background-layer';
+import { useNoteFeatureVisibility } from '../hooks/use-note-feature-visibility';
 import { collaborationService } from '../services/collaborationService';
 import { lockPasswordService } from '../services/lockPasswordService';
 import PasswordModal from '../components/PasswordModal';
@@ -65,6 +66,9 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const [showShare, setShowShare] = useState(false);
   const [showLock, setShowLock] = useState(false);
   const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const features = useNoteFeatureVisibility(noteId, {
+    backgroundUri: noteBackgroundUri, attachmentCount: 0, readOnly: isReadOnly, refreshKey: showActions,
+  });
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [isBodyEditing, setIsBodyEditing] = useState(false);
   const [scheduling, setScheduling] = useState(false);
@@ -514,10 +518,10 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       >
         <View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={() => setShowActions(false)} accessible={false} /><View style={[styles.actionMenu, { top: insets.top + 60 }]}>
           {[
-            { icon: 'people-outline', text: 'Share', action: () => setShowShare(true) },
+            ...(features.showSharing ? [{ icon: 'people-outline', text: features.sharingLabel, action: () => setShowShare(true) }] : []),
             { icon: 'color-palette-outline', text: 'Color', action: () => setShowColor(true) },
-            { icon: 'image-outline', text: 'Background', action: () => setShowBackground(true) },
-            { icon: 'share-outline', text: 'Export', action: () => setShowExport(true) },
+            ...(features.showBackground ? [{ icon: 'image-outline', text: features.canChangeBackground ? 'Background' : 'Remove background', action: () => setShowBackground(true) }] : []),
+            ...(features.canExport ? [{ icon: 'share-outline', text: 'Export', action: () => setShowExport(true) }] : []),
             { icon: isPinned ? 'pin' : 'pin-outline', text: isPinned ? 'Unpin' : 'Pin', action: handleTogglePin },
             { icon: hasPassword ? 'lock-open-outline' : 'lock-closed-outline', text: hasPassword ? 'Unlock' : 'Lock', action: () => setShowLock(true) },
             { icon: 'trash-outline', text: 'Delete', danger: true, action: handleDelete },
@@ -526,7 +530,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
       </Modal>
 
       <ReminderScheduleModal visible={showSchedule} reminder={reminder} onClose={() => setShowSchedule(false)} onSave={handleScheduleSave} saving={scheduling} />
-      <NoteExportModal noteId={noteId} visible={showExport} onClose={() => setShowExport(false)} title={title} content={body} type="reminder" reminder={reminder} />
+      <NoteExportModal noteId={noteId} visible={showExport && features.canExport} onClose={() => setShowExport(false)} title={title} content={body} type="reminder" reminder={reminder} />
       <NoteShareModal visible={showShare} noteId={noteId} onClose={() => setShowShare(false)} onLeft={() => navigation.goBack()} />
       <NoteColorModal visible={showColor} value={noteColor} onClose={() => setShowColor(false)} onSelect={handleChangeColor} />
       <NoteBackgroundModal visible={showBackground} noteId={noteId} value={noteBackgroundUri} onClose={() => setShowBackground(false)} onChanged={handleBackgroundChanged} />

@@ -252,11 +252,11 @@ export const collaborationService = {
     if (ownerAccess?.plan === 'free') {
       heldEditLeases.delete(noteId);
       return local.share_origin === 'owned'
-        ? { collaborative: true, canEdit: true, reason: 'local', acquired: false }
-        : { collaborative: true, canEdit: false, reason: 'subscription' };
+        ? { collaborative: true, canEdit: true, reason: 'local', acquired: false, ownerPlan: 'free' }
+        : { collaborative: true, canEdit: false, reason: 'subscription', ownerPlan: 'free' };
     }
     if (isReadOnlyCollaborativeNote(local)) {
-      return { collaborative: true, canEdit: false, reason: 'viewer' };
+      return { collaborative: true, canEdit: false, reason: 'viewer', ownerPlan: ownerAccess?.plan };
     }
     try {
       const lease = await requestEditLease(local);
@@ -267,6 +267,7 @@ export const collaborationService = {
         canEdit: lease.acquired,
         reason: lease.acquired ? 'owner' : 'locked',
         ...lease,
+        ownerPlan: ownerAccess?.plan,
       };
     } catch (error) {
       heldEditLeases.delete(noteId);

@@ -22,6 +22,7 @@ import CollaborationFooter from '../components/CollaborationFooter';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
 import NoteBackgroundLayer from '../components/note-background-layer';
+import { useNoteFeatureVisibility } from '../hooks/use-note-feature-visibility';
 import NoteAttachmentGallery from '../components/note-attachment-gallery';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { collaborationService } from '../services/collaborationService';
@@ -79,6 +80,9 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
   const [attachments, setAttachments] = useState([]);
+  const features = useNoteFeatureVisibility(noteId, {
+    backgroundUri: noteBackgroundUri, attachmentCount: attachments.length, readOnly: isReadOnly, refreshKey: showActionsMenu,
+  });
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [isContentEditing, setIsContentEditing] = useState(isNewDraft && !shared);
@@ -157,6 +161,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   };
 
   const handleCollaborationAccessChange = useCallback((access) => {
+    features.setOwnerPlan(access?.ownerPlan ?? null);
     if (!access?.editAccess && !access?.collaborative) return;
     const readOnly = access.canEdit !== true;
     latest.current.readOnly = readOnly;
@@ -716,7 +721,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
             style={[styles.actionsMenu, { top: insets.top + 60 }]}
             accessibilityViewIsModal
           >
-            <Pressable
+            {features.canInsertImages && (<Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); handleAddAttachments(); }}
               disabled={isReadOnly || attachmentBusy || attachments.length >= MAX_NOTE_ATTACHMENTS}
@@ -726,16 +731,16 @@ const NoteEditorScreen = ({ route, navigation }) => {
             >
               <Ionicons name="images-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.actionsMenuText}>Insert images</Text>
-            </Pressable>
+            </Pressable>)}
 
-            <Pressable
+            {features.showSharing && (<Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowShareModal(true); }}
               accessibilityRole="button"
             >
               <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Share</Text>
-            </Pressable>
+              <Text style={styles.actionsMenuText}>{features.sharingLabel}</Text>
+            </Pressable>)}
             <Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowColorModal(true); }}
@@ -746,17 +751,17 @@ const NoteEditorScreen = ({ route, navigation }) => {
               <Text style={styles.actionsMenuText}>Color</Text>
             </Pressable>
 
-            <Pressable
+            {features.showBackground && (<Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowBackgroundModal(true); }}
               accessibilityRole="button"
-              accessibilityLabel="Change note background"
+              accessibilityLabel={features.canChangeBackground ? 'Change note background' : 'Remove note background'}
             >
               <Ionicons name="image-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Background</Text>
-            </Pressable>
+              <Text style={styles.actionsMenuText}>{features.canChangeBackground ? 'Background' : 'Remove background'}</Text>
+            </Pressable>)}
 
-            <Pressable
+            {features.canExport && (<Pressable
               style={({ pressed }) => [
                 styles.actionsMenuItem,
                 pressed && styles.actionsMenuItemPressed,
@@ -770,7 +775,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
             >
               <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.actionsMenuText}>Export</Text>
-            </Pressable>
+            </Pressable>)}
 
             <Pressable
               style={({ pressed }) => [
@@ -842,7 +847,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
 
       <NoteExportModal
         noteId={noteId}
-        visible={showExportModal}
+        visible={showExportModal && features.canExport}
         onClose={() => setShowExportModal(false)}
         title={title}
         content={content}

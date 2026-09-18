@@ -31,6 +31,8 @@ import MoveFolderModal from '../components/MoveFolderModal';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
+import { useSubscription } from '../context/SubscriptionContext';
+import { getSubfolderVisibility } from '../utils/premium-visibility.mjs';
 import { lockPasswordService } from '../services/lockPasswordService';
 import { deleteFolderTree, inspectFolderTree } from '../services/folderTreeService';
 import KeyboardAwareModalContent from '../components/keyboard-aware-modal-content';
@@ -138,6 +140,8 @@ const FolderScreen = ({ route, navigation }) => {
   const [isSubfolder, setIsSubfolder] = useState(!!route.params?.isSubfolder);
   const [folderPath, setFolderPath] = useState([]);
   const [childFolders, setChildFolders] = useState([]);
+  const { activePlanId, loading: subscriptionLoading } = useSubscription();
+  const folderFeatures = getSubfolderVisibility(subscriptionLoading ? 'free' : activePlanId, isSubfolder, childFolders.length);
   const [folderNoteCounts, setFolderNoteCounts] = useState({});
   const [notes, setNotes] = useState([]);
   const requestedFolderViewMode = route.params?.folderViewMode;
@@ -670,7 +674,7 @@ const FolderScreen = ({ route, navigation }) => {
                 ))}
               </View>
             )}
-            {!isSubfolder && (
+            {folderFeatures.showSection && (
               <>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>Folders</Text>
@@ -681,7 +685,7 @@ const FolderScreen = ({ route, navigation }) => {
                       value: folderViewMode,
                       onChange: changeFolderViewMode,
                     })}
-                    <TouchableOpacity
+                    {folderFeatures.canAddSubfolder && (<TouchableOpacity
                       style={styles.sectionAddButton}
                       onPress={() => setShowFolderModal(true)}
                       activeOpacity={0.7}
@@ -689,7 +693,7 @@ const FolderScreen = ({ route, navigation }) => {
                       accessibilityLabel="Add subfolder"
                     >
                       <Ionicons name="add" size={20} color={colors.primary} />
-                    </TouchableOpacity>
+                    </TouchableOpacity>)}
                   </View>
                 </View>
                 {renderFolderItems()}
@@ -704,7 +708,7 @@ const FolderScreen = ({ route, navigation }) => {
                   value: noteViewMode,
                   onChange: changeNoteViewMode,
                 })}
-                <TouchableOpacity
+                {folderFeatures.canAddNote && (<TouchableOpacity
                   style={styles.sectionAddButton}
                   onPress={() => setShowNoteTypeModal(true)}
                   activeOpacity={0.7}
@@ -712,7 +716,7 @@ const FolderScreen = ({ route, navigation }) => {
                   accessibilityLabel="Add note"
                 >
                   <Ionicons name="add" size={20} color={colors.primary} />
-                </TouchableOpacity>
+                </TouchableOpacity>)}
               </View>
             </View>
           </View>
@@ -722,7 +726,7 @@ const FolderScreen = ({ route, navigation }) => {
             <Ionicons name="document-text-outline" size={32} color={colors.textTertiary} />
             <Text style={styles.emptyText}>This folder is empty</Text>
             <Text style={styles.emptyHint}>
-              {isSubfolder ? 'Tap + to create a note' : 'Add a folder or tap + to create a note'}
+              {!folderFeatures.canAddNote ? 'Move this folder to Home or renew Pro to add notes' : folderFeatures.canAddSubfolder ? 'Add a folder or tap + to create a note' : 'Tap + to create a note'}
             </Text>
           </View> : null
         }
@@ -735,7 +739,7 @@ const FolderScreen = ({ route, navigation }) => {
         }
       />
 
-      <TouchableOpacity
+      {folderFeatures.canAddNote && (<TouchableOpacity
         style={styles.fab}
         onPress={() => setShowNoteTypeModal(true)}
         activeOpacity={0.8}
@@ -743,7 +747,7 @@ const FolderScreen = ({ route, navigation }) => {
         accessibilityLabel="Add note"
       >
         <Ionicons name="add" size={28} color={colors.card} />
-      </TouchableOpacity>
+      </TouchableOpacity>)}
 
       <CreateNoteTypeModal
         visible={showNoteTypeModal}
@@ -756,6 +760,7 @@ const FolderScreen = ({ route, navigation }) => {
         itemType={itemActions.type}
         isPinned={!!itemActions.item?.is_pinned}
         isLocked={!!itemActions.item?.password}
+        hasBackground={!!itemActions.item?.background_image_uri}
         onClose={closeItemActions}
         onTogglePin={() => itemActions.type === 'folder' ? handleToggleFolderPin(itemActions.item) : handleToggleNotePin(itemActions.item)}
         onMove={() => itemActions.type === 'folder' ? openMoveFolder(itemActions.item) : openMoveNote(itemActions.item)}

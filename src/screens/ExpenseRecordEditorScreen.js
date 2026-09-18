@@ -34,6 +34,7 @@ import { noteEditingAccessService } from '../services/noteEditingAccessService';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
 import NoteBackgroundLayer from '../components/note-background-layer';
+import { useNoteFeatureVisibility } from '../hooks/use-note-feature-visibility';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { collaborationService } from '../services/collaborationService';
 import { lockPasswordService } from '../services/lockPasswordService';
@@ -488,6 +489,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
+  const features = useNoteFeatureVisibility(noteId, {
+    backgroundUri: noteBackgroundUri, attachmentCount: 0, readOnly: isReadOnly, refreshKey: showActionsMenu,
+  });
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
@@ -2342,14 +2346,14 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             style={[styles.actionsMenu, { top: insets.top + 60 }]}
             accessibilityViewIsModal
           >
-            <Pressable
+            {features.showSharing && (<Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowShareModal(true); }}
               accessibilityRole="button"
             >
               <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Share</Text>
-            </Pressable>
+              <Text style={styles.actionsMenuText}>{features.sharingLabel}</Text>
+            </Pressable>)}
             <Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowColorModal(true); }}
@@ -2360,17 +2364,17 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               <Text style={styles.actionsMenuText}>Color</Text>
             </Pressable>
 
-            <Pressable
+            {features.showBackground && (<Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowBackgroundModal(true); }}
               accessibilityRole="button"
-              accessibilityLabel="Change expense record background"
+              accessibilityLabel={features.canChangeBackground ? 'Change expense record background' : 'Remove expense record background'}
             >
               <Ionicons name="image-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Background</Text>
-            </Pressable>
+              <Text style={styles.actionsMenuText}>{features.canChangeBackground ? 'Background' : 'Remove background'}</Text>
+            </Pressable>)}
 
-            <Pressable
+            {features.canExport && (<Pressable
               style={({ pressed }) => [
                 styles.actionsMenuItem,
                 pressed && styles.actionsMenuItemPressed,
@@ -2384,7 +2388,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
             >
               <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.actionsMenuText}>Export</Text>
-            </Pressable>
+            </Pressable>)}
 
             <Pressable
               style={({ pressed }) => [
@@ -2473,6 +2477,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
           summaryNote={summaryNote}
           currency={currency}
           recordTitle={title}
+          canExport={features.canExport}
           saveStatus={saveStatus}
           onSave={handleSaveCategory}
           onDelete={handleDeleteCategory}
@@ -2493,7 +2498,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
 
       <NoteExportModal
         noteId={noteId}
-        visible={showExportModal}
+        visible={showExportModal && features.canExport}
         onClose={() => setShowExportModal(false)}
         title={title}
         rows={rows}

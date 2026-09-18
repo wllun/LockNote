@@ -26,6 +26,7 @@ import { noteEditingAccessService } from '../services/noteEditingAccessService';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
 import NoteBackgroundLayer from '../components/note-background-layer';
+import { useNoteFeatureVisibility } from '../hooks/use-note-feature-visibility';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { collaborationService } from '../services/collaborationService';
 import { lockPasswordService } from '../services/lockPasswordService';
@@ -268,6 +269,9 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showDeletePasswordModal, setShowDeletePasswordModal] = useState(false);
+  const features = useNoteFeatureVisibility(noteId, {
+    backgroundUri: noteBackgroundUri, attachmentCount: 0, readOnly: isReadOnly, refreshKey: showActionsMenu,
+  });
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [activeDrag, setActiveDrag] = useState(null);
@@ -1222,24 +1226,24 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
               <Ionicons name="color-palette-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.actionsMenuText}>Color</Text>
             </Pressable>
-            <Pressable
+            {features.showBackground && (<Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowBackgroundModal(true); }}
               accessibilityRole="button"
-              accessibilityLabel="Change checklist background"
+              accessibilityLabel={features.canChangeBackground ? 'Change checklist background' : 'Remove checklist background'}
             >
               <Ionicons name="image-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Background</Text>
-            </Pressable>
-            <Pressable
+              <Text style={styles.actionsMenuText}>{features.canChangeBackground ? 'Background' : 'Remove background'}</Text>
+            </Pressable>)}
+            {features.showSharing && (<Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => { setShowActionsMenu(false); setShowShareModal(true); }}
               accessibilityRole="button"
             >
               <Ionicons name="people-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Share</Text>
-            </Pressable>
-            <Pressable
+              <Text style={styles.actionsMenuText}>{features.sharingLabel}</Text>
+            </Pressable>)}
+            {features.canExport && (<Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => {
                 setShowActionsMenu(false);
@@ -1250,7 +1254,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
             >
               <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.actionsMenuText}>Export</Text>
-            </Pressable>
+            </Pressable>)}
             <Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
               onPress={() => {
@@ -1305,7 +1309,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
       <NoteExportModal
         noteId={noteId}
-        visible={showExportModal}
+        visible={showExportModal && features.canExport}
         onClose={() => setShowExportModal(false)}
         title={title}
         checklistItems={items}

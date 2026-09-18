@@ -54,6 +54,19 @@ the View only or Can edit permission assigned by the owner.
 
 ## Cancellation and Expiry
 
+Unavailable paid actions are hidden rather than shown as upgrade/error buttons.
+This applies to all four editor menus, category transaction export and list
+background actions. Existing backgrounds retain a Remove background action,
+but choosing/changing an image requires Pro. Existing shared notes retain Manage
+access for removing collaborators or leaving; Free does not show new invitations
+or role-change controls. A top-level folder hides its empty child-folder section
+without Pro, but existing subfolders remain visible for recovery and move-out.
+Subfolder and subfolder-note creation controls require Pro. Export stays visible
+for existing premium-content recovery as described below. Invited editors can
+still insert images when the note owner has verified Pro access and the editor
+holds edit access. Visibility is not authorization; action and server checks
+remain authoritative.
+
 Cancelling renewal does not end access immediately. The user keeps the paid plan
 until the end of the already-paid billing period. If a renewal payment fails,
 the server honors RevenueCat's verified entitlement expiry and applicable

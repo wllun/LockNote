@@ -43,6 +43,7 @@ const ExpenseSummaryModal = ({
   onDelete,
   onNoteChange,
   readOnly = false,
+  canExport = false,
 }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -699,7 +700,7 @@ const ExpenseSummaryModal = ({
                 )}
               </ScrollView>
 
-              <View style={styles.categoryTransactionsFooter}>
+              {canExport && (<View style={styles.categoryTransactionsFooter}>
                 <Pressable
                   style={({ pressed }) => [styles.categoryTransactionsExportButton, pressed && styles.pressed]}
                   onPress={() => {
@@ -718,7 +719,7 @@ const ExpenseSummaryModal = ({
                   <Ionicons name="download-outline" size={18} color={colors.primary} />
                   <Text style={styles.categoryTransactionsExportText}>Export</Text>
                 </Pressable>
-              </View>
+              </View>)}
             </View>
           ) : (
             <View style={styles.categoryDeleteConfirmation}>
@@ -775,7 +776,7 @@ const ExpenseSummaryModal = ({
     </Modal>
     <NoteExportModal
       noteId={noteId}
-      visible={!!categoryExport}
+      visible={!!categoryExport && canExport}
       onClose={() => setCategoryExport(null)}
       type="expense-category"
       title={categoryExport?.name ?? ''}

@@ -91,6 +91,14 @@ Local action gating and server quota/expiry enforcement are implemented in
 `202609170001_premium_plan_2.sql`. Deploy/configure the RevenueCat webhook and
 backfill existing subscribers before releasing enforcement on a paid service.
 
+UI visibility uses the same tier matrix through `premium-visibility.mjs` and
+`use-note-feature-visibility.js`. Unavailable new paid actions are omitted from
+editor/list menus and empty child-folder sections. Existing premium content,
+background removal, shared-note access management, subfolder move-out and
+eligible recovery exports remain accessible. The existing edit-lease response
+supplies the owner's verified plan for incoming image controls; visibility does
+not bypass any local action or server authorization checks.
+
 Expiry must downgrade the account to Free without deleting local or cloud note
 data. Local editing continues at Home and in top-level folders; notes inside
 subfolders become read-only without Pro. Users can move notes out or un-nest

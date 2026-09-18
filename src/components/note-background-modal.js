@@ -16,12 +16,16 @@ import { pickNoteBackground } from '../utils/note-background-picker';
 import { noteBackgroundPreference } from '../utils/note-background-preference';
 import NoteBackgroundLayer from './note-background-layer';
 import { premiumAccessService } from '../services/premiumAccessService';
+import { useSubscription } from '../context/SubscriptionContext';
+import { canUsePremiumFeature } from '../utils/premium-access.mjs';
 
 const NoteBackgroundModal = ({ visible, noteId, value, onClose, onChanged }) => {
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
+  const { activePlanId, loading } = useSubscription();
+  const canChangeBackground = !loading && canUsePremiumFeature(activePlanId, 'backgrounds');
 
   useEffect(() => {
     if (!visible) setBusy(false);
@@ -118,10 +122,10 @@ const NoteBackgroundModal = ({ visible, noteId, value, onClose, onChanged }) => 
             )}
           </View>
 
-          <Text style={styles.helper}>Choose one image up to 10 MB. It is not included in sync, sharing, or backups.</Text>
+          {canChangeBackground && <Text style={styles.helper}>Choose one image up to 10 MB. It is not included in sync, sharing, or backups.</Text>}
 
           <View style={styles.actions}>
-            <Pressable
+            {canChangeBackground && (<Pressable
               style={({ pressed }) => [styles.primaryButton, pressed && !busy && styles.pressed]}
               onPress={chooseImage}
               disabled={busy}
@@ -135,7 +139,7 @@ const NoteBackgroundModal = ({ visible, noteId, value, onClose, onChanged }) => 
                 <Ionicons name="images-outline" size={20} color={colors.card} />
               )}
               <Text style={styles.primaryButtonText}>{value ? 'Change image' : 'Choose image'}</Text>
-            </Pressable>
+            </Pressable>)}
             {!!value && (
               <Pressable
                 style={({ pressed }) => [styles.removeButton, pressed && !busy && styles.pressed]}

@@ -10,6 +10,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, shadow, useTheme } from '../theme';
+import { useSubscription } from '../context/SubscriptionContext';
+import { canUsePremiumFeature } from '../utils/premium-access.mjs';
 
 const ItemActionsModal = ({
   visible,
@@ -21,6 +23,7 @@ const ItemActionsModal = ({
   onToggleLock,
   onColor,
   onBackground,
+  hasBackground = false,
   onMove,
   onArchive,
   trashMode = false,
@@ -31,6 +34,8 @@ const ItemActionsModal = ({
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
+  const { activePlanId, loading } = useSubscription();
+  const canChangeBackground = !loading && canUsePremiumFeature(activePlanId, 'backgrounds');
   const isNote = itemType === 'note';
   const title = trashMode
     ? 'Trash actions'
@@ -139,17 +144,17 @@ const ItemActionsModal = ({
             </Pressable>
           )}
 
-          {!trashMode && !archiveMode && isNote && !!onBackground && (
+          {!trashMode && !archiveMode && isNote && !!onBackground && (canChangeBackground || hasBackground) && (
             <Pressable
               style={({ pressed }) => [styles.action, pressed && styles.pressed]}
               onPress={() => runAction(onBackground)}
               accessibilityRole="button"
-              accessibilityLabel="Change note background"
+              accessibilityLabel={canChangeBackground ? 'Change note background' : 'Remove note background'}
             >
               <View style={styles.actionIcon}>
                 <Ionicons name="image-outline" size={20} color={colors.textSecondary} />
               </View>
-              <Text style={styles.actionText}>Background</Text>
+              <Text style={styles.actionText}>{canChangeBackground ? 'Background' : 'Remove background'}</Text>
             </Pressable>
           )}
 

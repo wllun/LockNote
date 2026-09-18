@@ -40,6 +40,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
   const offlineCallbackRef = useRef(onOffline);
   const offlineNotifiedRef = useRef(false);
   const ownsLeaseRef = useRef(false);
+  const ownerPlanRef = useRef(null);
   const onlineRef = useRef(online);
   const appStateRef = useRef(appState);
   const syncRef = useRef(() => {});
@@ -129,10 +130,11 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
         }
 
         const lease = ownsLeaseRef.current && !renewLease
-          ? { collaborative: true, canEdit: true, reason: 'owner', acquired: true }
+          ? { collaborative: true, canEdit: true, reason: 'owner', acquired: true, ownerPlan: ownerPlanRef.current }
           : await collaborationService.acquireEditLease(noteId);
         if (!mounted) return;
         ownsLeaseRef.current = lease.acquired === true;
+        ownerPlanRef.current = lease.ownerPlan ?? null;
         if (onlineRef.current !== true || appStateRef.current !== 'active') {
           pauseForAvailability();
           return;
@@ -148,7 +150,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
         if (result.changed) await callbackRef.current?.(result.note);
         if (isReadOnlyCollaborativeNote(result.note)) {
           releaseLease();
-          publishAccess({ collaborative: true, status: 'viewer', canEdit: false });
+          publishAccess({ collaborative: true, status: 'viewer', canEdit: false, ownerPlan: lease.ownerPlan });
           return;
         }
         publishAccess({

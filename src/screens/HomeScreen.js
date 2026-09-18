@@ -798,6 +798,7 @@ const HomeScreen = ({ navigation }) => {
         itemType={itemActions.type}
         isPinned={!!itemActions.item?.is_pinned}
         isLocked={!!itemActions.item?.password}
+        hasBackground={!!itemActions.item?.background_image_uri}
         onClose={closeItemActions}
         onTogglePin={() => {
           if (itemActions.type === 'folder') {
