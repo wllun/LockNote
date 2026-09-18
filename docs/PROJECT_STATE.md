@@ -4,6 +4,8 @@ _Snapshot: 2026-09-18. Check off items as they land._
 
 ## Done
 
+- [X] Subscription pricing updated to USD — Plus US$1.99/month or US$19.99/year; Pro US$3.99/month or US$39.99/year; Free US$0. Monthly fallback labels and pricing/setup documents match. Live localized store prices remain authoritative; store price configuration and yearly checkout/packages remain pending.
+
 - [X] Pro subfolder editing policy — existing folders and notes stay visible after expiry/downgrade, but plain, checklist, expense and reminder notes inside subfolders become read-only without Pro. Editors explain the restriction and offer Move note; moving to Home/top-level folders or moving the whole subfolder to Home restores editing. Nothing moves automatically. Creating notes/moving notes into subfolders requires Pro; pending Pro auto-saves may finish, exports/import/sync recovery remain available, and bulk currency changes skip read-only records. Renewing Pro restores editing; incoming shared-note access remains owner-funded.
 
 - [X] Premium Proposal 2 enforcement — Plus/Pro export and owner sharing; Pro image additions/cloud uploads, background changes and one-layer nested-folder organization. Existing premium content remains readable and locally exportable after downgrade; owners can keep editing local shared drafts outside subfolders while remote collaboration pauses. Free invitees are funded by the owner's plan. Server-owned subscriptions, authenticated canonical RevenueCat webhook, 25/75/750 MB combined quotas, serialized upload reservations, usage display and no-upload recovery are implemented. Deployment, secret configuration, existing-subscriber backfill and live payment/device verification remain pending; automatic/background sync remains planned.
@@ -79,7 +81,7 @@ _Snapshot: 2026-09-18. Check off items as they land._
 - [X] Set password (one shared password for note locks; individual folder passwords)
 - [X] Theme mode (light/dark, plus system)
 
-### Phase 2 — LockNote Plus — proposed RM4.90/month
+### Phase 2 — LockNote Plus — US$1.99/month or US$19.99/year
 
 - [X] Login — Profile tab with real Supabase Auth (email/password sign up + sign in, session persisted via AsyncStorage). Account login remains Free.
 - [X] Sync DB — Profile pushes/pulls private/owned notes and folders through account-scoped Supabase RPCs. Deletions and root-note semantics are preserved. Proposal 2 server enforcement implements 25 MB Free, 75 MB Plus and 750 MB Pro combined notes/images, with read-only recovery above the limit.
@@ -87,7 +89,7 @@ _Snapshot: 2026-09-18. Check off items as they land._
 - [ ] Automatic/background sync — add lifecycle/network-triggered foreground sync first, followed by best-effort platform background execution with safe retry and conflict handling.
 - [X] Searchable — remains a Free offline feature.
 
-### Phase 3 — LockNote Pro attachments — proposed RM9.99/month
+### Phase 3 — LockNote Pro attachments — US$3.99/month or US$39.99/year
 
 - [X] Plain-note inline image attachments — up to 20 cursor-positioned images per note, maximum 5 MB source optimized below 1 MB, native/web local-first storage, wrapping rows, two-axis drag/drop, proportional resizing, preview/removal, Undo/Redo, matching inline PDF/image export and optional Supabase reconciliation. Proposal 2 gates new images/cloud writes to the owner's Pro plan; existing images stay viewable/downloadable after downgrade. Deploy migrations through `202609170001_premium_plan_2.sql` and configure the webhook before cloud image writes.
 - [ ] Optional cloud sync for local custom note backgrounds.

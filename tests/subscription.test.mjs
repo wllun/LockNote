@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
 import {
   FREE_PLAN_ID,
   ANDROID_UPGRADE_REPLACEMENT_MODE,
@@ -15,6 +16,19 @@ const plans = [
   { id: 'plus', entitlementId: 'plus', packageId: 'plus_monthly' },
   { id: 'pro', entitlementId: 'pro', packageId: 'pro_monthly' },
 ];
+
+test('uses the agreed USD fallback prices without changing monthly package mappings', async () => {
+  const source = await readFile(new URL('../src/config/premiumPlans.js', import.meta.url), 'utf8');
+  const { PREMIUM_PLANS } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+  assert.deepEqual(PREMIUM_PLANS.map(({ id, packageId, price, yearlyPrice, period }) => ({
+    id, packageId, price, yearlyPrice, period,
+  })), [
+    { id: 'plus', packageId: 'plus_monthly', price: 'US$1.99', yearlyPrice: 'US$19.99', period: 'per month' },
+    { id: 'pro', packageId: 'pro_monthly', price: 'US$3.99', yearlyPrice: 'US$39.99', period: 'per month' },
+  ]);
+  const screen = await readFile(new URL('../src/screens/PremiumScreen.js', import.meta.url), 'utf8');
+  assert.ok(screen.includes('storePackage?.product?.priceString ?? plan.price'));
+});
 
 test('uses Free when no paid entitlement is active', () => {
   assert.equal(getActivePlan(null, plans), FREE_PLAN_ID);

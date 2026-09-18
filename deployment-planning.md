@@ -94,7 +94,7 @@ Purpose: validate usefulness, reliability, onboarding, and willingness to pay.
 - [ ] Collect feedback through one documented channel.
 - [ ] Track crashes, failed authentication emails, failed syncs, duplicate/conflicting notes, notification failures, export failures, and data-loss reports.
 - [ ] Ask which feature caused testers to return: notes, expenses, reminders, offline privacy, sync, or collaboration.
-- [ ] Ask whether RM4.90/month for Plus and RM9.99/month for Pro feel justified.
+- [ ] Ask whether US$1.99/month or US$19.99/year for Plus and US$3.99/month or US$39.99/year for Pro feel justified; show testers their actual localized store prices.
 - [ ] Fix release-blocking failures and issue another closed-test build before production.
 
 For personal Google Play developer accounts created after 13 November 2023, production access currently requires at least 12 testers continuously opted into a closed test for 14 days. See [Google Play testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en-GB).
@@ -210,7 +210,7 @@ EAS Free currently includes up to 15 Android and 15 iOS builds per month in a lo
 
 Supabase Pro currently begins at USD 25/month and Resend Pro begins at USD 20/month. See [Supabase pricing](https://supabase.com/pricing) and [Resend pricing](https://resend.com/pricing).
 
-At RM4.90 per Plus subscription, budget approximately **25–30 active paying subscribers** to cover an initial RM105–120 monthly backend cost after allowing for store commission and exchange-rate variation. This is a cost break-even estimate, not a profit forecast.
+The agreed USD prices are Plus US$1.99/month or US$19.99/year and Pro US$3.99/month or US$39.99/year. Recalculate subscriber break-even using actual net localized store proceeds, the monthly/yearly plan mix, fees, taxes and current service costs. The previous RM4.90-based subscriber estimate no longer applies; this is a cost-planning calculation, not a profit forecast.
 
 ## Post-launch operations
 

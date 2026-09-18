@@ -23,7 +23,8 @@ webhook still require deployment and configuration.
 
 | Feature | Free | LockNote Plus | LockNote Pro |
 | --- | ---: | ---: | ---: |
-| Proposed monthly price | RM 0 | RM 4.90 | RM 9.99 |
+| Proposed monthly price (USD) | US$0 | US$1.99 | US$3.99 |
+| Proposed yearly price (USD) | US$0 | US$19.99 | US$39.99 |
 | Core offline notes and folders | Yes | Yes | Yes |
 | Search, note colors, Archive, Trash and locks | Yes | Yes | Yes |
 | PDF and image export | No | Yes | Yes |
@@ -40,6 +41,12 @@ webhook still require deployment and configuration.
 | Custom note backgrounds | No | No | Yes (device-local only) |
 | Nested folders | No | No | Yes (one subfolder layer) |
 | Image attachment storage | None | None | Included in the 750 MB Pro quota |
+
+These are the agreed USD price points, not live exchange-rate conversions.
+Actual checkout prices are configured in the stores and displayed using
+RevenueCat's localized store price. Monthly checkout is implemented; yearly
+checkout and its store/RevenueCat packages remain pending. Annual prices save
+approximately 16% compared with twelve monthly payments.
 
 LockNote Plus or Pro is required for the owner to create or actively synchronize
 a shared note. An invited person only needs a free LockNote account and follows

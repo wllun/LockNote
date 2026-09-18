@@ -4,7 +4,9 @@ export const PREMIUM_PLANS = [
     entitlementId: 'plus',
     packageId: 'plus_monthly',
     name: 'LockNote Plus',
-    price: 'RM 4.90',
+    price: 'US$1.99',
+    // Agreed yearly pricing; annual checkout is not yet implemented.
+    yearlyPrice: 'US$19.99',
     period: 'per month',
     description: 'Export your notes and work with others.',
     badge: 'Most popular',
@@ -20,7 +22,8 @@ export const PREMIUM_PLANS = [
     entitlementId: 'pro',
     packageId: 'pro_monthly',
     name: 'LockNote Pro',
-    price: 'RM 9.99',
+    price: 'US$3.99',
+    yearlyPrice: 'US$39.99',
     period: 'per month',
     description: 'Everything in LockNote Plus, plus richer notes and organization.',
     features: [
