@@ -239,7 +239,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
     : access.status === 'local'
       ? 'Editing locally · Cloud collaboration is paused'
     : access.status === 'subscription'
-      ? 'View only · The owner needs an active Plus or Pro plan'
+      ? 'Sharing unavailable · The owner needs an active Plus or Pro subscription'
     : access.status === 'paused'
       ? 'Shared editing is paused while LockNote is in the background'
       : access.status === 'locked'

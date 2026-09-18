@@ -408,8 +408,8 @@ through `apply_verified_subscription`. It verifies a configured Authorization
 secret, honors paid expiry/grace, handles transfers and duplicate/late events, and
 rejects stale snapshots. App users can read only their own subscription and cannot
 write it. Production excludes sandbox subscriptions by default. Owner-funded
-shared saves/leases/invitations pause on Free; owned local drafts outside subfolders remain editable
-and pending, while incoming shared notes remain readable/view-only online.
+sharing stops completely on Free; owned local drafts outside subfolders remain
+editable and pending, while recipients cannot view or edit incoming shared notes.
 
 ## Portable backup and restore
 
@@ -464,6 +464,24 @@ events refresh the local cache, role, editing lease, and an open editor. Shared
 notes are fetched from Supabase only while online; local shared caches are kept
 for synchronization but are never displayed offline. Collaboration synchronizes
 complete saved note snapshots and does not provide character-level CRDT merging.
+
+Sharing reads require an unexpired Plus/Pro plan for the owner. Migration
+`202609180001_shared_note_subscription_visibility.sql` applies this to the
+shared-note/member RLS helper, security-definer list RPC, attachment read/write
+authorization and saves using pre-expiry leases. Owners keep read/recovery and
+recipient-management access even on Free. The content-free subscription-access
+RPC exposes plan/expiry/can-view only to the owner or an existing member.
+All four incoming editor routes wrap their entire content, images and dialogs in
+`SharedNoteViewGate`; authorization must resolve before cached content appears.
+The gate rechecks every 30 seconds, on Realtime events, identity/connectivity
+changes and foreground restoration, and hides at the known expiry even if a
+recheck hangs. Verification failures fail closed. Recipient pending timers and
+staged drafts are cancelled when access becomes unavailable. Shared-list reads
+also recheck periodically and hide at expiry. Suspended caches/memberships are
+retained without soft-deletion, so renewal restores the same local cache IDs and
+media/preferences. Previously exported files/screenshots cannot be recalled;
+already issued attachment download URLs remain valid until their short expiry
+(currently up to five minutes). Suspension blocks issuing new download URLs.
 
 ## Notable state
 

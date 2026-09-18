@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,7 @@ import { getNetworkAvailability } from '../utils/network-availability.mjs';
 import { radius, useTheme } from '../theme';
 import { noteColorPreference } from '../utils/note-color-preference';
 import { noteBackgroundPreference } from '../utils/note-background-preference';
+import { isSharedNoteVisible } from '../utils/shared-note-access.mjs';
 
 const routeFor = (note) => note.note_type === EXPENSE_NOTE_TYPE
   ? 'ExpenseRecordEditor'
@@ -39,6 +41,8 @@ const SharedScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState('');
+  const [now, setNow] = useState(Date.now());
+  const visibleNotes = notes.filter((note) => isSharedNoteVisible(note));
   const loadRequestRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -75,11 +79,27 @@ const SharedScreen = ({ navigation }) => {
     load();
     const unsubscribeFocus = navigation.addListener('focus', load);
     const unsubscribeCloud = collaborationService.subscribe(load);
+    // Owner subscription changes need not produce a readable note Realtime
+    // event. Recheck permissions periodically and on foreground restoration.
+    const recheck = setInterval(load, 30_000);
+    const foreground = AppState.addEventListener('change', (state) => {
+      if (state === 'active') { setNotes([]); setLoading(true); load(); }
+    });
     return () => {
+      ++loadRequestRef.current;
+      clearInterval(recheck);
+      foreground.remove();
       unsubscribeFocus();
       unsubscribeCloud();
     };
   }, [load, navigation]);
+
+  useEffect(() => {
+    const deadlines = notes.map((note) => Date.parse(note.sharing_expires_at)).filter((deadline) => deadline > Date.now());
+    if (!deadlines.length) return undefined;
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(2_147_483_647, Math.max(1, Math.min(...deadlines) - Date.now())));
+    return () => clearTimeout(timer);
+  }, [notes, now]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -134,7 +154,7 @@ const SharedScreen = ({ navigation }) => {
           <Text style={styles.bannerText}>{message}</Text>
         </View>
       )}
-      {notes.length ? notes.map((note, index) => (
+      {visibleNotes.length ? visibleNotes.map((note, index) => (
         <NoteItem
           key={note.id}
           note={note}

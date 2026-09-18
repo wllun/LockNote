@@ -142,7 +142,10 @@ const NoteShareModal = ({ visible, noteId, onClose, onChanged, onLeft }) => {
               </View>
             </View>}
             {!!error && <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">{error}</Text>}
-            <Text style={styles.sectionLabel}>PEOPLE WITH ACCESS</Text>
+            {!incoming && !canInvite && !loading && <View style={styles.notice}>
+              <Text style={styles.noticeText}>Sharing is stopped. Recipients cannot view or edit this note until your Plus or Pro subscription is active again.</Text>
+            </View>}
+            <Text style={styles.sectionLabel}>{!incoming && !canInvite ? 'SAVED RECIPIENTS' : 'PEOPLE WITH ACCESS'}</Text>
             {busy && !members.length ? <ActivityIndicator color={colors.primary} /> : members.map((member) => (
               <View key={member.user_id} style={styles.memberRow}>
                 <View style={styles.avatar}><Text style={styles.avatarText}>{member.email?.[0]?.toUpperCase() || '?'}</Text></View>

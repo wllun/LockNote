@@ -144,7 +144,7 @@ entitlement and Restore purchases returns the same plan.
 
 ## 5. Deploy Proposal 2 Backend Enforcement
 
-1. Apply all migrations through `202609170001_premium_plan_2.sql` using
+1. Apply all migrations through `202609180001_shared_note_subscription_visibility.sql` using
    `npx supabase db push`. This immediately enables server gates, including for
    older app versions. Plan the rollout before doing this on a live paid service.
 2. In Supabase Dashboard → Edge Functions → Secrets, add
@@ -174,8 +174,11 @@ entitlement and Restore purchases returns the same plan.
    subscriber state on every event; non-200 responses request a retry. A brief
    delay between checkout and server entitlement activation is possible.
 8. Verify a Free invited editor can edit a Plus owner's note, and can add images
-   only for a Pro owner. After expiry verify shared reads/downloads still work,
-   owner local edits remain pending, and remote edits/new invitations pause.
+   only for a Pro owner. After expiry verify recipients cannot read, download,
+   export or edit shared notes/images (including an open editor and cached list).
+   Owner local notes/images remain available, local edits stay pending, and
+   recipient management remains available. Renewing Plus/Pro restores sharing;
+   Pro-to-Plus must not stop it. Verify natural expiry without a Free webhook too.
 9. Verify quota growth rejects atomically; shrinking/deleting and read-only
    recovery work without data deletion. Premium shows usage and recovery; Profile
    reports when sync downloaded only instead of claiming local uploads succeeded.

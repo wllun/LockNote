@@ -14,6 +14,7 @@ import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
+import SharedNoteViewGate from '../components/shared-note-view-gate';
 import { noteEditingAccessService } from '../services/noteEditingAccessService';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
@@ -152,6 +153,11 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
   const handleCollaborationAccessChange = useCallback((access) => {
     if (!access?.editAccess && !access?.collaborative) return;
+    if (access.canView === false) {
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+      saveTimeout.current = null;
+      collaborationService.discardStagedDraft(noteId);
+    }
     const readOnly = access.canEdit !== true;
     latest.current.readOnly = readOnly;
     setIsReadOnly(readOnly);
@@ -448,6 +454,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const noteColorTheme = getNoteColorTheme(noteColor, colors);
 
   return (
+    <SharedNoteViewGate noteId={noteId} enabled={shared} navigation={navigation} onUnavailable={handleCollaborationAccessChange}>
     <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top, backgroundColor: noteColorTheme.surface }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <NoteBackgroundLayer uri={features.visibleBackgroundUri} surface={noteColorTheme.surface} />
       <View style={styles.header}>
@@ -564,6 +571,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         onUnlock={handleRemovePassword}
       />
     </KeyboardAvoidingView>
+    </SharedNoteViewGate>
   );
 };
 

@@ -25,7 +25,7 @@ Security tests verify access gates and server authorization, **not encryption**.
 - Keep one disposable clean installation and one installation upgraded from an older supported build with existing data. Never uninstall or clear storage on a user's only copy of notes.
 - Use two devices or independent app/browser sessions for sync and sharing. Sessions A and B can use the same account for private sync. Sharing uses an owner account A, invited editor B and unrelated account C; switch B to viewer when required.
 - Prepare Free, Plus and Pro accounts through verified sandbox subscriptions. Cancellation is not expiry. For expiry, use accelerated sandbox lifecycle or controlled server fixtures in the test environment; do not add a client premium toggle.
-- Configure test email delivery and the allowed account-confirmation, account-reset and LockNote-reset redirects. Configure sharing functions, Realtime, the private image bucket, all migrations through `202609170001_premium_plan_2.sql`, and the authenticated RevenueCat webhook before live-service cases.
+- Configure test email delivery and the allowed account-confirmation, account-reset and LockNote-reset redirects. Configure sharing functions, Realtime, the private image bucket, all migrations through `202609180001_shared_note_subscription_visibility.sql`, and the authenticated RevenueCat webhook before live-service cases.
 - Use a native development/store build for native purchases, notifications, file permissions and keyboard behavior. Expo Go/Test Store and browser checks do not certify Google Play or Apple billing.
 - Disable Wi-Fi **and** cellular data for offline cases. A Wi-Fi connection without working internet is a separate failure condition.
 - Store evidence outside committed test files. Redact emails, tokens, password hashes, private filenames and secrets from screenshots/logs.
@@ -76,7 +76,7 @@ Focused checks do not replace the complete suite for a release. `verify.mjs` che
 | `note-color`, `note-background`, `note-attachment`, `note-export` | Media/export logic; actual managed files, permissions, Gallery and PDF viewing still required |
 | `backup-data`, `trash`, `sqlite-migration-order` | Backup/deletion/migration policies; real SQLite upgrade and restore still required |
 | `private-sync`, `collaboration-note` | Sync and collaboration logic with controlled dependencies; deployed RLS, leases and two-account verification still required |
-| `subscription`, `premium-service`, `premium-access`, `premium-attachments`, `subfolder-edit-access` | Entitlements, gating, owner funding, expiry and pending saves; store/webhook/device verification still required |
+| `subscription`, `premium-service`, `premium-access`, `premium-attachments`, `subfolder-edit-access`, `shared-note-access` | Entitlements, gating, owner funding, complete sharing suspension/renewal, expiry and pending saves; store/webhook/device verification still required |
 | `drag-auto-scroll`, `use-drag-auto-scroll`, `app-update` | Edge-scroll and update-policy logic; finger gestures and installed-build gates still required |
 
 Each entry above refers to `<name>.test.mjs`. Some tests use mocks, extracted callbacks or source assertions. Read the test before claiming integration or end-to-end coverage.
@@ -93,7 +93,7 @@ node scripts/verify-premium-db.mjs locknote-premium-plan2-check
 
 Repeat `pg_isready` until ready before running the script. No port or persistent volume is needed. Record its exit code and final PASS line. Afterward, stop **only the newly created disposable container** with `docker stop locknote-premium-plan2-check`; `--rm` removes its disposable data. The fixture is not idempotent; use a fresh container for another run. Image download requires network access.
 
-It verifies migrations, premium RLS, owner-funded editing/images, reservations, revoked-member uploads, expiry preservation, quota growth/shrink/concurrency, recovery and stale subscription updates. It uses simplified auth/Storage tables, not a full hosted Supabase or RevenueCat installation. Live cases below remain required.
+It verifies migrations, premium RLS, owner-funded editing/images, reservations, revoked-member uploads, complete sharing suspension/renewal and note/image read denial, expiry preservation, quota growth/shrink/concurrency, recovery and stale subscription updates. It uses simplified auth/Storage tables, not a full hosted Supabase or RevenueCat installation. Live cases below remain required. Previously exported files/screenshots cannot be recalled; already-issued five-minute download URLs expire independently of RLS.
 
 ## 4 Installed app test cases
 
@@ -364,7 +364,7 @@ Use the same account on A and B. Test all note types and parent/root relationshi
 | [ ] | SHARE-06 | P0 | Dirty pending local draft receives Realtime update | Unsaved snapshot not replaced; explicit latest/local resolution where permitted; no character merge claim |
 | [ ] | SHARE-07 | P0 | Revoke B, downgrade role or expire owner plan during editing/save | Realtime/access refresh updates UI; server enforcement rejects later unauthorized writes |
 | [ ] | SHARE-08 | P0 | Turn internet off with Shared tab or incoming editor open | No Shared-with-me notes shown offline; cached title/body not left visible through navigation/resume |
-| [ ] | SHARE-09 | P0 | Owner plan expires; owner edits at root; B tries remote edit/invite | Owner local draft remains pending; remote edits/leases/new invitations pause; online existing reads allowed |
+| [ ] | SHARE-09 | P0 | Owner plan expires or downgrades to Free; owner edits at root; B opens/keeps open all four note types with images; renew Plus/Pro | Owner local note/images remain intact and editable at root; draft stays pending. B cannot view/edit/export/download note/images; Shared hides the note and open editors hide cached content at known expiry even with a slow recheck. Pending recipient saves are cancelled. Direct RLS/get/list/save/attachment APIs deny access. Memberships/caches are retained; renewal restores sharing with the same cache/media. Pro-to-Plus and cancellation before paid expiry retain sharing |
 | [ ] | SHARE-10 | P0 | Renew owner plan with newer pending local draft | Reconciliation does not silently overwrite either version; permissions/leases resume safely |
 | [ ] | SHARE-11 | P0 | C enumerates memberships, shared rows, images and share-email function | Access denied; no arbitrary account-email enumeration or owner impersonation |
 | [ ] | SHARE-12 | P1 | Realtime reconnect, repeated open/close and list focus | Correct last-editor/collaborator metadata; no duplicate subscriptions or stale revoked note |

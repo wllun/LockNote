@@ -3,6 +3,7 @@ import { attachmentRepo } from '../db/attachmentRepo';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 import { noteEditingAccessService } from './noteEditingAccessService';
 import { premiumAccessService } from './premiumAccessService';
+import { hasActiveSharingSubscription, sharedNoteAccessError } from '../utils/shared-note-access.mjs';
 import {
   SHARE_ORIGIN_INCOMING,
   SHARE_ROLE_EDITOR,
@@ -62,6 +63,16 @@ const dirtyDrafts = new Map();
 // A snapshot staged while Pro was active may finish its existing auto-save
 // after expiry. This is not permission to stage further edits after expiry.
 const proDraftGrants = new Map();
+
+const requireIncomingAccess = async (local) => {
+  if (local?.share_origin !== SHARE_ORIGIN_INCOMING) return null;
+  await requireCloud();
+  const access = unwrap(await supabase.rpc('get_note_subscription_access', { p_note_id: local.cloud_id }));
+  if (!access) throw sharedNoteAccessError('revoked');
+  if (!hasActiveSharingSubscription(access)) throw sharedNoteAccessError();
+  if (access.can_view !== true) throw sharedNoteAccessError('revoked');
+  return access;
+};
 
 const draftsMatch = (draft, updates) => draft
   && draft.title === updates.title
@@ -193,6 +204,27 @@ const enqueueSave = (noteId, operation) => {
 };
 
 export const collaborationService = {
+  discardStagedDraft(noteId) {
+    dirtyDrafts.delete(noteId);
+    proDraftGrants.delete(noteId);
+  },
+
+  async getSharedViewAccess(noteId) {
+    const local = await noteRepo.getById(noteId);
+    if (!local || local.share_origin !== SHARE_ORIGIN_INCOMING || !local.cloud_id) {
+      return { canView: false, status: 'revoked' };
+    }
+    try {
+      const access = await requireIncomingAccess(local);
+      return { canView: true, status: 'active', expiresAt: access.expires_at };
+    } catch (error) {
+      this.discardStagedDraft(noteId);
+      if (error.code === 'SHARING_INACTIVE') return { canView: false, status: 'subscription' };
+      if (error.code === 'SHARED_ACCESS_REVOKED') return { canView: false, status: 'revoked' };
+      throw error;
+    }
+  },
+
   stageDraft(noteId, updates) {
     if (!noteId || !updates) return;
     dirtyDrafts.set(noteId, {
@@ -215,12 +247,21 @@ export const collaborationService = {
     const { data, error } = await supabase.rpc('list_shared_notes');
     if (error) throw error;
     const cachedBeforeRefresh = await noteRepo.getSharedWithMe();
-    const activeCloudIds = new Set((data || []).map((remote) => remote.id));
+    const visible = (data || []).filter((remote) => hasActiveSharingSubscription({
+      plan: remote.owner_plan, expires_at: remote.owner_subscription_expires_at,
+    }));
+    const activeCloudIds = new Set(visible.map((remote) => remote.id));
     for (const cached of cachedBeforeRefresh) {
-      if (!activeCloudIds.has(cached.cloud_id)) await noteRepo.softDelete(cached.id);
+      // Absence can mean suspension, not deletion. Keep hidden local media and
+      // preferences attached to the same cache ID for a later renewal.
+      if (!activeCloudIds.has(cached.cloud_id)) this.discardStagedDraft(cached.id);
     }
     const cached = [];
-    for (const remote of data || []) cached.push(await cacheRemote(remote));
+    for (const remote of visible) {
+      const note = await cacheRemote(remote);
+      if (note) cached.push({ ...note, sharing_owner_plan: remote.owner_plan,
+        sharing_expires_at: remote.owner_subscription_expires_at });
+    }
     return cached;
   },
 
@@ -247,6 +288,7 @@ export const collaborationService = {
     if (!local?.cloud_id) {
       return { collaborative: false, canEdit: true, reason: 'private' };
     }
+    await requireIncomingAccess(local);
     const { data: ownerAccess, error: accessError } = await supabase.rpc('get_note_subscription_access', { p_note_id: local.cloud_id });
     if (accessError) throw accessError;
     if (ownerAccess?.plan === 'free') {
@@ -288,6 +330,7 @@ export const collaborationService = {
       && draftsMatch(proDraftGrants.get(noteId), updates);
     return await enqueueSave(noteId, async () => {
       const beforeSave = await noteRepo.getById(noteId);
+      await requireIncomingAccess(beforeSave);
       if (isReadOnlyCollaborativeNote(beforeSave)) throw createReadOnlyError();
       const changesContent = (updates.title !== undefined && updates.title !== beforeSave?.title)
         || (updates.content !== undefined && updates.content !== beforeSave?.content);
@@ -399,6 +442,7 @@ export const collaborationService = {
   async refreshNote(noteId) {
     const local = await noteRepo.getById(noteId);
     if (!local?.cloud_id) return { note: local, changed: false };
+    await requireIncomingAccess(local);
     await requireCloud();
     const remote = unwrap(await supabase.rpc('get_shared_note', { p_note_id: local.cloud_id }));
     const remoteContext = remoteWithLocalFallback(remote, local);
@@ -450,6 +494,7 @@ export const collaborationService = {
 
   async resolveConflict(noteId, strategy) {
     const local = await noteRepo.getById(noteId);
+    await requireIncomingAccess(local);
     if (strategy === 'local' && isReadOnlyCollaborativeNote(local)) throw createReadOnlyError();
     if (strategy === 'local') await noteEditingAccessService.requireNote(local);
     await requireCloud();

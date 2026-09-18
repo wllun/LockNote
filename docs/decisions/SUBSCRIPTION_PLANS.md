@@ -82,9 +82,14 @@ After the paid period expires:
   owner-funded collaboration pause.
 - Existing cloud note data remains read-only and available for download or
   one-way recovery.
-- Existing shared notes remain readable, but remote edits and new invitations
-  pause when the owner's plan is no longer active.
-- Existing attachments remain viewable and downloadable; new attachment uploads
+- Sharing stops completely when the owner has no active Plus/Pro subscription.
+  Recipients cannot view, edit, export or download the shared note/images;
+  suspended notes disappear from Shared and an already-open editor hides its
+  cached content. The owner's local note remains available and editable outside
+  Pro-only subfolders. Memberships and hidden recipient caches are retained, so
+  renewal restores sharing unless the owner removed a recipient. Pro-to-Plus
+  keeps sharing active. Cancellation alone does not stop sharing before expiry.
+- Owners' existing attachments remain viewable and downloadable; new attachment uploads
   require LockNote Pro.
 - Existing custom backgrounds are hidden in editors, cards and settings previews
   without active Pro (including Plus). Their device-local files/Blobs and saved
@@ -154,7 +159,9 @@ owner per deferred transaction snapshot rather than once per uploaded row.
 The Premium screen shows server usage/limit and a no-upload recovery action;
 over-quota sync automatically falls back to recovery while preserving newer
 local edits. An expired owner can edit locally without publishing; incoming
-shared notes remain view-only until the owner subscribes again.
+shared notes are hidden/inaccessible until the owner subscribes again. The
+follow-up `202609180001_shared_note_subscription_visibility.sql` enforces read
+suspension in RLS, list/get/save RPCs and attachment access without deleting data.
 
 The webhook fetches canonical RevenueCat subscribers rather than trusting event
 ordering or a client plan. Duplicate events converge safely; stale snapshots
