@@ -1,4 +1,4 @@
-# LockNote Setup TODO
+# LockNote Setup and Repository Cleanup TODO
 
 _Created: 2026-09-19. Check off tasks after configuration and verification._
 
@@ -91,7 +91,7 @@ Real native payments require an appropriate native development/store build and c
 - [ ] Edit and delete test notes across both devices, synchronizing each device explicitly; verify changes transfer and deleted notes do not return.
 - [ ] Verify another account cannot read these private records.
 
-RevenueCat setup is not needed for Free manual sync within its quota. Existing device-local notes can repopulate truncated cloud tables when synchronized; this is expected. Automatic/background sync remains unimplemented.
+RevenueCat setup is not needed for Free manual sync within its quota. Existing device-local notes can repopulate truncated cloud tables when synchronized; this is expected. Plus/Pro opt-in automatic/background record sync is implemented; a rebuilt native app and live device verification are still required. See [Background Sync](docs/BACKGROUND_SYNC.md).
 
 ## 5. Parked: sandbox-only dummy subscription seeder
 
@@ -180,3 +180,79 @@ Database migrations and dummy subscription seeds do not complete backend setup. 
 6. [ ] **Force update:** configure Android/iOS policy rows and validate their replacement URLs/build numbers. Keep `force_update_enabled = false` until update-capable installed builds and their replacement builds are available to users.
 
 Use separate test accounts/projects for destructive, quota, and subscription tests. A successful migration or seed is not evidence that RLS, Storage, purchases, or webhook delivery work in production.
+
+## 7. Parked: clean up files included in Git commits
+
+This is a cleanup plan, not authorization to delete files or rewrite Git history. Documentation, tests and AI guidance are useful source files; they do not need to be removed simply because they are not app runtime code. Review each candidate before deleting or untracking it, and keep cleanup separate from feature commits.
+
+### AI guidance and installed skills
+
+- [ ] Keep `AGENTS.md` as the shared project rules and `CLAUDE.md` as its small `@AGENTS.md` entry point. Remove contradictory or duplicated instructions, not the guidance itself.
+- [ ] Review tracked `.claude/settings.json` and `.claude/launch.json`: keep portable, intentional team configuration; move machine-specific paths, personal permissions and private values to ignored local configuration. Do not ignore the entire `.claude/` directory if its project skills/configuration are intentionally shared.
+- [ ] Decide whether `.agents/skills/drawio-skill/`, `.agents/skills/ui-ux-pro-max/` and `.claude/skills/verify-locknote-task/` are shared project dependencies or personal tooling. If shared, retain required scripts/data/references and upstream license notices, and document their source/version. If personal, document installation before untracking them.
+- [ ] Preserve the diagram generator dependency: `scripts/generate-project-diagrams.cjs` currently imports the SQL parser from `.agents/skills/drawio-skill/scripts/`. Do not remove that skill without providing/documenting a replacement and verifying diagram regeneration.
+- [ ] Remove tracked generated Python caches from `.agents/skills/ui-ux-pro-max/scripts/__pycache__/` from the Git index, while keeping local files. Add ignore rules for `__pycache__/` and `*.py[cod]`; do not remove the skill's actual source or tests.
+
+### Environment, credentials and private data
+
+- [ ] Keep `.env.example` tracked with placeholders and explanatory comments only. Keep actual `.env` values, server secrets, database/SMTP passwords, access tokens and signing credentials out of Git.
+- [ ] Review `.gitignore` coverage for additional real environment files such as `.env.production`, `.env.development` and `.env.test`. The current root rules ignore `.env` and `.env*.local`, but not every `.env.*` variant. If using `.env.*`, explicitly allow `.env.example` and any other deliberately sanitized templates.
+- [ ] Check already-tracked paths; ignore rules do not untrack existing files. Review matches privately and never paste secret values into reports, commit messages or this TODO.
+- [ ] Review backup/database exports, test reports, screenshots and logs for real emails, user UUIDs, note content, tokens and other private data before committing. Use synthetic fixtures instead of production exports.
+- [ ] If a secret was previously committed, rotate/revoke it first. Removing it from the latest commit does not remove it from history; coordinate any history cleanup separately before force-pushing.
+- [ ] Keep public app configuration distinct from server secrets: Supabase anon and RevenueCat SDK keys are bundled into the app, while service-role keys and RevenueCat webhook/server secrets must never enter the client bundle. Keep this repository's `.env.example` placeholder-only even for public keys.
+
+### Documentation and design artifacts
+
+- [ ] Keep canonical documentation: `README.md`, `docs/ARCHITECTURE.md`, `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, `TODO.md`, build/device commands and current decisions. Update stale claims instead of deleting these references.
+- [ ] Review root `FORCE_UPDATE.md`, `deployment-planning.md` and `supabase-setup.md` against `docs/` and `supabase/README.md`. Consolidate overlapping instructions only after preserving unique setup steps and updating inbound links.
+- [ ] Review `docs/1_MY_DEV_NOTE.md` and `docs/tutorials/`: retain useful sanitized learning notes, or move personal/machine-specific notes outside tracked project documentation.
+- [ ] Review `artifacts/supabase_notes/`, `docs/proposals/` and generated `.docx`/`.pdf` companions. Decide which are deliberate deliverables and which are reproducible/obsolete outputs. Preserve generators and unique content; do not ignore all document formats indiscriminately.
+- [ ] Keep `docs/diagrams/DATABASE_ERD.drawio`, `docs/diagrams/APPLICATION_OVERVIEW.drawio` and their generator if they remain maintained project documentation. Exclude temporary diagram drafts, renderer caches and redundant preview outputs unless intentionally retained.
+- [ ] Review `assets/design/` and `assets/icon-concepts/` for obsolete experiments; preserve approved design references and all assets referenced by `app.config.js` or application code.
+- [ ] Keep `docs/legal/` public legal pages aligned with `src/content/legalDocuments.js`; they are intentional publishing sources, not disposable generated documentation.
+
+### Tests, scripts, builds and generated output
+
+- [ ] Keep `tests/*.test.mjs`, `scripts/verify.mjs`, `scripts/verify-premium-db.mjs` and `docs/testing/TEST_PLAN.md`. Tests and verification scripts belong in Git even though they do not ship in the app bundle.
+- [ ] Review `docs/testing/HOW_TO_TEST.docx` with its linked test plan before consolidating formats. Keep intentional test fixtures/reference snapshots; exclude incidental run logs, coverage output, temporary screenshots and test-result folders.
+- [ ] Add appropriate ignore rules for generated outputs actually used by the project, such as `coverage/`, temporary test reports and Python caches. Avoid broad rules that accidentally hide source fixtures or approved design assets.
+- [ ] Keep dependencies/build caches and installable binaries out of commits: `node_modules/`, `.expo/`, `dist/`, `web-build/`, native build output, APK/AAB/IPA files and temporary export files. Review ignore coverage for binaries created outside the already-ignored `/android` and `/ios` directories.
+- [ ] Keep `package.json`, `package-lock.json`, app/build configuration, Supabase migrations and Edge Function source tracked. Never delete applied migrations as routine cleanup. Keep generated native folders ignored under the current workflow unless adopting an intentional native-source workflow.
+- [ ] Keep reusable, sanitized test seeder source when implemented; exclude real database dumps and production subscription fixtures. Seeders must remain explicitly invoked and test-project guarded.
+
+### Safe cleanup and pre-commit review
+
+Run commands from the project root. Substitute only a reviewed, exact path when untracking a file; `--cached` removes it from Git tracking but leaves the local copy. Do not run a blanket `git rm -r --cached .`.
+
+```powershell
+# Inspect the current work and any staged changes.
+git status --short
+git diff --stat
+git diff --cached --stat
+
+# Inspect tracked environment files (filenames only, not values).
+git ls-files -- '.env' '.env.*' '*.env' 'supabase/.env*'
+
+# Inspect already-tracked paths that also match ignore rules.
+git ls-files -ci --exclude-standard
+
+# Example only: after adding cache ignore rules, untrack this reviewed cache directory.
+git rm -r --cached -- .agents/skills/ui-ux-pro-max/scripts/__pycache__
+
+# Stage only files intentionally included in the cleanup, then inspect their full diff privately.
+git add -- TODO.md .gitignore
+git diff --cached
+git diff --cached --check
+
+# If cleanup changes tests, scripts, configuration or source paths, run verification.
+npm.cmd test
+```
+
+- [ ] Inventory and classify candidates as keep / consolidate / untrack / delete before taking action.
+- [ ] Update `.gitignore` and untrack only approved generated/private files; remember that historical commits still contain previously tracked copies.
+- [ ] Verify documentation links, imported paths and scripts still work after moving/removing anything. If skill placement changes, regenerate and validate both diagrams.
+- [ ] Review the staged diff for secrets, unrelated changes and accidental source/test deletions. Stage exact paths rather than using `git add .` automatically.
+- [ ] Run relevant checks and commit repository housekeeping separately, for example `chore: clean repository tracking and documentation`.
+
+This checklist records future work only. No files have been untracked, deleted or ignored by adding it.
