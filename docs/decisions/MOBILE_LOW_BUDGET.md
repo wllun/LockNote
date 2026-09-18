@@ -1,6 +1,6 @@
 # Mobile-only low-budget deployment plan
 
-Updated: 18 September 2026.
+Updated: 19 September 2026. Linked vendor/store pricing references were reviewed; they are planning inputs, not evidence of configured services.
 
 Scope: LockNote mobile distribution, starting with Android. No public web app deployment is planned. Start with free service tiers and upgrade only when usage or operational requirements justify the cost.
 
@@ -43,6 +43,8 @@ This excludes development-tool subscriptions, hired maintenance, testing devices
 - Mobile-only distribution still needs a publicly accessible privacy policy and suitable support information. Free static hosting can serve these pages without deploying LockNote's web app.
 - RevenueCat's tracked-revenue charge is separate from store commissions. Expo paid plans are not required simply to keep an already installed app running.
 - Local-only notes and backgrounds do not consume Supabase file storage; synced note data and cloud images do.
+- Implemented 25/75/750 MiB account quotas (displayed MB) do not reserve capacity in a shared project. Monitor aggregate database, image bytes/metadata and upload reservations.
+- Automatic record sync is implemented for verified Plus/Pro opt-in. Native OS tasks need a rebuilt binary; binaries/preferences are excluded from automatic transfer. Local Android builds avoid EAS build quotas without adding an EAS subscription.
 
 ## When to reconsider paid services
 
@@ -53,3 +55,5 @@ This excludes development-tool subscriptions, hired maintenance, testing devices
 - Monitoring and backups: support needs or recovery requirements exceed what the free/manual approach can provide.
 
 Prices and quotas can change. Recheck the linked official sources before launch or upgrading. This document is a budget plan, not confirmation that the services have been configured or the app is production-ready.
+
+Follow [setup TODO](../../TODO.md), [deployment plan](../../deployment-planning.md) and [Background Sync](../BACKGROUND_SYNC.md). Static public legal/support/deletion pages are separate from deploying the LockNote web app.

@@ -1,5 +1,7 @@
 # LockNote forced mobile updates
 
+Repository review: 2026-09-19. This guide does not enable enforcement or prove store availability. See [deployment plan](deployment-planning.md), [setup TODO](TODO.md) and [release tests](docs/testing/TEST_PLAN.md).
+
 LockNote 1.1.0 is the update-capable baseline. Android and iOS each check their
 own public `app_update_config` row when the app starts and when it returns to the
 foreground. Web is intentionally excluded because a deployed web app already
@@ -134,6 +136,10 @@ Devices cache the last valid policy for offline launches. A cached force policy
 expires after 72 hours and then fails open, preventing a permanent lockout caused
 only by a Supabase or network outage.
 
+A remote rollback is not instantaneous offline: an existing valid cached policy
+may block until successful refresh or expiry. Do not claim a database change has
+already unblocked every installed device.
+
 ## Release checklist
 
 - Verify the new build preserves all local notes after an update install.
@@ -142,3 +148,4 @@ only by a Supabase or network outage.
 - Test offline with fresh and expired cached policies.
 - Confirm the download is public before raising `minimum_version_code`.
 - Roll out through internal and closed testing before production.
+- Verify the actual candidate build/certificate/policy, not only its displayed version. Background-sync native modules need a rebuilt binary, not hot reload.

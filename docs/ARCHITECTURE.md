@@ -7,6 +7,10 @@ device is offline. A signed-in user can manually sync private folders and notes
 to their own Supabase account, and can separately share an individual note with
 another LockNote account.
 
+Repository snapshot: 2026-09-19; deployment and live acceptance are separate.
+Editable references: [database ERD](diagrams/DATABASE_ERD.drawio) and
+[application overview](diagrams/APPLICATION_OVERVIEW.drawio). See the [documentation index](README.md).
+
 ## Layers
 
 ```
@@ -31,10 +35,12 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
 
 1. `index.js` → `registerRootComponent(App)`
 2. `App.js` calls `initDB()`:
-   - **native** — opens `locknote.db`, sets WAL + foreign keys, creates `folders`/`notes` tables and indexes if absent
+   - **native** — opens `locknote.db`, sets WAL + foreign keys, creates `folders`, `notes`, `sync_tombstones` and `note_attachments`, then finishes guarded migrations/indexes; foreground/headless callers share initialization
    - **web** — no-op (AsyncStorage is schemaless)
-3. Once the database is ready, renders `AppNavigator`; a spinner shows only
-   while the local database is opening.
+3. Theme/Auth/Subscription providers wrap `AppRoot`. The spinner waits for
+   local initialization and the initial update-policy check. Required updates
+   render `AppUpdateGate`; otherwise `AutomaticSyncProvider` wraps `AppNavigator`.
+   These providers coordinate services, not a global store of note data.
 4. Runs best-effort Trash cleanup for soft-deleted records that reached 30 days
    in the background after navigation is available.
 
@@ -149,11 +155,20 @@ confirmation is shown; unlocked-item deletion is unchanged.
 
 ## Data model
 
-Two tables / collections. Timestamps are ISO strings; IDs are generated client-side (`Date.now()` base36 + random suffix).
+Four native tables: `folders`, `notes`, `sync_tombstones`, and `note_attachments`.
+Web uses equivalent records/tombstone keys in AsyncStorage and image metadata/Blobs
+in IndexedDB. Timestamps are ISO strings; local IDs are client-generated
+(`Date.now()` base36 + random suffix). Cloud shared IDs are UUIDs.
 
 **folders**: `id, parent_id (nullable → top-level folder), name, password, is_deleted, is_pinned, is_archived, created_at, updated_at`
 
 **notes**: `id, folder_id (nullable → root note), title, content, note_type, password, is_deleted, is_pinned, is_archived, created_at, updated_at` plus collaboration/sync metadata
+
+Both native note and folder records also contain cloud/origin/role, revision,
+last-editor and sync metadata from `src/db/sqlite.js`; these are not local FKs to
+remote tables. `note_attachments` holds image/note IDs, local URI, MIME,
+dimensions/bytes, order, anchor, width ratio, cloud path, sync state and timestamps.
+Its note FK cascades on hard deletion; attachment rows have no `is_deleted` field.
 
 **sync_tombstones** (native) / per-repository tombstone keys (web): deleted
 folder/note IDs and deletion timestamps. Normal reads still filter deleted rows;
@@ -230,7 +245,7 @@ the note's Viewer/Editor role. The server migration enforces 20 images per note,
 files below 1 MB, and a legacy 2 GB technical cap; the follow-up premium migration
 enforces the smaller 750 MB combined Pro quota. Storage uploads require an
 owner-funded reservation before accepting a file. Deploy migrations
-through `202609170001_premium_plan_2.sql` so shared image dimensions
+through `202609180001_shared_note_subscription_visibility.sql` so shared access, image dimensions
 and drag order reconcile correctly. Portable JSON backups continue to exclude
 binary attachments.
 
@@ -250,11 +265,14 @@ reminders schedule privacy-safe text, but their locally stored content remains
 plaintext like every other locked note. Web preserves and exports reminder
 settings but cannot schedule a device notification.
 
-Plain-note bodies and reminder descriptions open as non-input previews. A
+Existing plain-note bodies and reminder descriptions open as non-input previews. A
 double-tap replaces the selected preview with the editable input and focuses it;
 normal taps and scroll gestures therefore do not summon the keyboard or place a
 cursor. Screen-reader activation enters editing directly. Plain-note attachment
 drag and resize controls are also available only after the body enters editing.
+
+New plain-note drafts instead start with an editable body without forcing the
+keyboard, so a single tap can position the cursor immediately.
 
 Checklist notes use `checklist` and store ordered `{id, text, completed}` items
 as versioned JSON in `content`. `ChecklistEditorScreen` supports inline editing,
@@ -309,7 +327,7 @@ reads alongside the existing folder/deletion indexes.
   Locked notes require their password before user-triggered permanent deletion.
   Empty Trash removes unlocked notes and leaves locked ones for individual confirmation.
 - **Root notes** — `folder_id IS NULL` means the note lives on the Home screen, not in a folder.
-- **Ordering** — folders by `created_at DESC`, notes by `updated_at DESC`.
+- **Ordering** — pinned items first, then folders by `created_at DESC` and notes by `updated_at DESC`.
 
 ## Password protection
 
@@ -438,7 +456,7 @@ See [Background Sync](BACKGROUND_SYNC.md) for rebuilding and device verification
 
 ## Portable backup and restore
 
-Settings → Export Backup builds a schema-versioned `locknote-backup` JSON file
+The backup service's export implementation builds a schema-versioned `locknote-backup` JSON file
 from the repositories' active private/owned records and sync tombstones. The
 file includes folders, notes, note types, pin/archive state, ISO timestamps,
 nullable folder `parent_id` and note `folder_id` relationships, and existing
@@ -468,6 +486,10 @@ Backup JSON contains plaintext note content and is not encrypted.
 Portable backup import and export is a Free, device-local feature. Backup files
 selected by the user are not uploaded to LockNote and do not consume a cloud
 storage quota.
+
+The Settings **Export Backup** action is currently hidden; its handler/service
+remain implemented. Import is visible. Test export through a controlled developer
+harness rather than instructing users to press a nonexistent button.
 
 ## Shared-note collaboration
 

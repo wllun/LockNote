@@ -2,6 +2,11 @@
 
 _Snapshot: 2026-09-19. Check off items as they land._
 
+This records repository implementation, not confirmation that remote migrations,
+SMTP, store products or physical-device tests are complete. Configuration and
+parked Git cleanup live in [TODO.md](../TODO.md); use the [documentation index](README.md)
+and [test plan](testing/TEST_PLAN.md) for operational acceptance.
+
 ## Done
 
 - [X] Complete sharing suspension without subscription — when the owner has no active Plus/Pro plan, recipients cannot view/edit/export/download shared notes or images. Shared lists omit suspended notes, and all four editors hide cached content until authorization resolves and at known expiry, including slow requests, offline/sign-out and account changes. Local pending save timers/staged recipient drafts are cancelled on denial. Server RLS, list/get/save RPCs and attachment access enforce suspension; owner local notes and management/recovery access remain intact. Memberships and hidden caches are retained for renewal; Pro-to-Plus sharing stays active. Apply `202609180001_shared_note_subscription_visibility.sql` before releasing; live backend/two-device verification remains required.
@@ -22,7 +27,7 @@ _Snapshot: 2026-09-19. Check off items as they land._
 - [X] Password lock/unlock on folders and notes (SHA-256 gate). Locked notes share one LockNote password; folders retain their own individual passwords.
 - [X] Require the shared LockNote password before deleting a locked note, or the individual folder password before deleting a locked folder, from lists or editors.
 - [X] Local persistence — SQLite on iOS/Android, AsyncStorage on web
-- [X] Bottom-tab navigation (Home, Settings) with pull-to-refresh
+- [X] Five bottom tabs (Home, Shared, Premium, Settings, Profile); data lists retain focus reloads and applicable pull-to-refresh.
 - [X] Home folder cards show a soft-delete-aware note count badge
 - [X] Folder names can be renamed from Home actions or by tapping the editable title inside an open folder.
 - [X] Expense-note cards show the grand total of daily entries plus checked monthly commitments on Home, search results, and inside folders.
@@ -33,7 +38,8 @@ _Snapshot: 2026-09-19. Check off items as they land._
 
 ### Incomplete / stubbed
 - [X] Wire up search UI — Home has a search bar that queries `folderRepo.search()` + `noteRepo.search()` (added `folderRepo.search()` to both repos); results replace the default lists, password gating preserved
-- [X] Settings backup export — creates a versioned, portable JSON file containing private/owned folders and notes, password hashes, pinned/archive state, note types, root-note relationships, and deletion tombstones. Incoming shared-note caches and account/collaboration identifiers are excluded.
+- [X] Backup export service — creates versioned JSON for private/owned records, hash gates, pin/archive/type/root relationships and tombstones. Incoming caches, account IDs and binary media are excluded. The Settings Export Backup action is currently hidden; Import Backup remains visible.
+- [ ] Decide whether to restore the Settings Export Backup action; do not advertise it as visible until that change is approved and implemented.
 - [X] Backup import/restore — selects and validates a LockNote JSON backup (including schema version, references, timestamps, password-hash shape, duplicates, and a 25 MB limit), previews its counts, and requires an explicit Merge or Replace choice. Merge uses ID/timestamp conflict handling; Replace resets private data while preserving Shared-with-me notes. Both paths preserve `folder_id = null`, soft deletes, and native/web repository parity.
 - [X] Decide on `hardDelete()` — used by empty-draft cleanup and the Trash permanent-delete/30-day retention flows.
 - [X] Clean up empty notes on editor exit — navigation now awaits the hard-delete before returning to Home/Folder, preventing its focus reload from racing and briefly retaining an untouched note. The same guarded exit flushes pending auto-saves for non-empty notes, with unmount cleanup as a fallback.
@@ -52,15 +58,15 @@ _Snapshot: 2026-09-19. Check off items as they land._
   cache valid policies separately per platform for up to 72 hours, and show a
   password-independent blocking update screen only when the remote kill switch
   and minimum build both require it. Web intentionally remains unblocked.
-- [ ] Verify registration, email confirmation, login persistence, password reset, and sign-out end-to-end on Android, iOS, and web. Android and iOS simulator binaries compile successfully on EAS; web production export and local HTTP runtime pass. Interactive cloud-device verification is blocked until EAS Simulator is enabled for the Expo account.
+- [ ] Verify registration, confirmation, session persistence, both recovery flows and sign-out on actual release candidates. Earlier build/export checks are historical evidence, not current acceptance. Local Android/physical-device testing does not require EAS Simulator; verify iOS before releasing it and retain web regressions.
 - [X] Email confirmation returns to `locknote://auth-confirm` on native and the corresponding app URL on web.
 - [ ] Configure production authentication email branding before public release:
   - Supabase's default email service is acceptable during development, but its sender or content may expose Supabase branding.
-  - Recommended setup: connect the hosted Supabase project to Resend using Custom SMTP. As checked on 2026-08-31, Resend Free includes 3,000 transactional emails per month, a 100-email daily limit, SMTP relay, and one custom domain; confirm current limits before launch.
+  - Setup direction: connect the hosted project to a verified sender via Custom SMTP. See [Mobile Low-Budget Plan](decisions/MOBILE_LOW_BUDGET.md) for dated official pricing references; do not treat an old provider quota as permanent.
   - A domain is required for the email sender identity and deliverability, not to host the mobile app or a website. Use a dedicated sending subdomain such as `auth.example.com` and a sender such as `LockNote <no-reply@auth.example.com>`.
   - Add the SPF and DKIM DNS records supplied by the SMTP provider. Add DMARC when the sending domain is ready for production.
   - In Supabase Dashboard, customize the Confirm signup, account-password recovery, LockNote-password recovery, and email-change templates so their subjects and content say LockNote. Preserve Supabase template variables such as `{{ .ConfirmationURL }}` so existing deep-link callbacks continue to work.
-  - Custom SMTP controls the sender name, sender address, and delivery provider; Email Templates control the subject and message design. A custom SMTP provider may be required before Supabase permits fully customized templates.
+  - Custom SMTP controls sender identity/delivery; Email Templates control subjects/content. Template editing and SMTP configuration are separate tasks; test both rather than assuming SMTP is what enables template editing.
 - [X] Sync Notes — manual two-way folder/note sync through the authenticated `sync_private_data` RPC, with RLS, last-write-wins timestamps, soft-delete tombstones, native/web repository parity, and per-account last-sync status. Proposal 2 server quotas are implemented: 25 MB Free, 75 MB Plus, 750 MB Pro combined notes/images. Over-quota sync falls back to no-upload recovery and preserves newer local changes. Deployment and live multi-device verification remain pending.
 - [X] Automatic/background folder/note sync — per-device/account Profile opt-in for Plus/Pro, launch/resume/reconnect/editor-close triggers and a 60-second idle foreground interval; durable offline snapshots, capped exponential retries, one manual/automatic/recovery queue, editor/final-save deferral, original-account Authorization and stale-response guards, fresh server plan/expiry checks and visible last-success/retry/paused status. SDK 54 native tasks use a best-effort 15-minute minimum; web/Expo Go/old APKs fall back to foreground synchronization. Binary images retain open-note/manual sync. Tests pass; new native builds and live two-device/OS-scheduled verification remain required. See [Background Sync](BACKGROUND_SYNC.md).
 - [X] Collaboration Release 1 — explicit sharing by registered email, View only/Can edit roles, owner indicators, collaborator management, realtime refresh, last-editor footer, RLS, revision-protected saves and renewable 90-second leases. Shared-with-me notes remain hidden offline. Proposal 2 now requires Plus/Pro for the owner; invited collaborators only need Free. Expired owner plans pause remote saves/leases/invitations while owned local drafts remain editable and pending. Migrations, webhook setup and live two-account verification still require deployment/configured credentials.
@@ -71,7 +77,7 @@ _Snapshot: 2026-09-19. Check off items as they land._
 - [X] Plus-to-Pro store upgrade — paid Plus users can start the Pro purchase directly. Android supplies the active Plus product with `WITH_TIME_PRORATION`; Apple relies on the shared subscription group and Pro's higher service level. The store calculates and confirms the exact credit and charge. Pro-to-Plus changes remain in store subscription management.
 - [X] Dark mode — palette centralized in `src/theme.js` (`useTheme()` + `makeStyles(colors)`). Theme mode (`system` / `light` / `dark`) is set in Settings, persisted in AsyncStorage (`@locknote_theme`), shared via `ThemeProvider` context; `system` follows the OS via `useColorScheme`. `userInterfaceStyle` is `automatic`.
 - [X] Shared LockNote password and email recovery — every locked note uses one local LockNote password, separate from the Supabase account password even if the user chooses the same text. Settings supports Old/New/Confirm password changes. Forgot Password sends a one-time Supabase email link to the account identity safely bound when the LockNote password is set or changed; the callback can replace the hash on all locked notes. The former app-wide Recovery PIN is removed because someone holding an unlocked device could set it themselves. Legacy per-note passwords remain usable and migrate after successful verification.
-- [X] Cross-platform data portability — manual Sync Notes merges native SQLite and web AsyncStorage data through Supabase, while Settings can export/import a backend-independent LockNote JSON backup.
+- [X] Cross-platform portability — manual sync merges native/web records via Supabase; portable JSON export/import services are backend-independent. Import is visible in Settings; Export Backup is currently hidden.
 - [X] Pinning — `is_pinned` column added to both SQLite tables (migrated via guarded `ALTER TABLE`) and to the web AsyncStorage records. Pinned folders/notes sort first everywhere (lists + search). List actions open by long-press on native or three dots on web; editor actions use a three-dots menu.
 - [X] Contextual list actions — notes can be locked/unlocked, pinned, moved between Home/folders, or soft-deleted; folders can be renamed, pinned, or soft-deleted together with their contained notes. Note action dialogs use the concise `Lock` / `Unlock` labels and verify the shared LockNote password before unlocking.
 - [X] Archive — folder/note actions hide items from Home and search without deleting them. Settings → Archive has separate Folders and Notes sections and can open, restore, or move either type to Trash. Restoring a folder reveals its visible notes while individually archived notes remain archived. Folder containers are still permanently removed when moved to Trash, with all child notes retained in Trash as root notes. Archive state is preserved in backups and private sync.
@@ -87,7 +93,7 @@ _Snapshot: 2026-09-19. Check off items as they land._
 - [X] Set password (one shared password for note locks; individual folder passwords)
 - [X] Theme mode (light/dark, plus system)
 
-### Phase 2 — LockNote Plus — $1.99/month or $19.99/year
+### Phase 2 — LockNote Plus — $1.99/month; $19.99/year target (annual checkout pending)
 
 - [X] Login — Profile tab with real Supabase Auth (email/password sign up + sign in, session persisted via AsyncStorage). Account login remains Free.
 - [X] Sync DB — Profile pushes/pulls private/owned notes and folders through account-scoped Supabase RPCs. Deletions and root-note semantics are preserved. Proposal 2 server enforcement implements 25 MB Free, 75 MB Plus and 750 MB Pro combined notes/images, with read-only recovery above the limit.
@@ -95,9 +101,9 @@ _Snapshot: 2026-09-19. Check off items as they land._
 - [X] Automatic/background sync — foreground triggers, offline retries and best-effort native scheduling implemented; live device verification remains pending. See [Background Sync](BACKGROUND_SYNC.md).
 - [X] Searchable — remains a Free offline feature.
 
-### Phase 3 — LockNote Pro attachments — $3.99/month or $39.99/year
+### Phase 3 — LockNote Pro — $3.99/month; $39.99/year target (annual checkout pending)
 
-- [X] Plain-note inline image attachments — up to 20 cursor-positioned images per note, maximum 5 MB source optimized below 1 MB, native/web local-first storage, wrapping rows, two-axis drag/drop, proportional resizing, preview/removal, Undo/Redo, matching inline PDF/image export and optional Supabase reconciliation. Proposal 2 gates new images/cloud writes to the owner's Pro plan; existing images stay viewable/downloadable after downgrade. Deploy migrations through `202609170001_premium_plan_2.sql` and configure the webhook before cloud image writes.
+- [X] Plain-note inline images — up to 20 per note, source ≤5 MB optimized <1 MB, native/web local storage, text anchors, wrapping rows, drag/resizing, Undo/Redo, export and optional reconciliation. Pro gates additions/cloud writes; retained owner images stay recoverable. Deploy migrations through `202609180001_shared_note_subscription_visibility.sql` and configure verified subscriptions before cloud writes; automatic record sync does not transfer binaries.
 - [ ] Optional cloud sync for local custom note backgrounds.
 
 ### Phase 4 — Export
@@ -114,7 +120,7 @@ _Snapshot: 2026-09-19. Check off items as they land._
 
 When the user presses the Add button, let them choose one of these note types:
 
-- [X] Add selection popup on both the Home and Folder Add buttons (unsupported types are clearly marked as coming soon)
+- [X] Add selection popup on Home/Folder with all four implemented types: plain, checklist, expense and reminder.
 - [X] Note — plaintext
 - [X] Checklist — ordered checkbox items with drag-handle reordering, inline editing, progress, local autosave, list/search previews, pin/password/delete support, PDF/image export, and a 100-active-item limit that preserves legacy oversized lists
 - [X] Checklist and expense-row/bill drag auto-scroll measures the FlatList's actual scroll viewport, waits for valid bounds, and uses only the finger's top/bottom edge position (not row height). Narrower zones, a short edge hold, and capped progressive speed prevent unintended downward scrolling and allow reversing upward; moving to the middle or hovering over Trash stops auto-scroll.
@@ -127,11 +133,12 @@ When the user presses the Add button, let them choose one of these note types:
 
 ### Additional / backlog (unphased)
 
-- [X] Pin — already shipped free in Phase 1 scope; decide which tier it belongs to
+- [X] Pin — Free offline feature for folders and notes.
 - [X] Coloring note — notes can use Default, Rose, Orange, Yellow, Green, Blue, or Purple from list actions and every editor. Semantic colors adapt to light/dark mode and are saved only as a per-device AsyncStorage preference; they are excluded from note rows, backup, private sync, and collaboration.
 - [X] Custom note background images — every note type can select, change, or remove one image (maximum 10 MB) from its editor or Home/Folder note actions. Native copies the image into app document storage; web stores it in IndexedDB. A theme-aware translucent overlay preserves readability, cards show the background, delete cleanup removes managed files, and the preference remains device-local outside note rows, backup, private sync, and collaboration.
 - [X] View controls — Home independently persists Folder List/Strip and Note List/Grid choices. Search results follow their section setting, notes inside folders inherit the Notes choice, and the former combined preference migrates automatically. Mobile contextual actions use long-press, while web retains visible three-dot controls.
-- [X] Trash — Settings lists soft-deleted notes only, with Restore and password-gated Delete forever inside each row's three-dots menu. Folders are deleted permanently while their notes move to Trash as Home notes. Empty Trash safely removes unlocked notes, and local note content is purged after 30 days at startup or when Trash opens.
+- [X] Trash — Settings lists deleted notes with Restore/password-gated Delete forever. Deleted folder containers do not appear in Trash; descendant notes become deleted Home notes. Local folder/note tombstones preserve removals during sync. Empty Trash removes unlocked notes; 30-day maintenance purges local note content.
+- [X] Editable database/application diagrams in `docs/diagrams/`, with a regeneration script and structural validation. They describe local source/migrations, not a queried production database.
 - [X] Archive — Settings module for folders and notes with open, restore, and Move to Trash actions; folder archiving preserves each child note's independent archive state.
 
 ## Caveats (not bugs — document, don't "fix" silently)

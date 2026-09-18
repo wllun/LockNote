@@ -1,6 +1,6 @@
 # LockNote Deployment Plan
 
-_Prepared: 11 September 2026. Store policies, service quotas, and prices can change; recheck every linked source before submission._
+_Reviewed: 19 September 2026. Linked vendor/store references were rechecked; MYR values are illustrative, not live FX quotes. Recheck before submission._
 
 ## Recommendation
 
@@ -25,7 +25,9 @@ The first beta should validate the features that already provide user value:
 - inline images inside plain-note text, including reopen and export order;
 - portable backup export and restore;
 - account registration and login;
-- manual Sync Notes and explicit note sharing, labelled as beta if enabled.
+- manual sync and owner-funded sharing, labelled beta if enabled;
+- paid opt-in automatic record sync with rebuilt native OS tasks and foreground fallback;
+- Pro subfolders/backgrounds and non-destructive downgrade/recovery.
 
 Do not charge testers for Plus or Pro during the first closed beta.
 
@@ -35,13 +37,13 @@ Do not charge testers for Plus or Pro during the first closed beta.
 | --- | --- | --- |
 | Authentication | Implemented, but live registration, confirmation, recovery, persistence, and sign-out remain unverified across platforms | Verify every flow on physical Android and iOS devices and on web if web remains supported |
 | Supabase backend | Migrations and RPC-based sync exist in the repository | Deploy every required migration and Edge Function to the production project; verify with two separate accounts |
-| Synchronization | Manual two-way sync exists | Finish lifecycle/connectivity-triggered sync or clearly advertise synchronization as manual |
+| Synchronization | Manual and paid opt-in automatic record sync implemented | Verify retries, editor/account guards and actual OS tasks; do not promise exact intervals or binary automatic transfer |
 | Collaboration | Roles, Realtime updates, revisions, and editing leases are implemented | Verify owner, view-only, editor, revocation, conflict, lease-expiry, offline, and reconnect cases with two devices |
-| Inline images | Local-first storage, resize/compression, cursor anchors, export, and optional cloud reconciliation are implemented | Deploy both attachment migrations, then verify insert/reopen/sync/delete with two devices and shared Viewer/Editor roles |
+| Inline images | Local storage, anchors/order/width, exports and Pro reconciliation implemented | Apply all attachment/premium/shared-access migrations; verify reservations, downloads, deletions, roles and owner expiry |
 | Authentication email | Production SMTP and LockNote branding are not configured | Connect custom SMTP, verify SPF/DKIM, preserve template callback variables, and test every email template |
 | Account deletion | No complete account-deletion flow was found | Add an easy-to-find in-app deletion path; Google Play also requires a web deletion-request URL |
 | Purchases | RevenueCat client UI is implemented | Configure store products and RevenueCat entitlements, then verify purchase, restore, upgrade, cancellation, expiration, and refund behaviour |
-| Premium enforcement | Feature gating, quota enforcement, and server-owned entitlement persistence are unfinished | Enforce Plus/Pro access and quotas on the server, not only in the app UI |
+| Premium enforcement | Client gates, server entitlements, quotas, expiry/suspension and recovery implemented | Deploy configured webhook/migrations, backfill subscribers and verify live denial/recovery; implementation is not acceptance |
 | Security positioning | Local and synchronized note content is not end-to-end encrypted | State this accurately in the app, privacy policy, store listing, and support documentation |
 | Operations | Free services are suitable for development | Choose production Supabase/SMTP plans, monitoring, backups, support contact, and an incident process |
 
@@ -53,7 +55,7 @@ Apple requires apps that support account creation to let users initiate account 
 - [ ] Confirm the production Android package and iOS bundle identifier.
 - [ ] Create separate development and production environment-variable sets.
 - [ ] Complete the Supabase steps in [supabase-setup.md](supabase-setup.md).
-- [ ] Deploy and record the production Supabase migration version.
+- [ ] Deploy/record migrations through `202609180001_shared_note_subscription_visibility.sql`, both Edge Functions and secrets; coordinate canonical subscriber backfill before gates take effect.
 - [ ] Deploy required Edge Functions without exposing a service-role key in the app.
 - [ ] Configure production SMTP and branded authentication templates.
 - [ ] Implement account deletion and associated cloud-data cleanup.
@@ -81,7 +83,7 @@ Purpose: catch installation, configuration, native API, and crash issues before 
 Suggested build command:
 
 ```powershell
-npx eas-cli@latest build -p android --profile production
+npx.cmd eas-cli@latest build -p android --profile production
 ```
 
 ## Phase 2 — Android closed beta
@@ -112,7 +114,7 @@ Release only when every item in the Production go/no-go checklist is complete.
 Suggested submission command after Play Console service-account configuration:
 
 ```powershell
-npx eas-cli@latest submit -p android --profile production
+npx.cmd eas-cli@latest submit -p android --profile production
 ```
 
 ## Phase 4 — TestFlight and iOS
@@ -126,8 +128,8 @@ npx eas-cli@latest submit -p android --profile production
 Suggested commands:
 
 ```powershell
-npx eas-cli@latest build -p ios --profile production
-npx eas-cli@latest submit -p ios --profile production
+npx.cmd eas-cli@latest build -p ios --profile production
+npx.cmd eas-cli@latest submit -p ios --profile production
 ```
 
 ## Required test matrix
@@ -158,6 +160,8 @@ npx eas-cli@latest submit -p ios --profile production
 - [ ] Share a note as View only and Can edit.
 - [ ] Revoke sharing and verify access disappears.
 - [ ] Verify editing lease acquisition, renewal, release, expiry, crash recovery, and offline recovery.
+- [ ] Verify owner expiry hides recipient lists/editors/images and renewal restores retained memberships/caches.
+- [ ] Run [automatic/background cases](docs/testing/TEST_PLAN.md#5-automaticbackground-sync-acceptance-and-future-exclusions) in rebuilt candidates; record actual OS tasks separately from developer worker tests.
 
 ### Purchases
 
@@ -184,7 +188,7 @@ If any answer is No, continue the closed beta rather than charging public users.
 
 ## Cost plan
 
-These estimates use **USD 1 = approximately RM4.07** and exclude taxes, card conversion, commissions, marketing, legal work, and support labour.
+These estimates use illustrative **USD 1 = RM4.07**, not a current FX quote, excluding taxes, overages, commissions and operating labour. Paid service tiers are capacity/operations choices, not offline-use requirements; see [Mobile Low-Budget Plan](docs/decisions/MOBILE_LOW_BUDGET.md).
 
 ### One-time and annual store costs
 
@@ -194,7 +198,7 @@ These estimates use **USD 1 = approximately RM4.07** and exclude taxes, card con
 | Apple Developer Program | USD 99 per year | RM403/year |
 | Sending/support domain | Vendor-dependent estimate | RM50–100/year |
 
-See [Google Play distribution](https://support.google.com/android-developer-console/answer/16640817?hl=en) and [Apple Developer Program membership](https://developer.apple.com/programs/whats-included/).
+See [Google Play registration](https://support.google.com/googleplay/android-developer/answer/6112435) and [Apple Developer membership](https://developer.apple.com/programs/enroll/).
 
 ### Monthly service costs
 
@@ -220,3 +224,5 @@ The agreed USD prices are Plus $1.99/month or $19.99/year and Pro $3.99/month or
 - Test backup restore and account deletion periodically.
 - Recheck store policies and service pricing before every major release.
 - Maintain a release log containing build numbers, migration versions, Edge Function versions, known issues, and rollback actions.
+
+Use the [documentation index](docs/README.md), [setup TODO](TODO.md), [test plan](docs/testing/TEST_PLAN.md) and [forced-update procedure](FORCE_UPDATE.md). Queued EAS submission is not store acceptance/public availability. Monthly checkout is implemented; annual checkout/products/period labels remain pending. Backup export is implemented but hidden in Settings; verify through a controlled harness or existing fixture.

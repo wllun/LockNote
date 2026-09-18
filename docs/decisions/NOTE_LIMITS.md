@@ -1,5 +1,7 @@
 # Note Character Limits
 
+Repository policy reviewed: 2026-09-19. Limits come from `src/utils/note-limits.mjs` and the checklist payload utility, not SQL column lengths. Counts use JavaScript string length (UTF-16 code units); an emoji may count as more than one unit.
+
 ## Plain notes
 
 | Field | Limit |
@@ -55,11 +57,10 @@ Existing longer reminder descriptions remain unchanged until edited.
 | Monthly commitment name | 120 characters |
 | Monthly summary note | 10,000 characters |
 
-The expense editor always explains the per-row remark limit and shows a live
-counter while a remark is focused. The commitment form displays its limit next
-to the bill-name label. Monthly summary notes show a live count, remaining-count
-warning near the limit, and a limit-reached message. These limits are enforced
-with `TextInput.maxLength` on Android, iOS, and web.
+Expense remarks, commitment names and monthly summary notes show a limit-reached
+dialog when their respective maximum is reached. Previously displayed persistent
+helper text/counters were removed; do not use their absence as proof that limits
+are disabled. Current input/change handlers enforce these bounds on native/web.
 
 ## Storage context
 
@@ -68,3 +69,9 @@ content. Native notes use SQLite `TEXT`, whose storage ceiling is much larger
 than a practical mobile editor should accept, while web notes use AsyncStorage.
 The 50,000-character rule is therefore a product and performance limit rather
 than the underlying database maximum.
+
+Expense rows, commitments and categories are serialized within one note's
+`content`, not one database row per expense entry. Binary inline images are
+separate attachment records/files and are excluded from portable JSON backups.
+Pro gates new image additions/uploads; existing owner images remain recoverable.
+See [database ERD](../diagrams/DATABASE_ERD.drawio), [subscription policy](SUBSCRIPTION_PLANS.md), and [boundary test cases](../testing/TEST_PLAN.md).

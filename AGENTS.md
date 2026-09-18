@@ -2,10 +2,12 @@
 
 LockNote is a local-first Expo / React Native notes app. Editing works offline
 and local storage remains authoritative; optional Supabase services provide
-account authentication, manual sync, collaboration, force-update policy, and
+account authentication, manual and opt-in automatic/background sync, collaboration, force-update policy, and
 signed-in inline-image synchronization.
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making structural changes and [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for the current status and planned work.
+
+Use [docs/README.md](docs/README.md) to find setup, testing and diagram references. [TODO.md](TODO.md) tracks configuration and parked cleanup, not permission to delete/untrack files. Distinguish implementation, hosted deployment and live acceptance when documenting status.
 
 ## Before writing code
 
@@ -24,6 +26,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making structural chang
 - Screens reload their data on the navigation `focus` event. There is no global store; follow the existing pattern unless a requested architectural change requires otherwise.
 - Repositories generate IDs and timestamps. IDs use the existing base-36 format and timestamps are ISO strings; do not rely on database defaults.
 - The note editor uses an 800 ms debounced auto-save. Clear pending timers on unmount and before destructive actions.
+- Automatic sync waits through mounted editors and final save/cleanup. Preserve serialized manual/automatic/recovery operations and account identity guards. Automatic runs transfer folder/note records, not binary images or device preferences.
 
 <!--
 ## Before completing code changes
@@ -35,5 +38,6 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before making structural chang
 
 ## Avoid
 
-- Do not add or expand Supabase or other network behavior without explicit direction. Existing account, sync, collaboration, force-update, and attachment-cloud paths are intentional; see [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
+- Do not add or expand Supabase or other network behavior without explicit direction. Existing account, manual/opt-in automatic sync, collaboration, force-update, and attachment-cloud paths are intentional; see [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
+- Do not commit real `.env` values, server/signing secrets, private exports or generated caches. Preserve placeholder templates, tests and canonical docs; review the cleanup plan before removing tooling/doc directories.
 - Do not introduce a state library, navigation redesign, or new storage abstraction for hypothetical future needs. Match the existing architecture and the scope of the requested change.

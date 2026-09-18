@@ -1,34 +1,41 @@
 # LockNote
 
-A local-first note-taking app with folder organization, password protection, optional account sync, and note sharing. Built with Expo / React Native.
+A local-first note-taking app with folders, password access gates, optional account sync, and owner-funded sharing. Built with Expo SDK 54 / React Native 0.81. Android is the first distribution target; iOS and web remain supported implementation/regression targets.
 
 ## Features
 
 - Folders and notes, with notes nested in folders or at the root
 - Optional locks: one shared LockNote password for all locked notes, plus individual folder passwords (SHA-256 gated — see [Security](#security))
 - Auto-save while editing (debounced)
-- Full-text search across notes (native)
+- Search across folders and note titles/content on native and web
 - Soft delete (items are flagged, not immediately purged)
 - Plain-note inline images inserted between text blocks, with wrapping multi-image rows, long-press drag/drop, and proportional resizing (up to 20 per note)
 - Preview-first plain-note bodies and reminder descriptions; double-tap the content to edit
 - Checklist, Expense Record, and reminder note types
 - Archive, 30-day Trash recovery, PDF/image export, and Undo/Redo
-- Manual two-way account sync across iOS, Android, and web
+- Free manual account sync and Plus/Pro opt-in automatic folder/note sync
 - Per-email note sharing with View only or Can edit access
 - Portable JSON backup export and validated merge/replace restore
 - Runs on iOS, Android, and web
 
 ## Requirements
 
-- Node.js 18+
-- Expo CLI (`npx expo`)
+- Compatible Node.js LTS, at least 20.19.4 for the installed native tooling; Node 18 is unsupported. See the [SDK 54 compatibility table](https://docs.expo.dev/versions/v54.0.0/).
+- npm and the project-local Expo CLI (`npx.cmd expo` in Windows PowerShell)
+- Android SDK/platform-tools and JDK 17 for local Android builds; macOS/Xcode for local iOS builds
 
 ## Run
 
-```bash
-npm install
-npm start        # then press i / a / w for iOS, Android, web
+```powershell
+npm.cmd ci
+npx.cmd expo start --go       # SDK 54-compatible Expo Go for supported features
+# After installing a native development build:
+npx.cmd expo start --dev-client
+# Web regression target:
+npm.cmd run web
 ```
+
+On macOS/Linux use `npm` and `npx`. See [physical-device commands](docs/COMMAND_RUN_APK.md), [AVD commands](docs/COMMAND_RUN_AVD.md), and the [short-directory build workflow](docs/1_MY_DEV_NOTE.md). Expo Go cannot certify native store billing or OS background sync.
 
 No account or backend configuration is needed for offline use. Account sync,
 authentication, and collaboration require a configured Supabase project and the
@@ -40,6 +47,7 @@ Local storage is the primary data source:
 
 - **iOS / Android** — SQLite (`expo-sqlite`), database file `locknote.db`
 - **Web** — AsyncStorage (localStorage), via `*.web.js` repo variants
+- **Inline images** — SQLite metadata/managed files on native; IndexedDB metadata/Blobs on web
 
 Signed-in users can run **Profile → Sync Notes** to merge folders and notes with
 their owner-scoped Supabase snapshot. Manual sync remains Free within 25 MB.
@@ -49,25 +57,28 @@ Normal editing remains offline-first; automatic sync waits for editors to close
 and save. Binary images retain open-note/manual synchronization. See
 [Background Sync](docs/BACKGROUND_SYNC.md) for native builds and verification.
 
-Every user can use **Settings → Export Backup** without an account, then import
-that versioned JSON file on iOS, Android, or web. Import previews the contents
+The portable JSON backup service works without an account. Its **Export Backup**
+Settings action is currently hidden; the implementation remains for developer
+verification. **Settings → Import Backup** is visible on iOS, Android, and web. Import previews the contents
 and requires choosing Merge or Replace. Replace affects private data only and
 keeps Shared-with-me notes. Reminder registrations remain device-local and are
 disabled on restore.
 
-## Planned subscriptions
+## Subscriptions — implemented gates, external setup pending
 
 Account login, offline features, portable local backup, and manual sync within a
-25 MB cloud quota remain Free. LockNote Plus is planned to add PDF/image export,
+25 MB cloud quota remain Free. LockNote Plus adds PDF/image export,
 collaboration, automatic sync, and a 75 MB cloud quota. LockNote Pro adds a
 750 MB combined note-and-image quota, image attachments, note backgrounds, and
-nested folders. Premium gating and plan-aware quota enforcement are not yet implemented.
-If a paid plan expires, local notes remain editable and
-existing cloud data remains read-only and downloadable; expiry never deletes
-notes.
+nested folders (one subfolder layer). Client gates, server-owned subscriptions,
+quotas and expiry/recovery policies are implemented; deployment and live testing
+remain required. Home/top-level notes remain editable after expiry; subfolder
+notes become read-only without Pro, retained backgrounds are hidden, and incoming
+sharing is suspended when the owner lacks Plus/Pro. Expiry never deletes notes.
 
 The Premium tab has RevenueCat checkout, restore, management, localized pricing,
-and active-plan status. Cloud features are deliberately not gated yet. Real
+and active-plan status. Monthly checkout is implemented ($1.99 Plus / $3.99 Pro
+USD targets); yearly checkout remains pending ($19.99 / $39.99 targets). Real
 payments require the external configuration in
 [Subscription Payment Setup](docs/decisions/SUBSCRIPTION_SETUP.md). See
 [Subscription Plans](docs/decisions/SUBSCRIPTION_PLANS.md) for the product policy.
@@ -79,7 +90,7 @@ Password protection is **access gating, not encryption**. Locked notes use one s
 ## Project layout
 
 ```
-App.js                    # Entry: initializes DB, renders navigator
+App.js                    # Providers, DB initialization, update gate, navigator
 src/
 ├── db/
 │   ├── sqlite.js          # SQLite init + schema (native)
@@ -90,11 +101,19 @@ src/
 │   ├── attachmentRepo.js  # Inline image metadata/files (native)
 │   └── attachmentRepo.web.js # Inline images in IndexedDB (web)
 ├── navigation/
-│   └── AppNavigator.js    # Bottom tabs (Home stack + Settings)
-├── screens/               # Home, Folder, NoteEditor, Settings
-├── components/            # FolderItem, NoteItem, PasswordModal
+│   └── AppNavigator.js    # Home, Shared, Premium, Settings, Profile stacks
+├── screens/               # Four editors, folders, account, premium, archive/trash
+├── components/            # Cards, dialogs, access gates, media/export UI
+├── context/               # Auth, subscription and automatic-sync coordination
+├── services/              # Sync, collaboration, media, backup, auth and payments
 └── utils/
     └── crypto.js          # SHA-256 password hashing
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together, [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for current status and the todo list, and [docs/ROADMAP.md](docs/ROADMAP.md) for the phased product plan.
+## Documentation and verification
+
+Start with the [documentation index](docs/README.md). [Architecture](docs/ARCHITECTURE.md), [project state](docs/PROJECT_STATE.md), [roadmap](docs/ROADMAP.md), and [setup/cleanup TODO](TODO.md) have separate purposes. Implemented code does not imply deployed services or device acceptance.
+
+Editable references: [database ERD](docs/diagrams/DATABASE_ERD.drawio) and [application overview](docs/diagrams/APPLICATION_OVERVIEW.drawio), derived from repository schemas rather than live database introspection.
+
+Run `npm.cmd test` on Windows (`npm test` on macOS/Linux). Automated checks do not replace [installed-device/backend testing](docs/testing/TEST_PLAN.md). Keep private credentials, exports, caches and build outputs out of commits; see [cleanup TODO](TODO.md#7-parked-clean-up-files-included-in-git-commits).

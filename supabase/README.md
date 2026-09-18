@@ -1,5 +1,7 @@
 # Supabase backend setup
 
+Updated: 2026-09-19. Instructions are not confirmation of remote deployment. See [full setup](../supabase-setup.md), [setup TODO](../TODO.md), [database ERD](../docs/diagrams/DATABASE_ERD.drawio), and [device/backend tests](../docs/testing/TEST_PLAN.md).
+
 Account sync, Release 1 note collaboration, force-update policy, nested folders,
 and inline note-image sync use the same Supabase project as authentication.
 
@@ -8,12 +10,15 @@ and inline note-image sync use the same Supabase project as authentication.
 Run these commands from the LockNote project folder:
 
 ```powershell
-npx supabase login
-npx supabase link --project-ref nhsomigoubtuajiloenc
-npx supabase db push
-npx supabase functions deploy share-note
-npx supabase functions deploy revenuecat-webhook --no-verify-jwt
+npx.cmd supabase login
+npx.cmd supabase link --project-ref YOUR_PROJECT_REF
+npx.cmd supabase db push --dry-run
+npx.cmd supabase db push
+npx.cmd supabase functions deploy share-note
+npx.cmd supabase functions deploy revenuecat-webhook --no-verify-jwt
 ```
+
+Confirm the intended project reference first. Dry-run previews, but does not deploy or verify RLS. On macOS/Linux omit `.cmd`. Current migrations run through `202609180001_shared_note_subscription_visibility.sql`; this final migration suspends recipient access after owner expiry while preserving caches/memberships. Confirm server subscription/upload-reservation tables, quota/recovery RPCs and canonical webhook secrets/backfill before releasing a live paid service; server gates affect older clients too.
 
 If Supabase is already logged in and this project is already linked, only run
 the deployment commands after linking.
@@ -52,6 +57,12 @@ See [../FORCE_UPDATE.md](../FORCE_UPDATE.md) for the Android/iOS release and
 emergency rollback procedure.
 
 ## Proposal 2 subscriptions
+
+Automatic/background record sync is implemented as Plus/Pro per-device/account
+opt-in and reuses these RPCs; it adds no migration or Edge Function. Rebuild native
+binaries and follow [Background Sync](../docs/BACKGROUND_SYNC.md). Automatic runs
+exclude image binaries/preferences; manual/open-note image reconciliation remains
+separate. Verify actual remote state in a sandbox, not with production customer data.
 
 Apply `202609170001_premium_plan_2.sql` for server-only subscription records,
 25/75/750 MB combined quotas, owner-funded collaboration and image-upload

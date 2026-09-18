@@ -1,5 +1,7 @@
 # Subscription Payment Setup
 
+Updated: 2026-09-19. Follow [TODO.md](../../TODO.md) for parked configuration tasks and [the test plan](../testing/TEST_PLAN.md) for acceptance; this guide does not record completed dashboard setup.
+
 LockNote uses RevenueCat to connect the Premium screen to Apple App Store,
 Google Play, and optional web billing. The app identifies a RevenueCat customer
 with the signed-in Supabase user UUID. This keeps a purchase attached to the
@@ -99,9 +101,9 @@ installing `react-native-purchases`; hot reload cannot add the native SDK to an
 existing build.
 
 ```powershell
-eas build --platform android --profile development
-eas build --platform ios --profile development
-npx expo start --dev-client
+npx.cmd eas-cli@latest build --platform android --profile development
+npx.cmd eas-cli@latest build --platform ios --profile development
+npx.cmd expo start --dev-client
 ```
 
 Use Google Play license testers and Apple sandbox/TestFlight accounts for store
@@ -145,17 +147,17 @@ entitlement and Restore purchases returns the same plan.
 ## 5. Deploy Proposal 2 Backend Enforcement
 
 1. Apply all migrations through `202609180001_shared_note_subscription_visibility.sql` using
-   `npx supabase db push`. This immediately enables server gates, including for
+   `npx.cmd supabase db push`. This immediately enables server gates, including for
    older app versions. Plan the rollout before doing this on a live paid service.
 2. In Supabase Dashboard → Edge Functions → Secrets, add
    `REVENUECAT_SECRET_API_KEY` (a secret RevenueCat v1 API key with subscriber
    read access) and `REVENUECAT_WEBHOOK_AUTHORIZATION` (a long random full header
    value, for example `Bearer <random-secret>`). Never put either in `.env`, Expo
    public variables, app config, Git, screenshots or the app bundle.
-3. Deploy `npx supabase functions deploy revenuecat-webhook --no-verify-jwt`.
+3. Deploy `npx.cmd supabase functions deploy revenuecat-webhook --no-verify-jwt`.
    Its Supabase JWT check is disabled intentionally: the function itself verifies
    the RevenueCat Authorization secret using a constant-time comparison.
-   Redeploy `npx supabase functions deploy share-note` too; it now checks the
+   Redeploy `npx.cmd supabase functions deploy share-note` too; it now checks the
    owner's verified plan before account-email lookup/invitations.
 4. In RevenueCat → Integrations → Webhooks, add
    `https://<project-ref>.supabase.co/functions/v1/revenuecat-webhook` and set

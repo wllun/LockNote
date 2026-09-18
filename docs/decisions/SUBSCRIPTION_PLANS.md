@@ -1,5 +1,7 @@
 # Subscription Plans
 
+Repository policy snapshot: 2026-09-19. Implementation and external production setup are separate; see the [setup TODO](../../TODO.md).
+
 This document defines the LockNote subscription boundaries. The Premium module
 can load offerings, complete purchases, restore purchases, open subscription
 management, and display the active RevenueCat entitlement. Store and RevenueCat
@@ -23,9 +25,9 @@ webhook still require deployment and configuration.
 
 | Feature | Free | LockNote Plus | LockNote Pro |
 | --- | ---: | ---: | ---: |
-| Proposed monthly price (USD) | $0 | $1.99 | $3.99 |
-| Proposed yearly price (USD) | $0 | $19.99 | $39.99 |
-| Core offline notes and folders | Yes | Yes | Yes |
+| Agreed monthly USD target | $0 | $1.99 | $3.99 |
+| Agreed yearly USD target (checkout pending) | $0 | $19.99 | $39.99 |
+| Core offline notes / top-level folders | Yes | Yes | Yes |
 | Search, note colors, Archive, Trash and locks | Yes | Yes | Yes |
 | PDF and image export | No | Yes | Yes |
 | Local backup import and export | Yes | Yes | Yes |
@@ -132,8 +134,12 @@ separate explicit actions.
   attachment objects and metadata within the same 750 MB total.
 - Treat the displayed note counts as conservative estimates, not guarantees;
   Pro capacity is lower when the user stores image attachments.
-- Show current usage, the plan limit, and a clear over-quota recovery action in
-  the Premium module before enforcement is enabled.
+- The Premium module shows current usage, plan limits and explicit no-upload
+  recovery. Verify these implemented controls against the deployed backend.
+
+Portable export is implemented but its Settings action is currently hidden;
+Import Backup is visible and Free. Recovery exceptions do not grant a new paid
+plan or authorize recipients to access an expired owner's shared content.
 
 ## Implementation Status
 

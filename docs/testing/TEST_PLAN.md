@@ -1,8 +1,8 @@
 # LockNote full test plan
 
-Baseline: 18 September 2026. Applies to Expo SDK 54, React Native 0.81 and Premium Proposal 2, including read-only subfolder notes after Pro expiry.
+Baseline: 19 September 2026. Applies to Expo SDK 54, React Native 0.81, Premium Proposal 2 and opt-in automatic/background record sync, including read-only subfolder notes after Pro expiry.
 
-This is a test specification, not a record of passed tests. Every case starts **Not run**. Copy the run template at the end before testing a particular build. The companion `HOW_TO_TEST.docx` explains the execution workflow.
+This is a test specification, not a record of passed tests. Every case starts **Not run**. Copy the run template at the end before testing a build. `HOW_TO_TEST.docx` is a companion execution guide; this Markdown is authoritative where newer behavior differs.
 
 ## 1 Scope and priorities
 
@@ -54,7 +54,7 @@ Run from the repository root in PowerShell with the project's normal development
 npm.cmd test
 ```
 
-This invokes `scripts/verify.mjs` and the Node test runner. Save the complete output and exit code. The previous implementation run reported 223 tests; counts can change and are not the acceptance criterion. A zero exit code and no task-related failures are required. Do not weaken tests to obtain a pass.
+This invokes `scripts/verify.mjs` and the Node test runner. Save full output and exit code for the candidate commit. Historical test counts are not acceptance evidence; require a zero exit code and no task-related failures. Do not weaken tests to obtain a pass.
 
 For a focused diagnosis:
 
@@ -76,6 +76,7 @@ Focused checks do not replace the complete suite for a release. `verify.mjs` che
 | `note-color`, `note-background`, `note-attachment`, `note-export` | Media/export logic; actual managed files, permissions, Gallery and PDF viewing still required |
 | `backup-data`, `trash`, `sqlite-migration-order` | Backup/deletion/migration policies; real SQLite upgrade and restore still required |
 | `private-sync`, `collaboration-note` | Sync and collaboration logic with controlled dependencies; deployed RLS, leases and two-account verification still required |
+| `automatic-sync` | Foreground scheduling, retry/backoff, editor deferral, account/preference guards and queues with controlled dependencies; actual native OS tasks and two-device verification remain required |
 | `subscription`, `premium-service`, `premium-access`, `premium-attachments`, `subfolder-edit-access`, `shared-note-access` | Entitlements, gating, owner funding, complete sharing suspension/renewal, expiry and pending saves; store/webhook/device verification still required |
 | `drag-auto-scroll`, `use-drag-auto-scroll`, `app-update` | Edge-scroll and update-policy logic; finger gestures and installed-build gates still required |
 
@@ -337,7 +338,7 @@ Run on checklist items, daily expense rows and monthly commitments. Run correspo
 
 ### Q Manual private sync
 
-Use the same account on A and B. Test all note types and parent/root relationships. It is **manual** sync, not automatic/background sync.
+Use the same account on A/B and disable Automatic Sync while isolating these **manual** cases. Test all note types and parent/root relationships; automatic/OS-task cases are in section 5.
 
 | Done | ID | Priority | Action | Expected result |
 | --- | --- | --- | --- | --- |
@@ -438,18 +439,29 @@ Targets below are **proposed acceptance budgets**, not existing measured guarant
 | [ ] | QUAL-07 | P1 | Web normal/narrow widths, refresh, downloads and IndexedDB unavailable/restricted | No blank app; storage/permission limitations explained; native/web behavior differences explicit |
 | [ ] | QUAL-08 | P2 | Explore rapid taps, unusual text, repeated cancel/retry, connectivity flaps for 30 minutes | Record new defects with reproducible steps; do not count exploration alone as all cases passed |
 
-## 5 Future functionality excluded from current release claims
+## 5 Automatic/background sync acceptance and future exclusions
 
-Automatic/background sync is **not implemented**. These are design acceptance cases for its future implementation, not current failures or boxes to mark passed. Do not advertise it as working because manual sync passes.
+Automatic/background folder/note sync is implemented as a device-local,
+per-account Plus/Pro opt-in. Rebuild the native binary for OS execution and use
+two devices with the same verified paid account. Fresh server access is required;
+mocked tests and manual sync do not certify OS scheduling. The existing FUT-SYNC
+IDs are retained for regression history but now apply to current implementation.
+See [Background Sync](../BACKGROUND_SYNC.md). All cases below start **Not run**.
 
-| Future ID | Acceptance requirement |
-| --- | --- |
-| FUT-SYNC-01 | Launch/session restoration/resume/connectivity recovery trigger serialized foreground sync only for eligible plans |
-| FUT-SYNC-02 | Manual/automatic runs and pending 800 ms editor saves cannot race or upload stale snapshots |
-| FUT-SYNC-03 | Offline retries queued with bounded backoff; duplicate runs deduplicated and status truthful |
-| FUT-SYNC-04 | OS background execution best-effort; no guarantee of an exact schedule; permissions/battery restrictions tested |
-| FUT-SYNC-05 | Newer local content protected on recovery, restart, cancellation and subscription expiry |
-| FUT-SYNC-06 | Account switch clears account-specific queues and prevents cross-account uploads |
+| Done | ID | Priority | Action / acceptance requirement |
+| --- | --- | --- | --- |
+| [ ] | FUT-SYNC-01 | P1 | Opt in on verified Plus/Pro; restore session, resume/reconnect and idle for 60 s with no editor. Serialized record sync updates the other device; Free/Off makes no automatic uploads |
+| [ ] | FUT-SYNC-02 | P0 | Keep each of the four editors mounted, including tab switches; type and close during 800 ms debounce. Auto sync waits through final save/empty-draft cleanup; manual/recovery requests stay serialized |
+| [ ] | FUT-SYNC-03 | P1 | Edit offline, close editor, then reconnect; inject timeouts. Durable snapshots/tombstones retain work, retries back off from 15 s to 5 min, status does not claim upload success on failure |
+| [ ] | FUT-SYNC-04 | P1 | Background rebuilt Android/physical iOS app with editors closed. Record real OS-task evidence and battery/network restrictions; 15 min is a minimum, not an exact interval or delivery guarantee |
+| [ ] | FUT-SYNC-05 | P0 | Preserve newer unsynced local edits through no-upload recovery, expiry and renewal; over-quota status is distinct. No downgrade deletion; fresh verified paid access required before automatic upload |
+| [ ] | FUT-SYNC-06 | P0 | Switch account/sign out/opt out while a request is queued or in flight. Original-account authorization remains pinned; stale responses cannot apply to a new account or upload as it |
+| [ ] | AUTO-SYNC-07 | P1 | Confirm opt-in defaults Off and is scoped by device/account; resume after renewal preserves the preference without silently enabling another device/account |
+| [ ] | AUTO-SYNC-08 | P1 | Sync moves, folder parents, root notes, archives and deletions; visible Home/Folder/Archive/Trash lists refresh on success without replacing mounted editor state |
+| [ ] | AUTO-SYNC-09 | P0 | Insert image/change background/colour/schedule reminder, then trigger auto record sync. Binary images transfer only on manual/open-note reconciliation; backgrounds/colours/notification IDs and enabled registrations stay device-local |
+| [ ] | AUTO-SYNC-10 | P1 | Web/compatible Expo Go/old binary: foreground auto sync works when eligible; closed page or unsupported native environment is not claimed to run OS tasks |
+| [ ] | AUTO-SYNC-11 | P0 | Headless and foreground startup arrive together; DB initialization finishes before repository access, no partial migrations or cross-account application |
+| [ ] | AUTO-SYNC-12 | P1 | Development-only worker test API triggers a controlled native test; separately capture OS scheduling. Release builds do not expose the development test API |
 
 Cloud storage for custom note backgrounds is also planned, not current behavior. Revisit MEDIA-04 only after that feature is explicitly implemented and its privacy/backup policy approved.
 
@@ -464,6 +476,7 @@ Cloud storage for custom note backgrounds is also planned, not current behavior.
 | Repository/migration | Native/web parity, START-05, root/deletion/archive/nesting, backup and sync |
 | Locks/auth | LOCK/AUTH applicable suites, wrong identity, links, cooldown and no plaintext credential |
 | Cloud/shared/premium | Backend fixture when affected, deployed sandbox RLS/quotas/roles/webhook and two-session tests |
+| Automatic/background scheduling | Section 5 on rebuilt native candidates, native/web foreground fallback, editor/account guards and actual OS-task evidence |
 | Release | Complete automated suite, release-build smoke, all P0/P1 applicable cases and declared P2/device gaps |
 
 This is testing guidance, not a change to the commented testing instruction in `AGENTS.md`. Document authorship does not enable an automatic test-after-every-task policy.
@@ -531,13 +544,14 @@ Tester retest result and neighboring regression results:
 - [ ] Production setup separately reviewed: migrations, verified subscriber backfill, RLS, Storage, email redirects/SMTP, webhook secrets and public/legal details. Test success does not deploy these.
 - [ ] iOS-specific cases and device testing completed before an iOS release; web regression status documented.
 - [ ] Remaining Blocked/Not run/Not applicable cases and performance/device gaps attached to sign-off.
-- [ ] User-facing promises match implemented features; no automatic/background sync claim.
+- [ ] Automatic-sync opt-in, offline/editor/account safety and OS-task/fallback cases pass when advertised; remaining device gaps are disclosed. No exact OS schedule or binary auto-sync guarantee is claimed.
 
 Sign-off record: candidate build, evidence directory, Pass/Fail/Blocked/Not run totals, open defects and accepted exceptions, developer name/date, tester name/date, project owner release decision/date.
 
 ## 9 Source references and maintenance
 
 - [Architecture](../ARCHITECTURE.md)
+- [Documentation index](../README.md) and [Automatic/background sync](../BACKGROUND_SYNC.md)
 - [Project state](../PROJECT_STATE.md)
 - [Subscription policy](../decisions/SUBSCRIPTION_PLANS.md)
 - [Subscription setup](../decisions/SUBSCRIPTION_SETUP.md)

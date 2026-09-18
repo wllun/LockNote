@@ -2,6 +2,11 @@
 
 Status: implemented with approved design Option C.
 
+Reviewed: 2026-09-19. This document describes the implemented data/interaction
+design, not a new database table or payment reminder feature. For current limits,
+plan-aware exports and installed-device acceptance see [Note Limits](NOTE_LIMITS.md),
+[Subscription Plans](SUBSCRIPTION_PLANS.md) and [the test plan](../testing/TEST_PLAN.md).
+
 ![Option C monthly commitments mock](../../assets/design/monthly-expense-checklist-option-c.png)
 
 Editable vector source: [monthly-expense-checklist-option-c.svg](../../assets/design/monthly-expense-checklist-option-c.svg)
@@ -93,6 +98,11 @@ Store commitments inside the Expense Record's versioned JSON payload, independen
 ```
 
 Payload version 6 defaults `monthlyCommitments` to an empty array and `currency` to `USD` for existing notes. No new repository methods are required because expense-note content remains versioned JSON. Commitments also appear in expense PDF and image exports.
+
+The entire Expense Record is one `notes` / `private_notes` content record;
+individual expense rows, commitments and category summaries are not separate DB
+rows. The reusable template is device-local and excluded from record sync/backup;
+commitments stored inside a note do travel with its content. See the [ERD](../diagrams/DATABASE_ERD.drawio).
 
 Settings stores the default currency for newly created Expense Records. Changing
 that setting asks whether to keep existing notes unchanged or apply the new

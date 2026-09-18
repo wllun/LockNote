@@ -1,5 +1,7 @@
 # Learning React Native Through LockNote
 
+Reviewed against the repository on 2026-09-19 (Expo SDK 54 / React Native 0.81). Use [architecture](../ARCHITECTURE.md) and [project state](../PROJECT_STATE.md) for current implementation status; older Word companions may lag this Markdown guide.
+
 This guide is for a web developer who knows Laravel, Node.js, and vanilla
 JavaScript, but is starting React and React Native from zero.
 
@@ -95,7 +97,7 @@ React Native uses React, but it does not normally render HTML.
 | `<input>` | `<TextInput>` |
 | `<button>` / click handler | `<TouchableOpacity onPress={...}>` |
 | scrollable list | `<FlatList>` |
-| browser alert/dialog | `Alert` / `<Modal>` |
+| browser alert/dialog | `AppAlert` adapter / themed `AppDialogHost` / modal components |
 | CSS stylesheet | `StyleSheet.create(...)` |
 | `class` / `className` | `style` |
 | `onclick` | `onPress` |
@@ -181,10 +183,10 @@ The startup sequence is:
 
 ```text
 index.js registers App
-  -> App installs ThemeProvider and AuthProvider
+  -> App installs ThemeProvider, AuthProvider and SubscriptionProvider
     -> AppRoot calls initDB() in useEffect
       -> loading spinner
-      -> AppNavigator after the database is ready
+      -> update gate when required; otherwise AutomaticSyncProvider + AppNavigator
 ```
 
 ### Navigation
@@ -323,8 +325,11 @@ Relevant files are:
 - `src/utils/auth.mjs`
 - `src/screens/AuthScreen.js`
 
-Auth is the exception to the app's local-only note storage. Notes and folders
-remain on the device; Supabase is currently used for account authentication.
+Local repositories remain authoritative for offline private editing. Supabase
+also supports manual/opt-in automatic private sync, explicit collaboration,
+private image reconciliation, subscription verification and force-update policy.
+Read `syncService`, `AutomaticSyncContext` and `collaborationService` after auth;
+incoming shared notes require online access, unlike ordinary local notes.
 
 ## 3. How to read through the code
 
@@ -333,8 +338,8 @@ remain on the device; Supabase is currently used for account authentication.
 From the project directory:
 
 ```powershell
-npm install
-npm start
+npm.cmd ci
+npm.cmd start
 ```
 
 Press `w` for web, or use an Android/iOS development environment when
@@ -416,7 +421,7 @@ User taps +
 Read:
 
 1. the create-note handlers in `HomeScreen.js`;
-2. `src/components/NoteTypeModal.js`;
+2. `src/components/create-note-type-modal.js`;
 3. `create()` in both note repositories;
 4. `src/screens/NoteEditorScreen.js`;
 5. `update()` in both repositories.
@@ -574,6 +579,8 @@ For real project changes, always preserve these rules:
 - hash passwords and never describe the content as encrypted;
 - clear editor save timers before destructive actions and on unmount;
 - run `npm.cmd test` before considering the change complete.
+
+For native/Expo Go limitations and device targets, follow the [documentation index](../README.md). Account/subscription/automatic-sync contexts coordinate services, not a global note data store; visible lists retain focus reloads and successful-sync refreshes. Never infer deployed backend or OS-task success from a mocked test.
 
 ## Concepts you do not need on day one
 

@@ -1,5 +1,8 @@
 # Automatic and background sync
 
+For related run/setup/acceptance guides use the [documentation index](README.md)
+and [automatic-sync test matrix](testing/TEST_PLAN.md#5-automaticbackground-sync-acceptance-and-future-exclusions).
+
 Implemented on 19 September 2026 for private/owned folders and note data.
 Local storage remains authoritative while editing. Scheduling reuses the existing
 last-write-wins RPC, root relationships and tombstones; it needs no new migration
@@ -90,5 +93,12 @@ npm.cmd test
 ```
 
 Live backend, payment and OS-scheduled device verification remains required.
+
+This Markdown is implementation guidance, not a passed manual test report.
+Record the exact Git commit/native build, test project, account aliases and
+observed task execution before declaring OS behavior verified. Preserve local
+data/signing compatibility during upgrades; a queued cloud build is not an
+installed candidate. Keep public client configuration outside Git and server
+secrets exclusively in Edge Function settings; see [TODO.md](../TODO.md).
 See [Expo SDK 54 BackgroundTask](https://docs.expo.dev/versions/v54.0.0/sdk/background-task/)
 for platform constraints and developer test tools.

@@ -1,8 +1,8 @@
 # Supabase Setup for LockNote
 
-_Setup checklist updated: 18 September 2026. Free-plan limits and cost estimates below retain their separate 11 September 2026 check date._
+_Setup and official vendor pricing references reviewed: 19 September 2026. MYR conversions below are illustrative assumptions, not live FX quotations._
 
-Follow this checklist to configure the latest LockNote account, manual sync, collaboration, inline-image sync, and subscription backend. Local SQLite/AsyncStorage remains authoritative for editing; note content is not end-to-end encrypted before upload.
+Follow this checklist for accounts, manual/opt-in automatic record sync, sharing, images and subscriptions. Local storage remains authoritative; content is not end-to-end encrypted. See [TODO.md](TODO.md) for parked configuration and [the documentation index](docs/README.md).
 
 Start with environment variables and authentication. Complete backend and RevenueCat configuration before testing paid cloud features. This document records setup instructions; it does not confirm that the hosted project has been deployed or verified.
 
@@ -117,13 +117,14 @@ After registration:
 Run from the LockNote project root, using the reference from the intended Supabase project URL:
 
 ```powershell
-npx supabase login
-npx supabase link --project-ref YOUR_PROJECT_REF
-npx supabase db push
-npx supabase functions deploy share-note
+npx.cmd supabase login
+npx.cmd supabase link --project-ref YOUR_PROJECT_REF
+npx.cmd supabase db push --dry-run
+npx.cmd supabase db push
+npx.cmd supabase functions deploy share-note
 ```
 
-`db push` applies pending migrations in order. The latest repository includes migrations through `202609170001_premium_plan_2.sql` for synchronization, archive/nesting, collaboration permissions/editing leases, attachments, update policy, and premium enforcement. Do not manually recreate these tables with broad public permissions or disable RLS to bypass errors.
+Confirm the project reference before deployment. Dry-run only previews; `db push` applies pending migrations in order, currently through `202609180001_shared_note_subscription_visibility.sql`, including recipient suspension after owner expiry. Do not disable RLS or recreate tables with broad permissions. On macOS/Linux omit `.cmd`.
 
 **Live-service caution:** the premium migration immediately enables server restrictions, including for older clients. On an existing paid service, coordinate the migration, webhook deployment, and subscriber backfill in a rollout window before resuming service. Applying the migration alone does not create paid subscription records.
 
@@ -164,8 +165,8 @@ Do not place these secrets in the app's `.env` or EAS client environment.
 Deploy the webhook and the current sharing function:
 
 ```powershell
-npx supabase functions deploy revenuecat-webhook --no-verify-jwt
-npx supabase functions deploy share-note
+npx.cmd supabase functions deploy revenuecat-webhook --no-verify-jwt
+npx.cmd supabase functions deploy share-note
 ```
 
 The webhook's Supabase JWT check is intentionally disabled; its code verifies the RevenueCat Authorization secret instead. Do not disable JWT verification for `share-note`.
@@ -199,7 +200,7 @@ See [EAS environment management](https://docs.expo.dev/eas/environment-variables
 After changing `.env`, restart Metro so the updated configuration is loaded:
 
 ```powershell
-npx expo start --dev-client -c
+npx.cmd expo start --dev-client -c
 ```
 
 Use a valid email address and a password containing at least eight characters. The password-confirmation value must match.
@@ -218,21 +219,23 @@ Verify in this order:
 8. Verify quota limits and download-only recovery retain existing data.
 9. Confirm ordinary local editing still works when Supabase is unavailable.
 
+10. On rebuilt native candidates, verify paid Profile Automatic Sync opt-in, editor/final-save deferral, retries, original-account guards and OS tasks using [Background Sync](docs/BACKGROUND_SYNC.md). It reuses existing RPCs; no additional migration is needed. Automatic runs exclude binary images/preferences.
+
 ## What is not required for basic authentication
 
 The custom application migrations and Edge Functions are not required merely to register or sign in using Supabase Auth. They are required for LockNote's additional sync, collaboration, attachment, update-policy, and premium services. Do not treat a successful login as proof that those services are deployed.
 
 ## Supabase Free plan limitations
 
-The following limits were checked on **11 September 2026**. Review the [Supabase pricing page](https://supabase.com/pricing) before launch because quotas and pricing can change.
+This snapshot was reviewed against [Supabase pricing](https://supabase.com/pricing) on **19 September 2026**. Recheck before launch; project-wide allowances are not per LockNote subscriber.
 
 | Resource | Free limit | LockNote impact |
 | --- | ---: | --- |
 | Active projects | 2 | Enough for development and production, but leaves little room for a separate staging project. |
 | Database size | 500 MB per project | Suitable for development and a small beta, but not a large note-sync service. |
 | Monthly active users | 50,000 | More than enough for LockNote's initial authentication needs. |
-| File storage | 1 GB | Stores optimized inline-note images when signed-in attachment sync is used. LockNote's planned per-owner quota is larger, so the Free project is for development or a small beta only. |
-| Egress | 5 GB per month | Syncing notes and downloading attachments consumes this allowance. |
+| File storage | 1 GB | Shared across all users; multiple Pro subscribers can exhaust it despite separate combined account quotas. |
+| Egress | 5 GB plus separate 5 GB cached egress per month | Sync/image traffic consumes distinct project allowances. |
 | Edge Function invocations | 500,000 per month | Sharing-by-email and other server functions consume these calls. |
 | Realtime messages | 2 million per month | Shared-note collaboration consumes these messages. |
 | Realtime peak connections | 200 | Approximately 200 clients can be connected concurrently. |
@@ -269,7 +272,7 @@ The Free plan does not automatically charge for overages. Continued quota usage 
 
 ### Estimated operating cost
 
-The following estimates were checked on **11 September 2026** and use an indicative conversion of **USD 1 = RM4.07**. Actual card rates, taxes, exchange rates, and vendor pricing can differ.
+Vendor USD prices were reviewed on **19 September 2026**. MYR estimates use illustrative **USD 1 = RM4.07**, not a verified current exchange rate. Card rates, taxes, usage and selected resources can change totals.
 
 | Scenario | Supabase | Authentication email | Approximate total |
 | --- | ---: | ---: | ---: |
@@ -290,6 +293,6 @@ These estimates cover Supabase and authentication email only. They do not includ
 
 - **Development and a small private beta:** the Free plan is suitable.
 - **Before public registration:** configure custom SMTP.
-- **Before accepting paid Plus or Pro subscribers:** upgrade to a paid Supabase plan for better reliability, backups, capacity, and support.
+- **Before accepting paid subscribers:** assess aggregate capacity, restore-tested cloud backups, monitoring and availability. A paid plan can improve operations but is not a code requirement; a low-budget launch still needs an adequate recovery plan.
 - Keep SQLite/AsyncStorage as LockNote's local source of truth so ordinary notes remain available when Supabase is offline.
 - Proposal 2 enforces 25/75/750 MB combined note/image quotas per account. These per-account limits do not increase Supabase's project-wide database or Storage allowances; upgrade capacity and monitor total usage before promising those quotas at production scale.
