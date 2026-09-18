@@ -21,6 +21,7 @@ import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
+import { useSyncRefresh } from '../hooks/use-sync-refresh';
 import NoteItem from '../components/NoteItem';
 import FolderItem from '../components/FolderItem';
 import PasswordModal from '../components/PasswordModal';
@@ -555,6 +556,11 @@ const FolderScreen = ({ route, navigation }) => {
     });
     return unsubscribe;
   }, [navigation, loadNotes, loadFolder]);
+  const refreshAfterSync = useCallback(() => {
+    loadNotes();
+    loadFolder();
+  }, [loadNotes, loadFolder]);
+  useSyncRefresh(navigation, refreshAfterSync);
 
   const renderViewControl = ({ scope, modes, value, onChange }) => (
     <View

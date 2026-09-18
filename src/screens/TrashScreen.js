@@ -12,6 +12,7 @@ import { AppAlert as Alert } from '../utils/app-alert';
 import { confirmDestructiveAction } from '../utils/confirm-action';
 import { formatTrashRemaining, TRASH_RETENTION_DAYS } from '../utils/trash.mjs';
 import { trashService } from '../services/trashService';
+import { useSyncRefresh } from '../hooks/use-sync-refresh';
 import { lockPasswordService } from '../services/lockPasswordService';
 import PasswordModal from '../components/PasswordModal';
 import ItemActionsModal from '../components/ItemActionsModal';
@@ -54,6 +55,7 @@ const TrashScreen = ({ navigation }) => {
     const unsubscribe = navigation.addListener('focus', loadTrash);
     return unsubscribe;
   }, [loadTrash, navigation]);
+  useSyncRefresh(navigation, loadTrash);
 
   const restoreItem = async (item) => {
     const key = `restore-${item.id}`;

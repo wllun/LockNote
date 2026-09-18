@@ -7,7 +7,7 @@ test('Proposal 2 feature matrix and quotas', () => {
   assert.deepEqual(Object.values(PLAN_LIMITS).map((bytes) => bytes / 1024 / 1024), [25, 75, 750]);
   for (const feature of Object.keys(FEATURE_PLANS)) {
     assert.equal(canUsePremiumFeature('free', feature), false);
-    assert.equal(canUsePremiumFeature('plus', feature), ['export', 'sharing'].includes(feature));
+    assert.equal(canUsePremiumFeature('plus', feature), ['export', 'sharing', 'automaticSync'].includes(feature));
     assert.equal(canUsePremiumFeature('pro', feature), true);
   }
   assert.equal(canUsePremiumFeature('unknown', 'export'), false);

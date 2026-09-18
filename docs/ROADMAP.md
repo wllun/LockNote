@@ -1,13 +1,13 @@
 # LockNote Roadmap
 
-_Snapshot: 2026-09-12. Current app version: 1.1.0._
+_Snapshot: 2026-09-19. Current app version: 1.1.0._
 
 This file describes the product direction and major delivery phases. For detailed implementation status and technical caveats, see [PROJECT_STATE.md](PROJECT_STATE.md). For the current architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Product direction
 
 - LockNote remains offline-first: local storage is authoritative while editing, and core note features work without an account.
-- Cloud features are opt-in. Private data is uploaded only when a signed-in user runs Sync Notes; shared notes use the collaboration backend.
+- Cloud features are opt-in. Private data uploads when a user runs Sync Notes or enables Plus/Pro Automatic Sync; shared notes use the collaboration backend.
 - Account login, local portable backup, manual multi-device sync, and 25 MB of cloud storage remain Free. LockNote Plus targets export, collaboration, automatic sync, and 75 MB of cloud storage. LockNote Pro targets 750 MB of combined note-and-image storage plus image attachments, note backgrounds, and nested folders.
 - LockNote Plus and LockNote Pro checkout is implemented through RevenueCat, with actual localized prices supplied by the configured stores. Store products, public SDK keys, and production payment testing still require external setup. Feature gating, quota enforcement, and server-side downgrade handling are not implemented.
 - Subscription expiry must not delete notes. Local editing continues while cloud writes pause and existing cloud data remains read-only and downloadable.
@@ -18,6 +18,7 @@ This file describes the product direction and major delivery phases. For detaile
 - [ ] Deploy and verify all required Supabase migrations and the `share-note` Edge Function against the production project.
 - [ ] Verify registration, email confirmation, session persistence, account-password recovery, LockNote-password recovery, and sign-out end-to-end on Android, iOS, and web.
 - [ ] Verify manual private sync on at least two physical devices, including edits, moves, root notes, archives, and soft-delete tombstones.
+- [ ] Verify opt-in automatic sync on two devices, offline/reconnect, editor deferral, opt-out/account changes, expiry/quota recovery and Android/iOS OS-scheduled tasks in new native builds. See [Background Sync](BACKGROUND_SYNC.md).
 - [ ] Verify collaboration with two real accounts, including Can edit/View only invitations, one-editor leases and expiry, offline Shared-tab hiding, permission changes while an editor is open, member removal, realtime refresh, and revision conflicts.
 - [ ] Configure production authentication email branding:
   - Connect Supabase Auth to Resend through Custom SMTP. As checked on 2026-08-31, Resend Free allows 3,000 transactional emails per month and 100 per day; confirm current limits before launch.
@@ -58,10 +59,10 @@ This file describes the product direction and major delivery phases. For detaile
 ### Remaining
 
 - [ ] Complete the production verification tasks listed above.
-- [ ] Add safe automatic/foreground sync after session restoration, app resume, and connectivity recovery.
-- [ ] Add queued offline retries and serialize automatic sync with manual sync and pending editor saves.
-- [ ] Add best-effort OS background sync only after foreground synchronization is reliable.
-- [ ] Show clear last-success and retry/error state for automatic synchronization.
+- [X] Opt-in Plus/Pro automatic folder/note sync after session restoration, app resume, reconnect and editor closure, with a 60-second idle interval.
+- [X] Durable offline retries and one manual/automatic/recovery queue; defer during open editors and their final saves and reject stale-account responses.
+- [X] Best-effort OS background tasks with a 15-minute minimum; new native builds and live OS/device testing remain required. Web/Expo Go use foreground sync only.
+- [X] Profile last-success and automatic retry/error/editor/offline/plan/quota states.
 - [ ] Implement and validate the 25 MB Free, 75 MB Plus, and 750 MB Pro quotas, read-only over-quota recovery, and owner-funded collaboration.
 
 ## Phase 3 — Attachments — implemented, Pro gating pending

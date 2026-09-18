@@ -14,7 +14,7 @@ export const PREMIUM_PLANS = [
       '75 MB cloud storage (about 1,000 long notes)',
       'PDF and image export',
       'Share and edit notes together',
-      'Automatic background sync (planned)',
+      'Automatic background sync for notes and folders',
     ],
   },
   {

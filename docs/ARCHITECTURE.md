@@ -85,7 +85,7 @@ proration amount; the platform purchase sheet provides the authoritative price.
 
 Account login, local portable backup, manual multi-device sync, and a 25 MB
 cloud quota are Free capabilities. LockNote Plus adds PDF/image export,
-owner-funded collaboration, planned automatic sync, and a 75 MB cloud quota.
+owner-funded collaboration, opt-in automatic sync, and a 75 MB cloud quota.
 LockNote Pro includes every Plus capability and adds image attachments, note
 backgrounds, nested folders, and a 750 MB combined note-and-image quota.
 Local action gating and server quota/expiry enforcement are implemented in
@@ -410,6 +410,31 @@ rejects stale snapshots. App users can read only their own subscription and cann
 write it. Production excludes sandbox subscriptions by default. Owner-funded
 sharing stops completely on Free; owned local drafts outside subfolders remain
 editable and pending, while recipients cannot view or edit incoming shared notes.
+
+### Automatic and background scheduling
+
+Profile → Automatic Sync is a device-local, per-account opt-in for Plus/Pro.
+`AutomaticSyncProvider` schedules foreground synchronization after account
+restoration, resume, reconnect and editor closure, plus a 60-second idle interval.
+The provider holds sync while any editor is mounted, including final draft
+cleanup. It does not hold global note data. Visible lists listen for successful
+sync completion while retaining their navigation-focus reloads.
+
+`syncService` serializes manual/automatic/recovery runs and manual image transfers.
+The automatic runner checks fresh server subscription access (including expiry)
+without requiring React or RevenueCat in a headless launch. Requests pin
+Authorization to their snapshot account and verify session/preference/editor
+state before uploads and local application. Native/web repository timestamp
+merges still preserve newer local records. Failed foreground attempts use capped
+exponential backoff; durable local snapshots and tombstones retain offline work.
+
+`index.js` imports a globally defined `expo-task-manager` task, backed by
+`expo-background-task` with a 15-minute minimum OS-controlled interval. Web uses
+a native-free stub. Expo Go, unsupported environments and old binaries fall
+back to foreground sync. Automatic runs synchronize folder/note records only;
+binary images retain open-note/manual reconciliation, and custom backgrounds,
+colors and reminder notification registrations remain device-local.
+See [Background Sync](BACKGROUND_SYNC.md) for rebuilding and device verification.
 
 ## Portable backup and restore
 

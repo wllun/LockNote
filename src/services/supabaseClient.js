@@ -1,4 +1,4 @@
-// Supabase client for account auth, explicit note collaboration, and manual
+// Supabase client for account auth, explicit note collaboration, and opt-in
 // private note/folder sync. Local SQLite/AsyncStorage remains the primary store.
 // Session persists via AsyncStorage so a logged-in user stays logged in across app restarts.
 import { createClient } from '@supabase/supabase-js';

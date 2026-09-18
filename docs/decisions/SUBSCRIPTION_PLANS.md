@@ -32,7 +32,7 @@ webhook still require deployment and configuration.
 | Account login | Yes | Yes | Yes |
 | Download or restore existing cloud data | Yes | Yes | Yes |
 | Manual cloud sync | Yes | Yes | Yes |
-| Automatic background sync | No | Planned | Planned |
+| Automatic folder/note sync (opt-in; OS background is best-effort) | No | Yes | Yes |
 | Cloud storage quota | 25 MB | 75 MB | 750 MB |
 | Approximate long-note capacity | 300 | 1,000 | 10,000 text notes; fewer with images |
 | Multi-device use | Yes | Yes | Yes |
@@ -166,7 +166,10 @@ suspension in RLS, list/get/save RPCs and attachment access without deleting dat
 The webhook fetches canonical RevenueCat subscribers rather than trusting event
 ordering or a client plan. Duplicate events converge safely; stale snapshots
 cannot overwrite newer ones. Production ignores sandbox entitlements by default.
-Automatic/background sync and optional background-image cloud storage remain
-planned; no optional three-image Free/Plus trial has been enabled. See
+Opt-in automatic/background folder/note sync is implemented for Plus/Pro;
+see [Background Sync](../BACKGROUND_SYNC.md) for native build requirements and
+live verification. Binary image transfer retains open-note/manual sync. Optional
+background-image cloud storage remains planned; no optional three-image
+Free/Plus trial has been enabled. See
 [Subscription Payment Setup](SUBSCRIPTION_SETUP.md) for the external dashboard,
 product, key, and testing steps.

@@ -18,6 +18,7 @@ import { CHECKLIST_NOTE_TYPE } from '../utils/checklist-note.mjs';
 import { REMINDER_NOTE_TYPE } from '../utils/reminder-note.mjs';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
+import { useSyncRefresh } from '../hooks/use-sync-refresh';
 import { lockPasswordService } from '../services/lockPasswordService';
 import { deleteFolderTree, inspectFolderTree } from '../services/folderTreeService';
 import FolderItem from '../components/FolderItem';
@@ -82,6 +83,7 @@ const ArchiveScreen = ({ navigation }) => {
     const unsubscribe = navigation.addListener('focus', loadArchive);
     return unsubscribe;
   }, [loadArchive, navigation]);
+  useSyncRefresh(navigation, loadArchive);
 
   const navigateToItem = (item, type) => {
     if (type === 'folder') {

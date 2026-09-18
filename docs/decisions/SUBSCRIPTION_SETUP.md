@@ -189,5 +189,8 @@ a disposable container of that exact name. It intentionally cannot target an
 arbitrary hosted database. Real RevenueCat/Storage/device verification remains
 required before production release.
 
-Automatic/background sync is still planned, as labeled in Proposal 2. This
-implementation changes packaging/enforcement, not the sync scheduling model.
+Automatic/background folder/note sync is now an explicit per-device/account
+Plus/Pro opt-in. Fresh server entitlement access is required even in headless
+tasks. Rebuild native binaries and follow [Background Sync](../BACKGROUND_SYNC.md)
+for foreground/reconnect, editor deferral and OS-task verification. Images retain
+open-note/manual synchronization; custom background cloud storage remains planned.

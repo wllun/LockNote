@@ -15,6 +15,7 @@ import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
+import { useSyncRefresh } from '../hooks/use-sync-refresh';
 import { hashPassword } from '../utils/crypto';
 import { lockPasswordService } from '../services/lockPasswordService';
 import FolderItem from '../components/FolderItem';
@@ -223,6 +224,7 @@ const HomeScreen = ({ navigation }) => {
     if (q) runSearch(q);
     else loadData();
   }, [query, runSearch, loadData]);
+  useSyncRefresh(navigation, refreshCurrent);
 
   const handleCreateFolder = async () => {
     if (!folderName.trim()) {

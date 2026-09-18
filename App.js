@@ -8,6 +8,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { ThemeProvider, useTheme, useThemeMode } from './src/theme';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { SubscriptionProvider } from './src/context/SubscriptionContext';
+import { AutomaticSyncProvider } from './src/context/AutomaticSyncContext';
 import AppDialogHost from './src/components/AppDialogHost';
 import LockPasswordResetModal from './src/components/lock-password-reset-modal';
 import AppUpdateGate from './src/components/app-update-gate';
@@ -63,7 +64,9 @@ function AppRoot() {
 
   return (
     <SafeAreaProvider>
-      <AppNavigator />
+      <AutomaticSyncProvider>
+        <AppNavigator />
+      </AutomaticSyncProvider>
       <LockPasswordResetModal visible={recoveringLockPassword} />
       <AppDialogHost />
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />

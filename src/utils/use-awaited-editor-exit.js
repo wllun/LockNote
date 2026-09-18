@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePreventRemove } from '@react-navigation/native';
+import { holdSyncEditor } from '../services/syncActivity.mjs';
 
 // React Navigation focuses the previous screen as soon as a route is removed.
 // Await draft cleanup first so its focus reload cannot race an empty-note delete
@@ -10,6 +11,21 @@ export const useAwaitedEditorExit = ({ navigation, needsCleanup, cleanup }) => {
   const cleanupSettledRef = useRef(false);
   const pendingActionRef = useRef(null);
   const [removalAllowed, setRemovalAllowed] = useState(false);
+
+  // Keep sync paused until the draft's final save/empty-draft cleanup settles,
+  // including app teardown where navigation's exit guard cannot run.
+  useLayoutEffect(() => {
+    const releaseSync = holdSyncEditor();
+    return () => {
+      if (cleanupSettledRef.current || !needsCleanupRef.current()) {
+        releaseSync();
+        return;
+      }
+      Promise.resolve().then(() => cleanupRef.current())
+        .catch((error) => console.error('Editor unmount cleanup failed:', error))
+        .finally(releaseSync);
+    };
+  }, []);
 
   needsCleanupRef.current = needsCleanup;
   cleanupRef.current = cleanup;
@@ -32,10 +48,4 @@ export const useAwaitedEditorExit = ({ navigation, needsCleanup, cleanup }) => {
     pendingActionRef.current = null;
     navigation.dispatch(action);
   }, [navigation, removalAllowed]);
-
-  useEffect(() => () => {
-    if (cleanupSettledRef.current || !needsCleanupRef.current()) return;
-    Promise.resolve(cleanupRef.current())
-      .catch((error) => console.error('Editor unmount cleanup failed:', error));
-  }, []);
 };

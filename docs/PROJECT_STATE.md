@@ -1,6 +1,6 @@
 # Project State — TODO
 
-_Snapshot: 2026-09-18. Check off items as they land._
+_Snapshot: 2026-09-19. Check off items as they land._
 
 ## Done
 
@@ -14,7 +14,7 @@ _Snapshot: 2026-09-18. Check off items as they land._
 
 - [X] Pro subfolder editing policy — existing folders and notes stay visible after expiry/downgrade, but plain, checklist, expense and reminder notes inside subfolders become read-only without Pro. Editors explain the restriction and offer Move note; moving to Home/top-level folders or moving the whole subfolder to Home restores editing. Nothing moves automatically. Creating notes/moving notes into subfolders requires Pro; pending Pro auto-saves may finish, exports/import/sync recovery remain available, and bulk currency changes skip read-only records. Renewing Pro restores editing; incoming shared-note access remains owner-funded.
 
-- [X] Premium Proposal 2 enforcement — Plus/Pro export and owner sharing; Pro image additions/cloud uploads, background changes and one-layer nested-folder organization. Existing premium content remains readable and locally exportable after downgrade; owners can keep editing local shared drafts outside subfolders while remote collaboration pauses. Free invitees are funded by the owner's plan. Server-owned subscriptions, authenticated canonical RevenueCat webhook, 25/75/750 MB combined quotas, serialized upload reservations, usage display and no-upload recovery are implemented. Deployment, secret configuration, existing-subscriber backfill and live payment/device verification remain pending; automatic/background sync remains planned.
+- [X] Premium Proposal 2 enforcement — Plus/Pro export and owner sharing; Pro image additions/cloud uploads, background changes and one-layer nested-folder organization. Existing premium content remains readable and locally exportable after downgrade; owners can keep editing local shared drafts outside subfolders while remote collaboration pauses. Free invitees are funded by the owner's plan. Server-owned subscriptions, authenticated canonical RevenueCat webhook, 25/75/750 MB combined quotas, serialized upload reservations, usage display and no-upload recovery are implemented. Deployment, secret configuration, existing-subscriber backfill and live payment/device verification remain pending; opt-in automatic/background folder/note sync is now implemented.
 
 - [X] Create/open/move/delete nested folders. Folders support one subfolder layer (Home → folder → subfolder) with cycle-safe subtree moves, breadcrumbs, descendant note counts, and recursive deletion. Subfolder screens omit the Folders section entirely.
 - [X] Create/open/delete notes, at root or inside a folder (soft delete)
@@ -62,9 +62,9 @@ _Snapshot: 2026-09-18. Check off items as they land._
   - In Supabase Dashboard, customize the Confirm signup, account-password recovery, LockNote-password recovery, and email-change templates so their subjects and content say LockNote. Preserve Supabase template variables such as `{{ .ConfirmationURL }}` so existing deep-link callbacks continue to work.
   - Custom SMTP controls the sender name, sender address, and delivery provider; Email Templates control the subject and message design. A custom SMTP provider may be required before Supabase permits fully customized templates.
 - [X] Sync Notes — manual two-way folder/note sync through the authenticated `sync_private_data` RPC, with RLS, last-write-wins timestamps, soft-delete tombstones, native/web repository parity, and per-account last-sync status. Proposal 2 server quotas are implemented: 25 MB Free, 75 MB Plus, 750 MB Pro combined notes/images. Over-quota sync falls back to no-upload recovery and preserves newer local changes. Deployment and live multi-device verification remain pending.
-- [ ] Automatic/background sync — serialize with manual sync and the editors' pending 800 ms saves; trigger a foreground sync after session restoration, app launch/resume, and connectivity recovery, then add best-effort OS background execution where supported. Queue retries while offline, avoid duplicate concurrent runs, surface the last successful sync/error, and never let a stale cloud snapshot overwrite a newer local edit.
+- [X] Automatic/background folder/note sync — per-device/account Profile opt-in for Plus/Pro, launch/resume/reconnect/editor-close triggers and a 60-second idle foreground interval; durable offline snapshots, capped exponential retries, one manual/automatic/recovery queue, editor/final-save deferral, original-account Authorization and stale-response guards, fresh server plan/expiry checks and visible last-success/retry/paused status. SDK 54 native tasks use a best-effort 15-minute minimum; web/Expo Go/old APKs fall back to foreground synchronization. Binary images retain open-note/manual sync. Tests pass; new native builds and live two-device/OS-scheduled verification remain required. See [Background Sync](BACKGROUND_SYNC.md).
 - [X] Collaboration Release 1 — explicit sharing by registered email, View only/Can edit roles, owner indicators, collaborator management, realtime refresh, last-editor footer, RLS, revision-protected saves and renewable 90-second leases. Shared-with-me notes remain hidden offline. Proposal 2 now requires Plus/Pro for the owner; invited collaborators only need Free. Expired owner plans pause remote saves/leases/invitations while owned local drafts remain editable and pending. Migrations, webhook setup and live two-account verification still require deployment/configured credentials.
-- Private note content stays local unless the signed-in owner explicitly runs Sync Notes. LockNote does not end-to-end encrypt content before upload.
+- Private note content stays local unless the owner runs Sync Notes or explicitly enables Automatic Sync. LockNote does not end-to-end encrypt content before upload.
 
 ### Possible features
 - [X] Premium purchase module — RevenueCat Current offering, localized prices, account-linked Plus/Pro checkout, restore, provider management and offline legal pages. Proposal 2 feature gates, usage display, no-upload recovery, server-owned entitlements, canonical webhook and quota/expiry enforcement are implemented. Native payments require a development/store build; Expo Go supports Test Store. Store products/public SDK keys, backend deployment/webhook secrets, subscriber backfill, public legal pages and final legal/operator details remain setup work. See [Subscription Plans](decisions/SUBSCRIPTION_PLANS.md) and [Subscription Payment Setup](decisions/SUBSCRIPTION_SETUP.md).
@@ -91,8 +91,8 @@ _Snapshot: 2026-09-18. Check off items as they land._
 
 - [X] Login — Profile tab with real Supabase Auth (email/password sign up + sign in, session persisted via AsyncStorage). Account login remains Free.
 - [X] Sync DB — Profile pushes/pulls private/owned notes and folders through account-scoped Supabase RPCs. Deletions and root-note semantics are preserved. Proposal 2 server enforcement implements 25 MB Free, 75 MB Plus and 750 MB Pro combined notes/images, with read-only recovery above the limit.
-- [X] Multi-device login — after signing in, running Sync Notes merges that device with the account snapshot. Automatic background sync is not implemented.
-- [ ] Automatic/background sync — add lifecycle/network-triggered foreground sync first, followed by best-effort platform background execution with safe retry and conflict handling.
+- [X] Multi-device login — manual Sync Notes remains Free; verified Plus/Pro accounts can opt into automatic folder/note synchronization on each device.
+- [X] Automatic/background sync — foreground triggers, offline retries and best-effort native scheduling implemented; live device verification remains pending. See [Background Sync](BACKGROUND_SYNC.md).
 - [X] Searchable — remains a Free offline feature.
 
 ### Phase 3 — LockNote Pro attachments — $3.99/month or $39.99/year

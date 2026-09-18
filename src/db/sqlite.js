@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 let db = null;
+let initializationPromise = null;
 
 export const getDB = () => {
   if (Platform.OS === 'web') {
@@ -12,7 +13,7 @@ export const getDB = () => {
   return db;
 };
 
-export const initDB = async () => {
+const initializeDB = async () => {
   if (Platform.OS === 'web') {
     return { type: 'web' };
   }
@@ -168,4 +169,17 @@ export const initDB = async () => {
   `);
 
   return db;
+};
+
+// A headless task and foreground startup can arrive together. Share complete
+// initialization, not just an open connection whose migrations are still running.
+export const initDB = async () => {
+  if (!initializationPromise) {
+    initializationPromise = initializeDB().catch((error) => {
+      initializationPromise = null;
+      db = null;
+      throw error;
+    });
+  }
+  return await initializationPromise;
 };

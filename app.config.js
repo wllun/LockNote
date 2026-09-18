@@ -45,6 +45,7 @@ export default {
       },
     },
     plugins: [
+      'expo-background-task',
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       [

@@ -42,9 +42,12 @@ Local storage is the primary data source:
 - **Web** — AsyncStorage (localStorage), via `*.web.js` repo variants
 
 Signed-in users can run **Profile → Sync Notes** to merge folders and notes with
-their owner-scoped Supabase snapshot. Sync is manual; normal editing remains
-offline-first. Sync is currently ungated while subscription enforcement is being
-designed; it is targeted for LockNote Plus and Pro.
+their owner-scoped Supabase snapshot. Manual sync remains Free within 25 MB.
+Plus/Pro users can opt into **Profile → Automatic Sync** for notes/folders,
+including safe foreground retries and best-effort native OS background tasks.
+Normal editing remains offline-first; automatic sync waits for editors to close
+and save. Binary images retain open-note/manual synchronization. See
+[Background Sync](docs/BACKGROUND_SYNC.md) for native builds and verification.
 
 Every user can use **Settings → Export Backup** without an account, then import
 that versioned JSON file on iOS, Android, or web. Import previews the contents

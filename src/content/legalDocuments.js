@@ -1,4 +1,4 @@
-export const LEGAL_LAST_UPDATED = '13 September 2026';
+export const LEGAL_LAST_UPDATED = '19 September 2026';
 
 export const LEGAL_DOCUMENTS = {
   privacy: {
@@ -23,7 +23,7 @@ export const LEGAL_DOCUMENTS = {
         heading: '3. Account and cloud information',
         paragraphs: [
           'If you create an account, Supabase processes your email address, account identifier, authentication information, and the technical information needed to provide account services.',
-          'Private folders and notes are sent to Supabase only when you use Sync Notes. Notes you share, collaborator email addresses, access roles, edit history, and collaboration status are stored in Supabase so invited people can view or edit them. Signed-in image attachment synchronization also stores optimized images and attachment metadata in Supabase.',
+          'Private folders and notes are sent to Supabase when you use Sync Notes or explicitly enable Automatic Sync for your account on this device. Automatic Sync is off by default and can be turned off in Profile. Notes you share, collaborator email addresses, access roles, edit history, and collaboration status are stored in Supabase so invited people can view or edit them. Signed-in image attachment synchronization also stores optimized images and attachment metadata in Supabase.',
           'LockNote does not provide end-to-end encryption for cloud note content. Do not use LockNote for information that requires encrypted or regulated storage.',
         ],
       },
@@ -36,7 +36,7 @@ export const LEGAL_DOCUMENTS = {
       {
         heading: '5. How information is used',
         bullets: [
-          'Provide accounts, manual sync, shared-note collaboration, attachment sync, reminders, exports, and subscriptions.',
+          'Provide accounts, manual and opt-in automatic sync, shared-note collaboration, attachment sync, reminders, exports, and subscriptions.',
           'Keep shared changes consistent and enforce viewer or editor access.',
           'Protect the service, diagnose failures, and meet legal obligations.',
         ],
@@ -59,7 +59,7 @@ export const LEGAL_DOCUMENTS = {
         heading: '8. Your choices',
         bullets: [
           'Use LockNote without an account for local-only notes.',
-          'Choose whether to run private-note sync or share a note.',
+          'Choose whether to run private-note sync, enable or disable Automatic Sync, or share a note.',
           'Change or remove a collaborator\'s access to a note you own.',
           'Control photo and notification permissions in your device settings.',
           'Export your notes or a portable backup before deleting local data.',
