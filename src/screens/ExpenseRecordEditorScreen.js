@@ -1814,8 +1814,8 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       onLayout={measureDragArea}
     >
-      <NoteBackgroundLayer uri={noteBackgroundUri} surface={noteColorTheme.surface} />
-      <View style={[styles.header, { backgroundColor: noteBackgroundUri ? 'transparent' : noteColorTheme.surface }]}>
+      <NoteBackgroundLayer uri={features.visibleBackgroundUri} surface={noteColorTheme.surface} />
+      <View style={[styles.header, { backgroundColor: features.visibleBackgroundUri ? 'transparent' : noteColorTheme.surface }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.headerButton}

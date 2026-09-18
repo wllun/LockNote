@@ -4,6 +4,8 @@ _Snapshot: 2026-09-18. Check off items as they land._
 
 ## Done
 
+- [X] Background downgrade policy — custom backgrounds are hidden without active Pro in all four editors, note cards and background settings previews, with normal theme/note-colour surfaces restored. Device-local images and preferences are retained (no downgrade deletion) and reappear when Pro is restored. Remove background stays available on Free/Plus. Stored draft metadata, backup/sync exclusions and native/web storage remain unchanged.
+
 - [X] Plan-aware premium control visibility — all four editor menus and category transaction export hide unavailable paid actions. Free hides normal PDF/image Export and Share; Plus adds those, while Pro adds Insert images, background selection/change and subfolder creation. Home/Folder background actions follow the same rules. Existing backgrounds retain Remove background; existing shares retain Manage access (remove/leave, no new invitations or role changes on Free). Empty subfolder sections disappear without Pro, but existing child folders stay visible for read-only recovery/move-out; note creation in subfolders is hidden without Pro. Existing premium content retains its export recovery exception, and incoming shared-note image insertion follows the owner's verified Pro plan and editor/lease permissions. No data is deleted and action/server gates remain in place.
 
 - [X] Subscription pricing updated to USD — Plus US$1.99/month or US$19.99/year; Pro US$3.99/month or US$39.99/year; Free US$0. Monthly fallback labels and pricing/setup documents match. Live localized store prices remain authoritative; store price configuration and yearly checkout/packages remain pending.

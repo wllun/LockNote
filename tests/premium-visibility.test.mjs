@@ -4,7 +4,63 @@ import { readFileSync } from 'node:fs';
 import { parse } from '@babel/parser';
 import { transformSync } from '@babel/core';
 import vm from 'node:vm';
-import { getNoteFeatureVisibility, getSubfolderVisibility } from '../src/utils/premium-visibility.mjs';
+import { getNoteFeatureVisibility, getSubfolderVisibility, getVisibleNoteBackgroundUri } from '../src/utils/premium-visibility.mjs';
+
+test('background visibility hides on Free/Plus/loading without changing the saved URI', () => {
+  for (const uri of ['file:///notes/background.jpg', 'blob:https://local.test/background']) {
+    const saved = { backgroundUri: uri };
+    for (const plan of ['free', 'plus', 'pro']) {
+      const result = getNoteFeatureVisibility({ ...saved, plan });
+      assert.equal(result.visibleBackgroundUri, plan === 'pro' ? uri : null);
+      assert.equal(result.showBackground, true, 'manual removal stays available');
+      assert.equal(saved.backgroundUri, uri);
+      assert.equal(getVisibleNoteBackgroundUri(uri, plan, true), null);
+    }
+    assert.equal(getVisibleNoteBackgroundUri(saved.backgroundUri, 'pro'), uri);
+  }
+  assert.equal(getVisibleNoteBackgroundUri(null, 'pro'), null);
+});
+
+test('shared background layer hides card/editor/settings images and restores on renewal', () => {
+  const subscription = { activePlanId: 'pro', loading: false };
+  const source = read('src/components/note-background-layer.js')
+    .replace(/^import[^;]*;\r?\n/gm, '').replace('export default NoteBackgroundLayer;', '');
+  const code = transformSync(source, {
+    configFile: false, babelrc: false, plugins: ['@babel/plugin-transform-react-jsx'],
+  }).code;
+  const render = vm.runInNewContext(`${code}\nNoteBackgroundLayer;`, {
+    React: { createElement: (type, props, ...children) => ({ type, props, children }) },
+    View: 'View', Image: 'Image',
+    StyleSheet: { absoluteFill: {}, create: (styles) => styles },
+    useSubscription: () => subscription, getVisibleNoteBackgroundUri,
+    getNoteBackgroundOverlayColor: () => 'theme overlay',
+  });
+  const props = { uri: 'file:///notes/background.jpg', surface: '#ffffff' };
+  for (const [plan, loading] of [['pro', false], ['free', false], ['plus', false], ['pro', true], ['pro', false]]) {
+    subscription.activePlanId = plan;
+    subscription.loading = loading;
+    const result = render(props);
+    if (plan === 'pro' && !loading) {
+      assert.equal(result.children[0].props.source.uri, props.uri);
+      assert.equal(result.props.pointerEvents, 'none');
+    } else assert.equal(result, null);
+    assert.equal(props.uri, 'file:///notes/background.jpg');
+  }
+  assert.match(read('src/components/NoteItem.js'), /<NoteBackgroundLayer/);
+});
+
+test('editors use visible backgrounds for rendering but retain stored URI for settings/removal', () => {
+  for (const screen of ['NoteEditorScreen', 'ChecklistEditorScreen', 'ExpenseRecordEditorScreen', 'ReminderEditorScreen']) {
+    const source = read(`src/screens/${screen}.js`);
+    assert.match(source, /<NoteBackgroundLayer uri=\{features\.visibleBackgroundUri\}/);
+    assert.match(source, /value=\{noteBackgroundUri\}/);
+    assert.doesNotMatch(source, /backgroundColor: noteBackgroundUri \?/);
+  }
+  const modal = read('src/components/note-background-modal.js');
+  assert.match(modal, /value && canChangeBackground \?/);
+  assert.match(modal, /Background hidden without Pro/);
+  assert.match(modal, /!!value && \(/);
+});
 
 test('Free hides all new paid actions on ordinary private notes', () => {
   const result = getNoteFeatureVisibility({ plan: 'free' });
@@ -220,6 +276,25 @@ test('visibility hook reacts to expiry and preserves subfolder recovery without 
   assert.equal(expired.canExport, true);
   await harness.flush();
   assert.equal(harness.render('nested').canExport, true);
+  harness.unmount();
+});
+
+test('visibility hook hides retained backgrounds on expiry/loading and restores them on Pro renewal', async () => {
+  const harness = createHookHarness({ note: { id: 'note' } });
+  const options = { backgroundUri: 'blob:https://local.test/retained' };
+  assert.equal(harness.render('note', options).visibleBackgroundUri, options.backgroundUri);
+  await harness.flush();
+  for (const plan of ['free', 'plus']) {
+    harness.subscription.activePlanId = plan;
+    const result = harness.render('note', options);
+    assert.equal(result.visibleBackgroundUri, null);
+    assert.equal(result.showBackground, true);
+  }
+  harness.subscription.activePlanId = 'pro';
+  harness.subscription.loading = true;
+  assert.equal(harness.render('note', options).visibleBackgroundUri, null);
+  harness.subscription.loading = false;
+  assert.equal(harness.render('note', options).visibleBackgroundUri, options.backgroundUri);
   harness.unmount();
 });
 

@@ -1,9 +1,13 @@
 import React from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { getNoteBackgroundOverlayColor } from '../utils/note-background.mjs';
+import { useSubscription } from '../context/SubscriptionContext';
+import { getVisibleNoteBackgroundUri } from '../utils/premium-visibility.mjs';
 
 const NoteBackgroundLayer = ({ uri, surface, opacity = 0.82, borderRadius = 0 }) => {
-  if (!uri) return null;
+  const { activePlanId, loading } = useSubscription();
+  const visibleUri = getVisibleNoteBackgroundUri(uri, activePlanId, loading);
+  if (!visibleUri) return null;
   return (
     <View
       pointerEvents="none"
@@ -11,7 +15,7 @@ const NoteBackgroundLayer = ({ uri, surface, opacity = 0.82, borderRadius = 0 })
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <Image source={{ uri }} resizeMode="cover" style={StyleSheet.absoluteFill} />
+      <Image source={{ uri: visibleUri }} resizeMode="cover" style={StyleSheet.absoluteFill} />
       <View
         style={[
           StyleSheet.absoluteFill,

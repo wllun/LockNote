@@ -86,7 +86,11 @@ After the paid period expires:
   pause when the owner's plan is no longer active.
 - Existing attachments remain viewable and downloadable; new attachment uploads
   require LockNote Pro.
-- Existing backgrounds, attachments and subfolders are never hidden or flattened.
+- Existing custom backgrounds are hidden in editors, cards and settings previews
+  without active Pro (including Plus). Their device-local files/Blobs and saved
+  preferences are retained and reappear when Pro is restored. Manual removal
+  remains available without Pro; downgrade never deletes them.
+- Existing attachments and subfolders remain visible and are never flattened.
   Removal, un-nesting, import and JSON backup remain available. Users may move a
   note to Home or a top-level folder (or move its whole subfolder to Home) to
   resume editing without Pro. No folders or notes move automatically on expiry.

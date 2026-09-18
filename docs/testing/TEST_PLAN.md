@@ -290,7 +290,7 @@ Run on checklist items, daily expense rows and monthly commitments. Run correspo
 | [ ] | MEDIA-08 | P1 | Resize image to allowed bounds then undo/redo | Ratio within 0.35–1; aspect ratio preserved; optimized file not repeatedly rewritten |
 | [ ] | MEDIA-09 | P0 | Pro owner and Free invited editor add/reorder images; viewer tries | Owner-funded Pro access honored; viewer/server unauthorized mutation rejected |
 | [ ] | MEDIA-10 | P0 | Lose internet during upload; reopen/retry, revoke membership during reservation | No unauthorized storage object; no duplicate attachment; reconciliation recovers eligible missing copies |
-| [ ] | MEDIA-11 | P1 | Expire Pro with existing media | Existing images/backgrounds readable/downloadable; new paid actions blocked; allowed removal/recovery remains available |
+| [ ] | MEDIA-11 | P1 | Expire Pro, downgrade to Plus/Free or sign out with existing media; restore Pro | Inline images stay readable/downloadable. Custom backgrounds disappear in all four editors, list/grid cards and settings previews; normal note colours/readability return. Local background files/Blobs/preferences remain intact and the same images reappear on Pro renewal. Remove remains available without Pro; removing while hidden prevents return. New paid actions blocked; allowed recovery remains available |
 
 ### N PDF image and category export
 

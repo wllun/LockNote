@@ -106,7 +106,7 @@ const NoteBackgroundModal = ({ visible, noteId, value, onClose, onChanged }) => 
           </View>
 
           <View style={styles.preview}>
-            {value ? (
+            {value && canChangeBackground ? (
               <>
                 <NoteBackgroundLayer uri={value} surface={colors.card} opacity={0.72} borderRadius={radius.md} />
                 <View style={styles.previewCopy}>
@@ -117,7 +117,7 @@ const NoteBackgroundModal = ({ visible, noteId, value, onClose, onChanged }) => 
             ) : (
               <View style={styles.emptyPreview}>
                 <Ionicons name="image-outline" size={30} color={colors.textTertiary} />
-                <Text style={styles.emptyText}>No background image</Text>
+                <Text style={styles.emptyText}>{value ? 'Background hidden without Pro' : 'No background image'}</Text>
               </View>
             )}
           </View>

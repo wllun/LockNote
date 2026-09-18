@@ -68,7 +68,8 @@ to be restored to the same LockNote account. `SubscriptionProvider` owns purchas
 state and account identity changes, while `subscriptionService` owns the SDK.
 `premiumAccessService` grants new paid actions from unexpired store entitlements
 or server-verified access. Account changes clear this in-memory state; it never
-stores a local premium toggle. Existing paid content is not gated from reads.
+stores a local premium toggle. Existing paid content is not gated from storage
+reads; custom backgrounds are retained locally but hidden without active Pro.
 The Premium footer opens Privacy Policy and Terms of Service routes inside the
 Premium stack. Their shared app copy lives in `src/content/legalDocuments.js`,
 so it remains readable offline. Matching static HTML copies under `docs/legal/`
@@ -193,6 +194,12 @@ theme-colored translucent layer above the image to preserve text contrast.
 Background images are device-local and excluded from note rows, backups,
 private sync, and shared-note collaboration; deleting the note also removes its
 managed local image. A background makes an otherwise empty new draft meaningful.
+`NoteBackgroundLayer` gates rendering on resolved, active Pro across all editors,
+cards and settings previews. Editors restore their normal opaque note surfaces
+while the image is hidden. Free/Plus, expiry and sign-out never delete the file,
+Blob or preference; restoring Pro displays the same image again. Manual Remove
+background remains available without Pro. Stored draft/background metadata is
+unchanged by this presentation-only policy.
 
 Plain notes can contain up to 20 image attachments. The picker accepts source
 images up to 5 MB, then `expo-image-manipulator` converts each image to JPEG and

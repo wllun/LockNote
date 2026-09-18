@@ -449,7 +449,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
   return (
     <KeyboardAvoidingView style={[styles.container, { paddingTop: insets.top, backgroundColor: noteColorTheme.surface }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <NoteBackgroundLayer uri={noteBackgroundUri} surface={noteColorTheme.surface} />
+      <NoteBackgroundLayer uri={features.visibleBackgroundUri} surface={noteColorTheme.surface} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton} activeOpacity={0.7} hitSlop={4} accessibilityRole="button" accessibilityLabel="Go back"><Ionicons name="chevron-back" size={24} color={colors.text} /></TouchableOpacity>
         <View style={[styles.titleField, isTitleFocused && styles.titleFieldFocused]}>

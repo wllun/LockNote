@@ -1,5 +1,9 @@
 import { canUsePremiumFeature } from './premium-access.mjs';
 
+// Presentation only: keep the stored URI intact so renewal restores the image.
+export const getVisibleNoteBackgroundUri = (uri, plan = 'free', loading = false) =>
+  !loading && canUsePremiumFeature(plan, 'backgrounds') ? uri || null : null;
+
 // Visibility mirrors action gates, including non-destructive downgrade recovery.
 export const getNoteFeatureVisibility = ({
   plan = 'free', note = null, isSubfolder = false, backgroundUri = null,
@@ -15,6 +19,7 @@ export const getNoteFeatureVisibility = ({
       ? note?.share_role === 'editor' && ownerPlan === 'pro'
       : canUsePremiumFeature(plan, 'attachments')),
     canChangeBackground,
+    visibleBackgroundUri: getVisibleNoteBackgroundUri(backgroundUri, plan),
     showBackground: canChangeBackground || Boolean(backgroundUri),
     canShare,
     showSharing: canShare || Boolean(note?.cloud_id),

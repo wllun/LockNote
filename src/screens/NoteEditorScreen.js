@@ -618,8 +618,8 @@ const NoteEditorScreen = ({ route, navigation }) => {
       style={[styles.container, { paddingTop: insets.top, backgroundColor: noteColorTheme.surface }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <NoteBackgroundLayer uri={noteBackgroundUri} surface={noteColorTheme.surface} />
-      <View style={[styles.header, { backgroundColor: noteBackgroundUri ? 'transparent' : noteColorTheme.surface }]}>
+      <NoteBackgroundLayer uri={features.visibleBackgroundUri} surface={noteColorTheme.surface} />
+      <View style={[styles.header, { backgroundColor: features.visibleBackgroundUri ? 'transparent' : noteColorTheme.surface }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.headerButton}
@@ -679,7 +679,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.contentArea, { backgroundColor: noteBackgroundUri ? 'transparent' : noteColorTheme.surface }]}>
+      <View style={[styles.contentArea, { backgroundColor: features.visibleBackgroundUri ? 'transparent' : noteColorTheme.surface }]}>
         <NoteAttachmentGallery
           ref={contentEditorRef}
           content={content}
