@@ -57,6 +57,7 @@ import {
   replaceInlineTextBlock,
 } from '../utils/note-attachment.mjs';
 import { attachmentCloudService } from '../services/attachmentCloudService';
+import { noteEditingAccessService } from '../services/noteEditingAccessService';
 
 const NoteEditorScreen = ({ route, navigation }) => {
   const colors = useTheme();
@@ -67,7 +68,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [content, setContent] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
-  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(true);
   const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
   const [showColorModal, setShowColorModal] = useState(false);
   const [noteBackgroundUri, setNoteBackgroundUri] = useState(null);
@@ -114,7 +115,8 @@ const NoteEditorScreen = ({ route, navigation }) => {
         setNoteColor(localColor);
         setNoteBackgroundUri(localBackgroundUri);
         setAttachments(localAttachments);
-        const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note);
+        const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note)
+          || await noteEditingAccessService.isReadOnly(note);
         setIsReadOnly(readOnly);
         if (readOnly) {
           if (saveTimeout.current) clearTimeout(saveTimeout.current);
@@ -155,7 +157,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   };
 
   const handleCollaborationAccessChange = useCallback((access) => {
-    if (!access?.collaborative) return;
+    if (!access?.editAccess && !access?.collaborative) return;
     const readOnly = access.canEdit !== true;
     latest.current.readOnly = readOnly;
     setIsReadOnly(readOnly);
@@ -568,7 +570,19 @@ const NoteEditorScreen = ({ route, navigation }) => {
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
-    if (latest.current.readOnly) return;
+    if (latest.current.readOnly) {
+      if (await collaborationService.flushStagedDraft(noteId)) {
+        // Preserve image anchors shifted by text typed before expiry too.
+        for (const attachment of latest.current.attachments) {
+          await attachmentRepo.update(attachment.id, {
+            anchor_offset: attachment.anchor_offset,
+            display_order: attachment.display_order,
+            display_width_ratio: attachment.display_width_ratio,
+          });
+        }
+      }
+      return;
+    }
 
     if (disposition === 'delete') {
       await attachmentRepo.removeAll(noteId);
@@ -632,7 +646,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
             returnKeyType="next"
             onSubmitEditing={() => contentEditorRef.current?.focus()}
             accessibilityLabel="Note title"
-            accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Edits the title of this note'}
+            accessibilityHint={isReadOnly ? 'This note is view only' : 'Edits the title of this note'}
           />
         </View>
 

@@ -11,6 +11,12 @@ import {
 } from '../utils/collaboration-note.mjs';
 import { getNetworkAvailability } from '../utils/network-availability.mjs';
 import { useTheme } from '../theme';
+import { useSubscription } from '../context/SubscriptionContext';
+import { folderRepo } from '../db/folderRepo';
+import MoveNoteModal from './MoveNoteModal';
+import { noteEditingAccessService } from '../services/noteEditingAccessService';
+import { combineNoteEditAccess, SUBFOLDER_READ_ONLY_MESSAGE } from '../utils/subfolder-edit-access.mjs';
+import { AppAlert as Alert } from '../utils/app-alert';
 
 const LEASE_RENEW_INTERVAL_MS = 30_000;
 
@@ -18,12 +24,17 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { session } = useAuth();
+  const { activePlanId, loading: subscriptionLoading } = useSubscription();
   const network = useNetInfo();
   const online = getNetworkAvailability(network);
   const [appState, setAppState] = useState(AppState.currentState);
   const [note, setNote] = useState(null);
   const [access, setAccess] = useState({ status: 'checking', canEdit: false });
   const [resolving, setResolving] = useState(false);
+  const [subfolderReadOnly, setSubfolderReadOnly] = useState(false);
+  const [moveFolders, setMoveFolders] = useState(null);
+  const [moving, setMoving] = useState(false);
+  const subfolderReadOnlyRef = useRef(false);
   const callbackRef = useRef(onRemoteNote);
   const accessCallbackRef = useRef(onEditAccessChange);
   const offlineCallbackRef = useRef(onOffline);
@@ -39,8 +50,9 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
   appStateRef.current = appState;
 
   const publishAccess = useCallback((nextAccess) => {
-    setAccess(nextAccess);
-    accessCallbackRef.current?.(nextAccess);
+    const combined = combineNoteEditAccess(nextAccess, subfolderReadOnlyRef.current);
+    setAccess(combined);
+    accessCallbackRef.current?.(combined);
   }, []);
 
   const releaseLease = useCallback(() => {
@@ -62,6 +74,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
       if (syncing) return;
       syncing = true;
       let local = null;
+      let checkingFolder = true;
       try {
         const pauseForAvailability = () => {
           releaseLease();
@@ -87,6 +100,11 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
 
         local = await noteRepo.getById(noteId);
         if (!mounted) return;
+        const folderReadOnly = await noteEditingAccessService.isReadOnly(local);
+        if (!mounted) return;
+        checkingFolder = false;
+        subfolderReadOnlyRef.current = folderReadOnly;
+        setSubfolderReadOnly(folderReadOnly);
         setNote(local);
         if (!local?.cloud_id) {
           publishAccess({ collaborative: false, status: 'private', canEdit: true });
@@ -99,6 +117,16 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
         }
 
         offlineNotifiedRef.current = false;
+
+        if (folderReadOnly) {
+          releaseLease();
+          publishAccess({ collaborative: true, status: 'subfolder', canEdit: false });
+          const result = await collaborationService.refreshNote(noteId);
+          if (!mounted) return;
+          setNote(result.note);
+          if (result.changed) await callbackRef.current?.(result.note);
+          return;
+        }
 
         const lease = ownsLeaseRef.current && !renewLease
           ? { collaborative: true, canEdit: true, reason: 'owner', acquired: true }
@@ -135,7 +163,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
         publishAccess({
           collaborative: true,
           status: owned ? 'local' : onlineRef.current === false ? 'offline' : 'unavailable',
-          canEdit: owned,
+          canEdit: owned && !checkingFolder,
           message: error?.message || 'Shared editing is temporarily unavailable.',
         });
         noteRepo.getById(noteId).then((local) => {
@@ -170,9 +198,37 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
     syncRef.current();
   }, [appState, online, releaseLease]);
 
+  useEffect(() => {
+    // Re-evaluate private notes too when checkout, restore, expiry or sign-out
+    // changes the plan. Shared edit access must never override this restriction.
+    syncRef.current();
+  }, [activePlanId, subscriptionLoading]);
+
   const refreshLocal = () => noteRepo.getById(noteId).then(setNote).catch(() => {});
   const message = formatCollaborativeEdit(note, session?.user?.email);
-  if (!note?.cloud_id) return null;
+  const openMove = async () => {
+    try {
+      setMoveFolders(await folderRepo.getAll());
+    } catch {
+      Alert.alert('Cannot move note', 'Folders could not be loaded. Please try again.');
+    }
+  };
+  const moveNote = async (folderId) => {
+    setMoving(true);
+    try {
+      await collaborationService.flushStagedDraft(noteId);
+      const moved = await noteRepo.move(noteId, folderId);
+      if (!moved) throw new Error('This note no longer exists.');
+      setNote(moved);
+      await callbackRef.current?.(moved);
+      await syncRef.current();
+    } catch (error) {
+      Alert.alert('Cannot move note', error?.message || 'Please try again.');
+    } finally {
+      setMoving(false);
+    }
+  };
+  if (!note?.cloud_id && !subfolderReadOnly) return null;
 
   const isRoleReadOnly = isReadOnlyCollaborativeNote(note);
   const lockHolder = access.lock_user_email || 'Another collaborator';
@@ -217,7 +273,24 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
 
   return (
     <View style={styles.container}>
-      <View style={styles.statusRow}>
+      {subfolderReadOnly && (
+        <View style={styles.subfolderNotice}>
+          <Text selectable style={styles.subfolderText} accessibilityLiveRegion="polite">
+            View only · {SUBFOLDER_READ_ONLY_MESSAGE}
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
+            disabled={moving}
+            accessibilityRole="button"
+            accessibilityLabel="Move note out of subfolder"
+            accessibilityState={{ disabled: moving }}
+            onPress={openMove}
+          >
+            <Text style={styles.actionText}>{moving ? 'Moving…' : 'Move note'}</Text>
+          </Pressable>
+        </View>
+      )}
+      {note?.cloud_id && !subfolderReadOnly && <View style={styles.statusRow}>
         <Ionicons
           name={statusIcon}
           size={14}
@@ -230,7 +303,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
         >
           {statusMessage}
         </Text>
-      </View>
+      </View>}
       {note.sync_status === 'conflict' && online === true && (
         <View style={styles.actions}>
           <Pressable
@@ -242,7 +315,7 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
           >
             <Text style={styles.actionText}>Use latest</Text>
           </Pressable>
-          {!isRoleReadOnly && access.canEdit && (
+          {!isRoleReadOnly && access.canEdit && !subfolderReadOnly && (
             <Pressable
               style={styles.actionButton}
               disabled={resolving}
@@ -255,6 +328,13 @@ const CollaborationFooter = ({ noteId, onRemoteNote, onEditAccessChange, onOffli
           )}
         </View>
       )}
+      <MoveNoteModal
+        visible={moveFolders !== null}
+        folders={moveFolders || []}
+        currentFolderId={note?.folder_id ?? null}
+        onClose={() => setMoveFolders(null)}
+        onSelect={moveNote}
+      />
     </View>
   );
 };
@@ -277,6 +357,8 @@ const makeStyles = (colors) => StyleSheet.create({
     gap: 7,
   },
   text: { color: colors.textTertiary, fontSize: 12, textAlign: 'center' },
+  subfolderNotice: { alignSelf: 'stretch', alignItems: 'center' },
+  subfolderText: { color: colors.text, fontSize: 14, lineHeight: 21, textAlign: 'center' },
   actions: { marginTop: 7, flexDirection: 'row', gap: 22 },
   actionButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
   actionText: { color: colors.primary, fontSize: 12, fontWeight: '800' },

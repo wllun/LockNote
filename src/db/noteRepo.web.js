@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hashPassword } from '../utils/crypto';
 import { COLLABORATION_DEFAULTS, normalizeCollaborationNote } from '../utils/collaboration-note.mjs';
 import { getVisibleFolders } from '../utils/folder-hierarchy.mjs';
+import { noteEditingAccessService } from '../services/noteEditingAccessService';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
@@ -100,6 +101,7 @@ export const noteRepo = {
   },
 
   async create(folderId = null, title = '', content = '', password = null, noteType = 'note') {
+    await noteEditingAccessService.requireFolder(folderId);
     const id = generateId();
     const timestamp = now();
     const passwordHash = password ? await hashPassword(password) : null;
@@ -181,9 +183,10 @@ export const noteRepo = {
   },
 
   async move(id, folderId = null) {
-    return await mutateStorage((notes) => {
+    return await mutateStorage(async (notes) => {
       const note = notes.find((item) => item.id === id && !item.is_deleted);
       if (!note) return null;
+      if (note.folder_id !== folderId) await noteEditingAccessService.requireFolder(folderId);
       note.folder_id = folderId;
       note.updated_at = now();
       return normalizeNote(note);

@@ -92,7 +92,16 @@ Local action gating and server quota/expiry enforcement are implemented in
 backfill existing subscribers before releasing enforcement on a paid service.
 
 Expiry must downgrade the account to Free without deleting local or cloud note
-data. Local editing continues; manual sync remains Free within 25 MB, while
+data. Local editing continues at Home and in top-level folders; notes inside
+subfolders become read-only without Pro. Users can move notes out or un-nest
+their folder to resume editing; nothing moves automatically. All four editors
+combine this restriction with collaboration permissions through the existing
+edit-access footer, which provides a Move note action. Local content saves,
+note creation and moves into subfolders enforce the same policy; sync/backup
+restoration and cloud-cache refresh remain available. A snapshot staged while
+Pro was active may finish its pending auto-save after expiry. Bulk expense
+currency updates report read-only subfolder records as skipped.
+Manual sync remains Free within 25 MB, while
 over-quota growth and owner-funded collaboration pause. Existing cloud data remains recoverable and
 downloadable, and resubscribing resumes cloud features after safe conflict
 reconciliation. Invited collaborators need a Free account, not their own paid
@@ -384,7 +393,7 @@ through `apply_verified_subscription`. It verifies a configured Authorization
 secret, honors paid expiry/grace, handles transfers and duplicate/late events, and
 rejects stale snapshots. App users can read only their own subscription and cannot
 write it. Production excludes sandbox subscriptions by default. Owner-funded
-shared saves/leases/invitations pause on Free; owned local drafts remain editable
+shared saves/leases/invitations pause on Free; owned local drafts outside subfolders remain editable
 and pending, while incoming shared notes remain readable/view-only online.
 
 ## Portable backup and restore

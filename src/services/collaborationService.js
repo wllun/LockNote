@@ -1,6 +1,8 @@
 import { noteRepo } from '../db/noteRepo';
 import { attachmentRepo } from '../db/attachmentRepo';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
+import { noteEditingAccessService } from './noteEditingAccessService';
+import { premiumAccessService } from './premiumAccessService';
 import {
   SHARE_ORIGIN_INCOMING,
   SHARE_ROLE_EDITOR,
@@ -57,6 +59,9 @@ const isEditLockedError = (error) => error?.code === '55P03'
 const EDIT_LEASE_SECONDS = 90;
 const heldEditLeases = new Set();
 const dirtyDrafts = new Map();
+// A snapshot staged while Pro was active may finish its existing auto-save
+// after expiry. This is not permission to stage further edits after expiry.
+const proDraftGrants = new Map();
 
 const draftsMatch = (draft, updates) => draft
   && draft.title === updates.title
@@ -194,6 +199,15 @@ export const collaborationService = {
       title: updates.title ?? '',
       content: updates.content ?? '',
     });
+    if (premiumAccessService.getPlan() === 'pro') proDraftGrants.set(noteId, dirtyDrafts.get(noteId));
+    else proDraftGrants.delete(noteId);
+  },
+
+  async flushStagedDraft(noteId) {
+    const draft = dirtyDrafts.get(noteId);
+    if (!draft) return false;
+    await this.save(noteId, draft);
+    return true;
   },
 
   async refreshSharedWithMe() {
@@ -269,14 +283,22 @@ export const collaborationService = {
   },
 
   async save(noteId, updates) {
+    const pendingProDraft = draftsMatch(dirtyDrafts.get(noteId), updates)
+      && draftsMatch(proDraftGrants.get(noteId), updates);
     return await enqueueSave(noteId, async () => {
       const beforeSave = await noteRepo.getById(noteId);
       if (isReadOnlyCollaborativeNote(beforeSave)) throw createReadOnlyError();
+      const changesContent = (updates.title !== undefined && updates.title !== beforeSave?.title)
+        || (updates.content !== undefined && updates.content !== beforeSave?.content);
+      if (changesContent && !pendingProDraft) await noteEditingAccessService.requireNote(beforeSave);
       let local = await noteRepo.update(
         noteId,
         beforeSave?.cloud_id ? { ...updates, sync_status: 'pending' } : updates
       );
-      if (draftsMatch(dirtyDrafts.get(noteId), updates)) dirtyDrafts.delete(noteId);
+      if (draftsMatch(dirtyDrafts.get(noteId), updates)) {
+        dirtyDrafts.delete(noteId);
+        proDraftGrants.delete(noteId);
+      }
       if (!local?.cloud_id || !isSupabaseConfigured) return local;
       if (local.share_origin === 'owned') {
         const { data: access, error: accessError } = await supabase.rpc('get_note_subscription_access', { p_note_id: local.cloud_id });
@@ -428,6 +450,7 @@ export const collaborationService = {
   async resolveConflict(noteId, strategy) {
     const local = await noteRepo.getById(noteId);
     if (strategy === 'local' && isReadOnlyCollaborativeNote(local)) throw createReadOnlyError();
+    if (strategy === 'local') await noteEditingAccessService.requireNote(local);
     await requireCloud();
     const remote = unwrap(await supabase.rpc('get_shared_note', { p_note_id: local.cloud_id }));
     let resolved = remote;

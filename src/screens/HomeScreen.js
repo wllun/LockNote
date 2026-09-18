@@ -471,7 +471,7 @@ const HomeScreen = ({ navigation }) => {
       if (!movedNote) throw new Error('Note no longer exists');
       refreshCurrent();
     } catch (error) {
-      Alert.alert('Error', 'Failed to move note');
+      Alert.alert('Cannot move note', error?.message || 'Failed to move note');
     }
   };
 

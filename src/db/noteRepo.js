@@ -1,5 +1,6 @@
 import { getDB } from './sqlite';
 import { getVisibleFolders } from '../utils/folder-hierarchy.mjs';
+import { noteEditingAccessService } from '../services/noteEditingAccessService';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
@@ -55,6 +56,7 @@ export const noteRepo = {
   },
 
   async create(folderId = null, title = '', content = '', password = null, noteType = 'note') {
+    await noteEditingAccessService.requireFolder(folderId);
     const db = getDB();
     const { hashPassword } = require('../utils/crypto');
     const id = generateId();
@@ -144,6 +146,9 @@ export const noteRepo = {
   },
 
   async move(id, folderId = null) {
+    const existing = await this.getById(id);
+    if (!existing) return null;
+    if (existing.folder_id !== folderId) await noteEditingAccessService.requireFolder(folderId);
     const db = getDB();
     await db.runAsync(
       `UPDATE notes SET folder_id = ?, updated_at = ? WHERE id = ? AND is_deleted = 0`,

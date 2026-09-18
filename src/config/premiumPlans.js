@@ -43,7 +43,8 @@ export const FREE_FEATURES = [
 ];
 
 export const EXPIRED_PLAN_BEHAVIOR = [
-  'Local notes stay available and editable',
+  'Local notes stay available; editing in subfolders requires Pro',
+  'Move notes to Home or a top-level folder to keep editing without Pro',
   'Manual sync remains Free within 25 MB; premium uploads and collaboration pause',
   'Existing cloud data stays read-only and downloadable',
   'Resubscribing resumes cloud features',

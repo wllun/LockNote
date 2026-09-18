@@ -22,6 +22,7 @@ import EditorHistoryButtons from '../components/editor-history-buttons';
 import NoteExportModal from '../components/NoteExportModal';
 import NoteShareModal from '../components/NoteShareModal';
 import CollaborationFooter from '../components/CollaborationFooter';
+import { noteEditingAccessService } from '../services/noteEditingAccessService';
 import NoteColorModal from '../components/note-color-modal';
 import NoteBackgroundModal from '../components/note-background-modal';
 import NoteBackgroundLayer from '../components/note-background-layer';
@@ -257,7 +258,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const [newItemText, setNewItemText] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
-  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(true);
   const [noteColor, setNoteColor] = useState(DEFAULT_NOTE_COLOR);
   const [showColorModal, setShowColorModal] = useState(false);
   const [noteBackgroundUri, setNoteBackgroundUri] = useState(null);
@@ -359,7 +360,8 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       ]);
 
       const parsed = parseChecklistNote(note.content);
-      const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note);
+      const readOnly = Boolean(note.cloud_id) || isReadOnlyCollaborativeNote(note)
+        || await noteEditingAccessService.isReadOnly(note);
       if (readOnly) {
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
         saveTimeout.current = null;
@@ -396,7 +398,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }, [clearUndo, noteId]);
 
   const handleCollaborationAccessChange = useCallback((access) => {
-    if (!access?.collaborative) return;
+    if (!access?.editAccess && !access?.collaborative) return;
     const readOnly = access.canEdit !== true;
     latest.current.readOnly = readOnly;
     setIsReadOnly(readOnly);
@@ -900,7 +902,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     if (pending) clearTimeout(pending);
     saveTimeout.current = null;
 
-    if (draft.readOnly) return;
+    if (draft.readOnly) {
+      await collaborationService.flushStagedDraft(noteId);
+      return;
+    }
 
     if (disposition === 'delete') {
       await noteRepo.hardDelete(noteId);

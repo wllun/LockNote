@@ -68,11 +68,11 @@ const SettingsScreen = ({ navigation }) => {
         savedCurrency
       );
       const hasIncompleteUpdates =
-        result.failedCount > 0 || result.pendingCloudCount > 0;
+        result.failedCount > 0 || result.pendingCloudCount > 0 || result.skippedReadOnlyCount > 0;
       Alert.alert(
-        hasIncompleteUpdates ? 'Currency updated locally' : 'Currency updated',
+        hasIncompleteUpdates ? 'Currency partially updated' : 'Currency updated',
         result.noteCount
-          ? `The currency display was changed for ${result.updatedCount} existing private or owned expense record${result.updatedCount === 1 ? '' : 's'}. Entered amounts were not converted.`
+          ? `The currency display was changed for ${result.updatedCount} existing private or owned expense record${result.updatedCount === 1 ? '' : 's'}. Entered amounts were not converted.${result.skippedReadOnlyCount ? ' Read-only expense records in subfolders were not changed. Move them out or renew Pro to edit their currency.' : ''}`
           : 'There were no existing expense records to update. New expense records will use the selected currency.',
         [{ text: 'OK' }],
         {
@@ -91,6 +91,9 @@ const SettingsScreen = ({ navigation }) => {
               : []),
             ...(result.failedCount
               ? [{ label: 'Could not update', value: String(result.failedCount) }]
+              : []),
+            ...(result.skippedReadOnlyCount
+              ? [{ label: 'Read-only subfolder records skipped', value: String(result.skippedReadOnlyCount) }]
               : []),
           ],
         }
