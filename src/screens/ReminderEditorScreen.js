@@ -5,8 +5,6 @@ import {
 } from 'react-native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { noteRepo } from '../db/noteRepo';
 import EditorHistoryButtons from '../components/editor-history-buttons';
@@ -45,6 +43,7 @@ import { noteColorPreference } from '../utils/note-color-preference';
 import { noteBackgroundPreference } from '../utils/note-background-preference';
 import { createNoteDeleteDetail } from '../utils/note-type-presentation.mjs';
 import { isReadOnlyCollaborativeNote } from '../utils/collaboration-note.mjs';
+import { registerDoubleTap } from '../utils/double-tap.mjs';
 
 const ReminderEditorScreen = ({ route, navigation }) => {
   const { noteId, isNewDraft = false, shared = false } = route.params;
@@ -76,6 +75,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
   const saveTimeout = useRef(null);
   const loadCompletedRef = useRef(false);
   const bodyRef = useRef(null);
+  const bodyPreviewTapRef = useRef(null);
   const bodyLimitDialogShown = useRef(false);
   const latest = useRef({ title: '', body: '', reminder: normalizeReminder(), hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, backgroundUri: null, cloudId: null, readOnly: false, deleted: false });
   const {
@@ -252,12 +252,14 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     setIsBodyEditing(true);
   }, []);
 
-  const bodyPreviewGesture = useMemo(() => Gesture.Tap()
-    .enabled(!isReadOnly && !isBodyEditing)
-    .numberOfTaps(2)
-    .onEnd((_event, success) => {
-      if (success) scheduleOnRN(activateBodyEditing);
-    }), [activateBodyEditing, isBodyEditing, isReadOnly]);
+  const handleBodyPreviewPress = useCallback(() => {
+    const result = registerDoubleTap(bodyPreviewTapRef.current, {
+      targetId: 'reminder-body',
+      timestamp: Date.now(),
+    });
+    bodyPreviewTapRef.current = result.nextTap;
+    if (result.isDoubleTap) activateBodyEditing();
+  }, [activateBodyEditing]);
 
   useEffect(() => {
     if (!isBodyEditing || isReadOnly) return undefined;
@@ -471,18 +473,22 @@ const ReminderEditorScreen = ({ route, navigation }) => {
         {isBodyEditing && !isReadOnly ? (
           <TextInput ref={bodyRef} style={styles.bodyInput} placeholder="Start writing..." placeholderTextColor={colors.textTertiary} value={body} editable onChangeText={handleBodyChange} maxLength={REMINDER_BODY_MAX_CHARACTERS} multiline textAlignVertical="top" accessibilityLabel="Reminder description" accessibilityHint={`Maximum ${REMINDER_BODY_MAX_CHARACTERS.toLocaleString()} characters`} />
         ) : (
-          <GestureDetector gesture={bodyPreviewGesture}>
-            <View
-              style={styles.bodyPreview}
-              accessible
-              accessibilityRole={isReadOnly ? 'text' : 'button'}
-              accessibilityLabel={body || 'Empty reminder description'}
-              accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Double-tap to edit the reminder description'}
-              onAccessibilityTap={activateBodyEditing}
+          <View
+            style={styles.bodyPreview}
+            accessible
+            accessibilityRole={isReadOnly ? 'text' : 'button'}
+            accessibilityLabel={body || 'Empty reminder description'}
+            accessibilityHint={isReadOnly ? 'This shared note is view only' : 'Double-tap to edit the reminder description'}
+            onAccessibilityTap={activateBodyEditing}
+          >
+            <Text
+              selectable={Boolean(body)}
+              onPress={handleBodyPreviewPress}
+              style={[styles.bodyPreviewText, !body && styles.bodyPlaceholder]}
             >
-              <Text style={[styles.bodyPreviewText, !body && styles.bodyPlaceholder]}>{body || 'Start writing...'}</Text>
-            </View>
-          </GestureDetector>
+              {body || 'Start writing...'}
+            </Text>
+          </View>
         )}
 
         <View style={[styles.reminderCard, reminder.enabled && styles.reminderCardEnabled]}>

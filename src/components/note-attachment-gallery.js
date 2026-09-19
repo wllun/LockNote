@@ -20,6 +20,7 @@ import {
   MIN_ATTACHMENT_DISPLAY_WIDTH_RATIO,
   normalizeAttachmentDisplayWidthRatio,
 } from '../utils/note-attachment.mjs';
+import { registerDoubleTap } from '../utils/double-tap.mjs';
 import { radius, shadow, useTheme } from '../theme';
 
 const DRAG_ACTIVATION_DELAY_MS = 1000;
@@ -300,6 +301,7 @@ const NoteAttachmentGallery = forwardRef(({
   const [inputHeights, setInputHeights] = useState({});
   const inputRefs = useRef(new Map());
   const pendingTextFocusRef = useRef(null);
+  const previewTapRef = useRef(null);
   const previewTextLinesRef = useRef(new Map());
   const blockLayoutsRef = useRef(new Map());
   const blocks = useMemo(() => buildInlineNoteBlocks(content, attachments), [content, attachments]);
@@ -361,6 +363,21 @@ const NoteAttachmentGallery = forwardRef(({
     );
     requestTextEditing(block, cursorOffset);
   }, [blocks, requestTextEditing]);
+
+  const handlePreviewTextPress = useCallback((block, event) => {
+    const result = registerDoubleTap(previewTapRef.current, {
+      targetId: block.id,
+      timestamp: Date.now(),
+    });
+    previewTapRef.current = result.nextTap;
+    if (!result.isDoubleTap || readOnly) return;
+
+    requestTextEditingAtPoint(
+      block.id,
+      Number(event?.nativeEvent?.locationX) || 0,
+      Number(event?.nativeEvent?.locationY) || 0
+    );
+  }, [readOnly, requestTextEditingAtPoint]);
 
   useImperativeHandle(ref, () => ({
     focus: () => {
@@ -486,37 +503,30 @@ const NoteAttachmentGallery = forwardRef(({
               accessibilityHint="Type text around the images in this note"
             />
           ) : (
-            <GestureDetector
+            <View
               key={block.id}
-              gesture={Gesture.Tap()
-                .enabled(!readOnly)
-                .numberOfTaps(2)
-                .onEnd((event, success) => {
-                  if (success) scheduleOnRN(requestTextEditingAtPoint, block.id, event.x, event.y);
-                })}
+              style={[
+                styles.previewTextBlock,
+                block.id === blocks[blocks.length - 1]?.id && styles.trailingTextBlock,
+              ]}
+              onLayout={(event) => saveBlockLayout(block.id, event.nativeEvent.layout)}
+              accessible
+              accessibilityRole={readOnly ? 'text' : 'button'}
+              accessibilityLabel={block.text || 'Empty note'}
+              accessibilityHint={readOnly ? 'This shared note is view only' : 'Double-tap to edit this note'}
+              onAccessibilityTap={() => requestTextEditing(block, 0)}
             >
-              <View
-                style={[
-                  styles.previewTextBlock,
-                  block.id === blocks[blocks.length - 1]?.id && styles.trailingTextBlock,
-                ]}
-                onLayout={(event) => saveBlockLayout(block.id, event.nativeEvent.layout)}
-                accessible
-                accessibilityRole={readOnly ? 'text' : 'button'}
-                accessibilityLabel={block.text || 'Empty note'}
-                accessibilityHint={readOnly ? 'This shared note is view only' : 'Double-tap to edit this note'}
-                onAccessibilityTap={() => requestTextEditing(block, 0)}
+              <Text
+                style={[styles.previewText, readOnly && styles.readOnlyText]}
+                selectable={Boolean(block.text)}
+                onPress={(event) => handlePreviewTextPress(block, event)}
+                onTextLayout={(event) => {
+                  previewTextLinesRef.current.set(block.id, event.nativeEvent.lines);
+                }}
               >
-                <Text
-                  style={[styles.previewText, readOnly && styles.readOnlyText]}
-                  onTextLayout={(event) => {
-                    previewTextLinesRef.current.set(block.id, event.nativeEvent.lines);
-                  }}
-                >
-                  {block.text || (blocks.length === 1 ? 'Start writing...' : '')}
-                </Text>
-              </View>
-            </GestureDetector>
+                {block.text || (blocks.length === 1 ? 'Start writing...' : '')}
+              </Text>
+            </View>
           )
         ) : (
           <View

@@ -10,7 +10,7 @@ A local-first note-taking app with folders, password access gates, optional acco
 - Search across folders and note titles/content on native and web
 - Soft delete (items are flagged, not immediately purged)
 - Plain-note inline images inserted between text blocks, with wrapping multi-image rows, long-press drag/drop, and proportional resizing (up to 20 per note)
-- Preview-first plain-note bodies and reminder descriptions; double-tap the content to edit
+- Preview-first plain-note bodies and reminder descriptions; select/copy normally or double-tap to edit
 - Checklist, Expense Record, and reminder note types
 - Archive, 30-day Trash recovery, PDF/image export, and Undo/Redo
 - Free manual account sync and Plus/Pro opt-in automatic folder/note sync

@@ -268,8 +268,10 @@ settings but cannot schedule a device notification.
 Existing plain-note bodies and reminder descriptions open as non-input previews. A
 double-tap replaces the selected preview with the editable input and focuses it;
 normal taps and scroll gestures therefore do not summon the keyboard or place a
-cursor. Screen-reader activation enters editing directly. Plain-note attachment
-drag and resize controls are also available only after the body enters editing.
+cursor. The preview uses native selectable text, so long-press selection and copy
+remain available on mobile and normal text selection remains available on web.
+Screen-reader activation enters editing directly. Plain-note attachment drag and
+resize controls are also available only after the body enters editing.
 
 New plain-note drafts instead start with an editable body without forcing the
 keyboard, so a single tap can position the cursor immediately.
