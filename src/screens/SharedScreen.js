@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   AppState,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -44,6 +45,10 @@ const SharedScreen = ({ navigation }) => {
   const [now, setNow] = useState(Date.now());
   const visibleNotes = notes.filter((note) => isSharedNoteVisible(note));
   const loadRequestRef = useRef(0);
+
+  const openSignIn = useCallback(() => {
+    navigation.getParent()?.navigate('Profile');
+  }, [navigation]);
 
   const load = useCallback(async () => {
     const requestId = ++loadRequestRef.current;
@@ -132,6 +137,16 @@ const SharedScreen = ({ navigation }) => {
         </View>
         <Text style={styles.emptyTitle}>Shared with me</Text>
         <Text style={styles.emptyText}>Sign in to your account.</Text>
+        <Pressable
+          onPress={openSignIn}
+          style={({ pressed }) => [styles.signInButton, pressed && styles.buttonPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in to LockNote"
+          accessibilityHint="Opens the account sign-in screen"
+        >
+          <Ionicons name="log-in-outline" size={19} color={colors.card} />
+          <Text style={styles.signInButtonText}>Sign in</Text>
+        </Pressable>
       </View>
     );
   }
@@ -202,6 +217,20 @@ const makeStyles = (colors) => StyleSheet.create({
     marginTop: 7,
     maxWidth: 320,
   },
+  signInButton: {
+    minWidth: 160,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 20,
+    paddingHorizontal: 20,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  signInButtonText: { color: colors.card, fontSize: 16, fontWeight: '700' },
+  buttonPressed: { opacity: 0.82 },
   banner: {
     flexDirection: 'row',
     gap: 8,
