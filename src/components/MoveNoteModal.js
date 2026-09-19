@@ -47,6 +47,9 @@ const MoveNoteModal = ({
         style={[
           styles.overlay,
           Platform.OS === 'web' ? styles.overlayWeb : styles.overlayPhone,
+          Platform.OS !== 'web' && {
+            paddingBottom: Math.max(insets.bottom + 8, 16),
+          },
         ]}
       >
         <Pressable
@@ -58,9 +61,6 @@ const MoveNoteModal = ({
           style={[
             styles.panel,
             Platform.OS === 'web' ? styles.panelWeb : styles.panelPhone,
-            Platform.OS !== 'web' && {
-              paddingBottom: Math.max(insets.bottom, 12),
-            },
           ]}
           accessibilityViewIsModal
         >

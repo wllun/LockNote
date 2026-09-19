@@ -526,6 +526,9 @@ const ExpenseSummaryModal = ({
           Platform.OS === 'web'
             ? styles.categoryActionOverlayWeb
             : styles.categoryActionOverlayPhone,
+          Platform.OS !== 'web' && {
+            paddingBottom: Math.max(insets.bottom + 8, 16),
+          },
         ]}
       >
         <Pressable
@@ -539,9 +542,6 @@ const ExpenseSummaryModal = ({
             Platform.OS === 'web'
               ? styles.categoryActionPanelWeb
               : styles.categoryActionPanelPhone,
-            Platform.OS !== 'web' && {
-              paddingBottom: Math.max(insets.bottom, 16),
-            },
           ]}
           accessibilityViewIsModal
           testID="expense-category-actions"

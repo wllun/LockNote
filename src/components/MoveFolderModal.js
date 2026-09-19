@@ -13,12 +13,15 @@ const MoveFolderModal = ({ visible, folders, folderId, onClose, onSelect }) => {
 
   return (
     <Modal visible={visible} animationType={visible ? 'fade' : 'none'} transparent onRequestClose={onClose}>
-      <View style={[styles.overlay, Platform.OS === 'web' ? styles.overlayWeb : styles.overlayPhone]}>
+      <View style={[
+        styles.overlay,
+        Platform.OS === 'web' ? styles.overlayWeb : styles.overlayPhone,
+        Platform.OS !== 'web' && { paddingBottom: Math.max(insets.bottom + 8, 16) },
+      ]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
         <View style={[
           styles.panel,
           Platform.OS === 'web' ? styles.panelWeb : styles.panelPhone,
-          Platform.OS !== 'web' && { paddingBottom: Math.max(insets.bottom, 12) },
         ]} accessibilityViewIsModal>
           <View style={styles.header}>
             <View>

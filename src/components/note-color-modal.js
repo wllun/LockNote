@@ -22,13 +22,16 @@ const NoteColorModal = ({ visible, value, onClose, onSelect }) => {
       animationType={visible ? 'fade' : 'none'}
       onRequestClose={onClose}
     >
-      <View style={[styles.overlay, Platform.OS === 'web' ? styles.overlayWeb : styles.overlayPhone]}>
+      <View style={[
+        styles.overlay,
+        Platform.OS === 'web' ? styles.overlayWeb : styles.overlayPhone,
+        Platform.OS !== 'web' && { paddingBottom: Math.max(insets.bottom + 8, 16) },
+      ]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
         <View
           style={[
             styles.panel,
             Platform.OS === 'web' ? styles.panelWeb : styles.panelPhone,
-            Platform.OS !== 'web' && { paddingBottom: Math.max(insets.bottom, 16) },
           ]}
           accessibilityViewIsModal
         >

@@ -61,6 +61,9 @@ const ItemActionsModal = ({
         style={[
           styles.overlay,
           Platform.OS === 'web' ? styles.overlayWeb : styles.overlayPhone,
+          Platform.OS !== 'web' && {
+            paddingBottom: Math.max(insets.bottom + 8, 16),
+          },
         ]}
       >
         <Pressable
@@ -72,9 +75,6 @@ const ItemActionsModal = ({
           style={[
             styles.panel,
             Platform.OS === 'web' ? styles.panelWeb : styles.panelPhone,
-            Platform.OS !== 'web' && {
-              paddingBottom: Math.max(insets.bottom, 12),
-            },
           ]}
           accessibilityViewIsModal
         >
