@@ -54,8 +54,8 @@ const setup = (initialPlan = 'free') => {
   return { folders, folderRepo, storage, noteRepo, noteEditingAccessService, collaborationService, setPlan: (next) => { plan = next; } };
 };
 
-test('all four note types are read-only in subfolders on Free and Plus, but not Pro', () => {
-  for (const note_type of ['note', 'checklist', 'expense', 'reminder']) {
+test('all five note types are read-only in subfolders on Free and Plus, but not Pro', () => {
+  for (const note_type of ['note', 'checklist', 'expense', 'reminder', 'recipe']) {
     const note = { folder_id: 'child', note_type };
     const folder = { id: 'child', parent_id: 'parent' };
     assert.equal(policy.isSubfolderReadOnly(note, folder, 'free'), true);
@@ -99,7 +99,7 @@ test('expiry preserves folders and content; renewal restores access', async () =
 
 test('creating new notes in subfolders is blocked for every note type without Pro', async () => {
   const app = setup();
-  for (const type of ['note', 'checklist', 'expense', 'reminder']) {
+  for (const type of ['note', 'checklist', 'expense', 'reminder', 'recipe']) {
     await assert.rejects(app.noteRepo.create('child', '', '', null, type), { code: 'SUBFOLDER_READ_ONLY' });
   }
   assert.equal((await app.noteRepo.getByFolderId('child')).length, 1);
@@ -223,6 +223,8 @@ test('all four actual editor exit handlers flush a pre-expiry draft after becomi
       loadCompletedRef: { current: true },
       latest: { current: { ...draft, readOnly: true, color: 'default', attachments: [], items: [] } },
       saveTimeout,
+      attachmentOperationRef: { current: null },
+      isRecipe: false,
       clearTimeout: () => {},
       getEditorExitDisposition,
       DEFAULT_NOTE_COLOR: 'default',

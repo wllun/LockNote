@@ -11,7 +11,8 @@ A local-first note-taking app with folders, password access gates, optional acco
 - Soft delete (items are flagged, not immediately purged)
 - Plain-note inline images inserted between text blocks, with wrapping multi-image rows, long-press drag/drop, and proportional resizing (up to 20 per note)
 - Preview-first plain-note bodies and reminder descriptions; select/copy normally or double-tap to edit
-- Checklist, Expense Record, and reminder note types
+- Checklist, Expense Record, reminder, and Recipe Note types
+- Recipe ingredients and numbered preparation steps, with add/remove/reorder controls and one optional local photo
 - Archive, 30-day Trash recovery, PDF/image export, and Undo/Redo
 - Free manual account sync and Plus/Pro opt-in automatic folder/note sync
 - Per-email note sharing with View only or Can edit access
@@ -40,6 +41,11 @@ On macOS/Linux use `npm` and `npx`. See [physical-device commands](docs/COMMAND_
 No account or backend configuration is needed for offline use. Account sync,
 authentication, and collaboration require a configured Supabase project and the
 migrations in `supabase/migrations`.
+
+Recipe Note is available from Home/Folder → Add → Recipe Note. Text editing is
+Free, including one local photo; cloud photo uploads require Pro. See
+[Recipe Notes](docs/decisions/RECIPE_NOTES.md) for limits, backup behavior and the
+required cloud migration.
 
 ## Storage
 

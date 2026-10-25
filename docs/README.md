@@ -30,6 +30,7 @@ Updated: 2026-09-19. App 1.1.0 uses Expo SDK 54 / React Native 0.81. Android is 
 ## Design, learning and tests
 
 - [Text/media limits](decisions/NOTE_LIMITS.md) and [monthly commitments](decisions/MONTHLY_EXPENSE_CHECKLIST.md).
+- [Recipe Notes](decisions/RECIPE_NOTES.md): ingredients, steps, optional photo, cloud migration and acceptance checks.
 - [Learning React Native](tutorials/LEARNING_REACT_NATIVE.md): trace actual repository paths.
 - [Full test plan](testing/TEST_PLAN.md): automated checks plus installed-device/backend cases; unchecked cases mean Not run.
 - [Editable diagrams](diagrams/README.md): database ERD and application overview with regeneration/validation commands.

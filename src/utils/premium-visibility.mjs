@@ -10,14 +10,15 @@ export const getNoteFeatureVisibility = ({
   attachmentCount = 0, readOnly = false, ownerPlan = null,
 } = {}) => {
   const incoming = note?.share_origin === 'incoming';
+  const localRecipe = note?.note_type === 'recipe' && !incoming;
   const canShare = !incoming && canUsePremiumFeature(plan, 'sharing');
   const canChangeBackground = canUsePremiumFeature(plan, 'backgrounds');
   return {
     canExport: canUsePremiumFeature(plan, 'export')
-      || Boolean(isSubfolder || backgroundUri || attachmentCount > 0),
+      || Boolean(isSubfolder || backgroundUri || (attachmentCount > 0 && !localRecipe)),
     canInsertImages: !readOnly && (incoming
       ? note?.share_role === 'editor' && ownerPlan === 'pro'
-      : canUsePremiumFeature(plan, 'attachments')),
+      : localRecipe || canUsePremiumFeature(plan, 'attachments')),
     canChangeBackground,
     visibleBackgroundUri: getVisibleNoteBackgroundUri(backgroundUri, plan),
     showBackground: canChangeBackground || Boolean(backgroundUri),

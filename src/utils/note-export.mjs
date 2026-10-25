@@ -25,6 +25,8 @@ export const getExportTitle = (title = '', type = 'note') =>
         ? 'Untitled checklist'
         : type === 'reminder'
           ? 'Untitled reminder'
+        : type === 'recipe'
+          ? 'Untitled recipe'
         : 'Untitled note'
   );
 
@@ -34,6 +36,7 @@ const EXPORT_TYPE_LABELS = {
   expense: 'Expense',
   'expense-category': 'Expense Category',
   reminder: 'Reminder',
+  recipe: 'Recipe',
 };
 
 export const formatExpenseCategoryPeriod = (month, year) => {
@@ -183,7 +186,7 @@ export const buildNoteExportHtml = ({
   const isChecklist = type === 'checklist' || Array.isArray(checklistItems);
   const isReminder = type === 'reminder';
   const heading = escapeHtml(
-    getExportTitle(title, isExpense ? 'expense' : isChecklist ? 'checklist' : isReminder ? 'reminder' : 'note')
+    getExportTitle(title, isExpense ? 'expense' : isChecklist ? 'checklist' : isReminder ? 'reminder' : type)
   );
   const exportCategories = getExpenseExportCategories(categories);
   const exportRows = getExpenseExportRows(rows);

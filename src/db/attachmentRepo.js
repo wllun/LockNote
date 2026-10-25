@@ -97,6 +97,40 @@ export const attachmentRepo = {
     return await getRow(id);
   },
 
+  async replace(noteId, attachmentId, asset) {
+    const existing = await getRow(attachmentId);
+    if (!existing || existing.note_id !== noteId || !asset?.uri) {
+      throw new Error('The recipe photo is no longer available.');
+    }
+    const source = new File(asset.uri);
+    if (!source.exists) throw new Error('The optimized image is no longer available.');
+    const id = createAttachmentId();
+    const noteDirectory = new Directory(attachmentsDirectory, safeSegment(noteId));
+    noteDirectory.create({ idempotent: true, intermediates: true });
+    const destination = new File(noteDirectory, `${safeSegment(id)}.jpg`);
+    try {
+      source.copy(destination);
+      // One atomic row change: keep the old photo/file until the new copy and
+      // metadata succeed. A fresh ID/URI also avoids stale image/cloud caches.
+      const result = await getDB().runAsync(
+        `UPDATE note_attachments SET id = ?, local_uri = ?, mime_type = ?,
+         width = ?, height = ?, byte_size = ?, cloud_path = NULL,
+         sync_status = 'pending', updated_at = ? WHERE id = ? AND note_id = ?`,
+        [id, destination.uri, asset.mime_type || 'image/jpeg',
+          Math.max(1, Math.floor(Number(asset.width) || 1)),
+          Math.max(1, Math.floor(Number(asset.height) || 1)),
+          Math.max(0, Math.floor(Number(asset.byte_size ?? destination.size) || 0)),
+          now(), attachmentId, noteId]
+      );
+      if (!result.changes) throw new Error('The recipe photo is no longer available.');
+    } catch (error) {
+      deleteManagedFile(destination.uri);
+      throw error;
+    }
+    deleteManagedFile(existing.local_uri);
+    return await getRow(id);
+  },
+
   async update(id, updates = {}) {
     const allowed = ['display_order', 'anchor_offset', 'display_width_ratio', 'cloud_path', 'sync_status', 'updated_at'];
     const fields = [];

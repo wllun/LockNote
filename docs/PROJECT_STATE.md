@@ -9,6 +9,8 @@ and [test plan](testing/TEST_PLAN.md) for operational acceptance.
 
 ## Done
 
+- [X] Recipe Note (2026-10-25) — fifth note type in Home/Folder creation, list/grid cards, Archive/Trash and Shared routing. A dedicated form reuses the plain editor lifecycle for ingredient text, ordered preparation steps, add/remove/reorder, preview/Edit mode, autosave, Undo/Redo, locks and access gates. Recipe text and one optional local photo are Free, using existing attachment storage/optimization; cloud photo uploads remain Pro. The local photo does not unlock paid exports; sharing/background/subfolder policies stay consistent. Backup/private-sync type validation is extended without changing local tables or existing notes. Cloud use needs `202610250001_recipe_notes.sql`; deployment and physical-device acceptance are pending. See [Recipe Notes](decisions/RECIPE_NOTES.md).
+
 - [X] Complete sharing suspension without subscription — when the owner has no active Plus/Pro plan, recipients cannot view/edit/export/download shared notes or images. Shared lists omit suspended notes, and all four editors hide cached content until authorization resolves and at known expiry, including slow requests, offline/sign-out and account changes. Local pending save timers/staged recipient drafts are cancelled on denial. Server RLS, list/get/save RPCs and attachment access enforce suspension; owner local notes and management/recovery access remain intact. Memberships and hidden caches are retained for renewal; Pro-to-Plus sharing stays active. Apply `202609180001_shared_note_subscription_visibility.sql` before releasing; live backend/two-device verification remains required.
 
 - [X] Background downgrade policy — custom backgrounds are hidden without active Pro in all four editors, note cards and background settings previews, with normal theme/note-colour surfaces restored. Device-local images and preferences are retained (no downgrade deletion) and reappear when Pro is restored. Remove background stays available on Free/Plus. Stored draft metadata, backup/sync exclusions and native/web storage remain unchanged.
@@ -120,7 +122,7 @@ and [test plan](testing/TEST_PLAN.md) for operational acceptance.
 
 When the user presses the Add button, let them choose one of these note types:
 
-- [X] Add selection popup on Home/Folder with all four implemented types: plain, checklist, expense and reminder.
+- [X] Add selection popup on Home/Folder with five implemented types: plain, checklist, expense, reminder and recipe.
 - [X] Note — plaintext
 - [X] Checklist — ordered checkbox items with drag-handle reordering, inline editing, progress, local autosave, list/search previews, pin/password/delete support, PDF/image export, and a 100-active-item limit that preserves legacy oversized lists
 - [X] Checklist and expense-row/bill drag auto-scroll measures the FlatList's actual scroll viewport, waits for valid bounds, and uses only the finger's top/bottom edge position (not row height). Narrower zones, a short edge hold, and capped progressive speed prevent unintended downward scrolling and allow reversing upward; moving to the middle or hovering over Trash stops auto-scroll.

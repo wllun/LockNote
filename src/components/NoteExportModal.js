@@ -123,8 +123,10 @@ const NoteExportModal = ({
       // Downgraded premium content must remain locally exportable.
       const note = noteId ? await noteRepo.getById(noteId) : null;
       const folder = note?.folder_id ? await folderRepo.getById(note.folder_id) : null;
-      const hasExistingImages = attachments.length > 0
-        || (noteId && (await attachmentRepo.listByNoteId(noteId)).length > 0);
+      // A free local recipe photo does not grant the paid Export feature.
+      const freeLocalRecipe = note?.note_type === 'recipe' && note.share_origin !== 'incoming';
+      const hasExistingImages = !freeLocalRecipe && (attachments.length > 0
+        || (noteId && (await attachmentRepo.listByNoteId(noteId)).length > 0));
       const existingBackground = noteId && await noteBackgroundPreference.load(noteId);
       if (!hasExistingImages && !existingBackground && !folder?.parent_id) {
         await premiumAccessService.require('export');

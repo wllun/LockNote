@@ -210,7 +210,7 @@ test('actual detailed-menu JSX evaluates to no button when disallowed, and a but
         const features = getNoteFeatureVisibility(options);
         const sandbox = {
           features, styles: {}, colors: {}, attachments: [], MAX_NOTE_ATTACHMENTS: 20,
-          isReadOnly: false, attachmentBusy: false, Pressable: 'Pressable', Text: 'Text', Ionicons: 'Ionicons',
+          isReadOnly: false, attachmentBusy: false, attachmentLimit: 20, isRecipe: false, Pressable: 'Pressable', Text: 'Text', Ionicons: 'Ionicons',
           React: { createElement: (type, props, ...children) => ({ type, props, children }) }, result: null,
         };
         vm.runInNewContext(code, sandbox);

@@ -51,6 +51,7 @@ import {
 } from '../utils/note-view-mode.mjs';
 
 const editorRouteFor = (note) => {
+  if (note.note_type === 'recipe') return 'RecipeEditor';
   if (note.note_type === EXPENSE_NOTE_TYPE) return 'ExpenseRecordEditor';
   if (note.note_type === CHECKLIST_NOTE_TYPE) return 'ChecklistEditor';
   if (note.note_type === REMINDER_NOTE_TYPE) return 'ReminderEditor';

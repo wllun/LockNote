@@ -31,6 +31,7 @@ import {
 import { formatNoteUpdatedAt } from '../utils/note-timestamp.mjs';
 import { getNoteColorTheme } from '../utils/note-color.mjs';
 import NoteBackgroundLayer from './note-background-layer';
+import { getRecipePreview } from '../utils/recipe-note.mjs';
 
 // ponytail: entering animations are native-only — reanimated web leaves items visibility:hidden
 const entering = (index) =>
@@ -53,7 +54,8 @@ const NoteItem = ({
   const isExpense = note.note_type === EXPENSE_NOTE_TYPE;
   const isChecklist = note.note_type === CHECKLIST_NOTE_TYPE;
   const isReminder = note.note_type === REMINDER_NOTE_TYPE;
-  const isPlainNote = !isExpense && !isChecklist && !isReminder;
+  const isRecipe = note.note_type === 'recipe';
+  const isPlainNote = !isExpense && !isChecklist && !isReminder && !isRecipe;
   const expense = isExpense ? parseExpenseNote(note.content) : null;
   const checklistItems = isChecklist ? parseChecklistNote(note.content).items : [];
   const reminder = isReminder ? parseReminderNote(note.content).reminder : null;
@@ -63,7 +65,7 @@ const NoteItem = ({
       ? note.title.trim() || 'Checklist'
       : isReminder
         ? note.title.trim() || 'Reminder'
-      : note.title || 'Untitled';
+      : isRecipe ? note.title.trim() || 'Recipe Note' : note.title || 'Untitled';
   const preview = isExpense
     ? formatExpenseMoney(
         calculateExpenseGrandTotal(expense.rows, expense.monthlyCommitments),
@@ -77,7 +79,7 @@ const NoteItem = ({
         ? reminderScheduleOnly
           ? getReminderSchedulePreview(note.content)
           : getReminderPreview(note.content)
-      : note.content || 'No content';
+      : isRecipe ? getRecipePreview(note.content) : note.content || 'No content';
 
   const handleActionsPress = (e) => {
     e.stopPropagation?.();
@@ -123,6 +125,12 @@ const NoteItem = ({
             <View style={styles.typeBadge}>
               <Ionicons name="document-text-outline" size={12} color={colors.primary} />
               <Text style={styles.typeBadgeText}>Note</Text>
+            </View>
+          )}
+          {isRecipe && (
+            <View style={styles.typeBadge}>
+              <Ionicons name="restaurant-outline" size={12} color={colors.primary} />
+              <Text style={styles.typeBadgeText}>Recipe</Text>
             </View>
           )}
           {isExpense && (
@@ -198,7 +206,7 @@ const NoteItem = ({
                 ? 'Locked checklist'
                 : isReminder
                   ? 'Locked reminder'
-                : 'Locked note'
+                : isRecipe ? 'Locked recipe' : 'Locked note'
             : preview}
         </Text>
         <View style={[styles.updatedAtRow, grid && styles.updatedAtRowGrid]}>

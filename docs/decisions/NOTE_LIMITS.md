@@ -62,6 +62,21 @@ dialog when their respective maximum is reached. Previously displayed persistent
 helper text/counters were removed; do not use their absence as proof that limits
 are disabled. Current input/change handlers enforce these bounds on native/web.
 
+## Recipe Notes
+
+| Field | Limit |
+| --- | ---: |
+| Ingredients (one ingredient per line) | 10,000 characters |
+| Preparation steps | 50 |
+| Each step | 2,000 characters |
+| Complete serialized recipe content | 50,000 characters, including JSON structure |
+| Recipe photo | One; source at most 5 MB, optimized below 1 MB |
+
+The ingredient/step limits apply to new input; loading does not truncate existing
+stored fields. An edit exceeding the serialized limit is rejected intact so it
+cannot corrupt JSON. Photos use separate attachment storage. Recipe text and one
+local photo are Free; cloud photo uploads remain Pro. See [Recipe Notes](RECIPE_NOTES.md).
+
 ## Storage context
 
 Before this application-level limit was added, LockNote did not cap plain-note

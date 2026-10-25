@@ -5,7 +5,7 @@ import {
 } from './collaboration-note.mjs';
 import { parseReminderNote, serializeReminderNote } from './reminder-note.mjs';
 
-const SUPPORTED_NOTE_TYPES = new Set(['note', 'checklist', 'expense', 'reminder']);
+const SUPPORTED_NOTE_TYPES = new Set(['note', 'checklist', 'expense', 'reminder', 'recipe']);
 
 const asBoolean = (value) => value === true || value === 1;
 

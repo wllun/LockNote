@@ -99,7 +99,8 @@ This file describes the product direction and major delivery phases. For detaile
 - [X] Checklist with ordered items, completion progress, drag reordering, and item limits.
 - [X] Expense Record with ordered rows, totals, complete ISO 4217 currency selection, monthly categories, a shared summary note, reusable commitments, and monthly paid-status tracking.
 - [X] Reminder note with a 5,000-character description limit, one-time/daily/weekly/monthly local notifications, and notification-tap navigation into the correct password-gated editor.
-- [X] Session undo/redo and debounced auto-save across all four editors.
+- [X] Recipe Note: ingredient list, numbered preparation steps, one optional Free local photo (Pro cloud uploads), and existing editor save/history/access behavior. Cloud migration and live acceptance remain pending; see [Recipe Notes](decisions/RECIPE_NOTES.md).
+- [X] Session undo/redo and debounced auto-save across all five note types.
 - [X] PDF/image export for every note type.
 
 See [NOTE_LIMITS.md](decisions/NOTE_LIMITS.md) for text and image limits and [MONTHLY_EXPENSE_CHECKLIST.md](decisions/MONTHLY_EXPENSE_CHECKLIST.md) for the expense commitment design.

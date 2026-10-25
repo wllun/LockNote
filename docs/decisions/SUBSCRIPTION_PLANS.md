@@ -28,6 +28,7 @@ webhook still require deployment and configuration.
 | Agreed monthly USD target | $0 | $1.99 | $3.99 |
 | Agreed yearly USD target (checkout pending) | $0 | $19.99 | $39.99 |
 | Core offline notes / top-level folders | Yes | Yes | Yes |
+| Recipe ingredients and preparation steps | Yes | Yes | Yes |
 | Search, note colors, Archive, Trash and locks | Yes | Yes | Yes |
 | PDF and image export | No | Yes | Yes |
 | Local backup import and export | Yes | Yes | Yes |
@@ -40,11 +41,18 @@ webhook still require deployment and configuration.
 | Multi-device use | Yes | Yes | Yes |
 | Share notes and collaborate | No | Yes | Yes |
 | Inline image attachments | No | No | Yes (up to 20 per plain note) |
+| Local recipe photo | One per recipe | One per recipe | One per recipe |
+| Recipe photo cloud uploads | No | No | Yes |
 | Custom note backgrounds | No | No | Yes (device-local only) |
 | Nested folders | No | No | Yes (one subfolder layer) |
 | Image attachment storage | None | None | Included in the 750 MB Pro quota |
 
 These are the agreed USD price points, not live exchange-rate conversions.
+
+One local recipe photo is included on every plan. Cloud photo uploads retain Pro
+checks and combined quotas; incoming shared editors follow the owner's Pro and
+edit permissions. A free local photo does not grant paid PDF/image export access.
+No existing photo is deleted on downgrade.
 Actual checkout prices are configured in the stores and displayed using
 RevenueCat's localized store price. Monthly checkout is implemented; yearly
 checkout and its store/RevenueCat packages remain pending. Annual prices save

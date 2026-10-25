@@ -191,6 +191,19 @@ instead of creating a duplicate. The note's `title` remains in the normal title
 column. Expense grand totals add daily-expense rows and checked monthly
 commitments; unchecked commitments are excluded.
 
+Recipe Notes use `recipe`. `RecipeEditor` is registered in the Home, Settings
+and Shared stacks and uses `NoteEditorScreen` with `RecipeNoteContent` for its
+form. Version-1 JSON content contains an ingredient string (one ingredient per
+line) and ordered `{id, text}` preparation steps. The existing save/history,
+access gates and exit cleanup operate on the serialized JSON; an edit over the
+50,000-character serialized limit is rejected without slicing JSON. A recipe
+can hold one optional local photo through the existing native/web attachment
+storage on every plan; cloud photo uploads still require Pro. Recipe text is Free.
+The free local photo does not unlock paid PDF/image exports. SQLite needs no new tables or data rewrite.
+Backup validation and private sync preserve `recipe`; cloud type constraints
+and shared-photo authorization require `202610250001_recipe_notes.sql`.
+See [Recipe Notes](decisions/RECIPE_NOTES.md) for acceptance checks and exclusions.
+
 Note colors are presentation preferences, not note data. AsyncStorage key
 `@locknote_note_colors` maps local note IDs to a semantic palette name
 (`rose`, `orange`, `yellow`, `green`, `blue`, or `purple`); absence means

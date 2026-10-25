@@ -75,10 +75,10 @@ export const optimizeNoteAttachment = async (asset) => {
   throw error;
 };
 
-export const pickNoteAttachments = async (noteId, currentCount = 0, anchorOffset = 0) => {
-  const remaining = getAttachmentSelectionLimit(currentCount);
+export const pickNoteAttachments = async (noteId, currentCount = 0, anchorOffset = 0, { maxAttachments = 20, replaceAttachmentId = null } = {}) => {
+  const remaining = replaceAttachmentId ? 1 : Math.min(getAttachmentSelectionLimit(currentCount), Math.max(0, maxAttachments - currentCount));
   if (!remaining) {
-    const error = new Error('This note already has 20 images.');
+    const error = new Error(`This note already has ${maxAttachments} ${maxAttachments === 1 ? 'image' : 'images'}.`);
     error.code = 'ATTACHMENT_LIMIT_REACHED';
     throw error;
   }
@@ -86,7 +86,7 @@ export const pickNoteAttachments = async (noteId, currentCount = 0, anchorOffset
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsEditing: false,
-    allowsMultipleSelection: true,
+    allowsMultipleSelection: remaining > 1,
     orderedSelection: true,
     selectionLimit: remaining,
     quality: 1,
@@ -115,11 +115,14 @@ export const pickNoteAttachments = async (noteId, currentCount = 0, anchorOffset
   const initialDisplayWidthRatio = result.assets.length > 1 ? 0.5 : 1;
   for (const asset of result.assets) {
     const optimized = await optimizeNoteAttachment(asset);
-    attachments.push(await attachmentRepo.add(noteId, {
+    const assetData = {
       ...optimized,
       anchor_offset: Math.max(0, Math.floor(Number(anchorOffset) || 0)),
       display_width_ratio: initialDisplayWidthRatio,
-    }));
+    };
+    attachments.push(replaceAttachmentId
+      ? await attachmentRepo.replace(noteId, replaceAttachmentId, assetData)
+      : await attachmentRepo.add(noteId, assetData));
   }
   return { canceled: false, attachments };
 };

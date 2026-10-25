@@ -18,7 +18,7 @@ npx.cmd supabase functions deploy share-note
 npx.cmd supabase functions deploy revenuecat-webhook --no-verify-jwt
 ```
 
-Confirm the intended project reference first. Dry-run previews, but does not deploy or verify RLS. On macOS/Linux omit `.cmd`. Current migrations run through `202609180001_shared_note_subscription_visibility.sql`; this final migration suspends recipient access after owner expiry while preserving caches/memberships. Confirm server subscription/upload-reservation tables, quota/recovery RPCs and canonical webhook secrets/backfill before releasing a live paid service; server gates affect older clients too.
+Confirm the intended project reference first. Dry-run previews, but does not deploy or verify RLS. On macOS/Linux omit `.cmd`. Current migrations run through `202610250001_recipe_notes.sql`. The preceding `202609180001_shared_note_subscription_visibility.sql` suspends recipient access after owner expiry while preserving caches/memberships; the recipe migration preserves those gates. Confirm server subscription/upload-reservation tables, quota/recovery RPCs and canonical webhook secrets/backfill before releasing a live paid service; server gates affect older clients too.
 
 If Supabase is already logged in and this project is already linked, only run
 the deployment commands after linking.
@@ -47,9 +47,15 @@ The `202609060001_shared_note_permissions.sql` migration adds `editor` and
 migration and redeploy `share-note` together so new invitations can safely send
 the selected permission.
 
+Recipe Note support (2026-10-25) adds `202610250001_recipe_notes.sql` after the
+existing migrations. It extends the private/shared note-type constraints and
+shared-photo authorization to `recipe`, retaining subscription/role/quota gates.
+Deploy it before syncing/sharing recipes; no hosted deployment is implied by
+the source change. Existing local SQLite tables and saved notes are unchanged.
+
 Inline images remain local-first. Supabase stores only optimized JPEGs below
 1 MB and their access-controlled metadata; each plain note accepts up to 20
-images. The attachment migrations save the character offset and proportional
+images; a Recipe Note accepts one photo in the editor. The attachment migrations save the character offset and proportional
 display width used to preserve drag order and aspect-ratio resizing on every
 device.
 

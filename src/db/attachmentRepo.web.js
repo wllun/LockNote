@@ -44,6 +44,8 @@ const runTransaction = async (mode, operation) => {
     try {
       result = operation(transaction.objectStore(STORE_NAME));
     } catch (error) {
+      // A synchronous put failure after a delete must roll back the whole swap.
+      try { transaction.abort(); } catch { /* Already settled. */ }
       reject(error);
       return;
     }
@@ -144,6 +146,38 @@ export const attachmentRepo = {
     await mutate(() => runTransaction('readwrite', (store) => store.put(record)));
     revokeUrl(id);
     return presentRecord(record);
+  },
+
+  async replace(noteId, attachmentId, asset) {
+    if (!asset?.uri) throw new Error('No optimized image was provided.');
+    const response = await fetch(asset.uri);
+    if (!response.ok) throw new Error('The optimized image could not be read.');
+    const blob = await response.blob();
+    return await mutate(async () => {
+      const existing = await getRecord(attachmentId);
+      if (!existing || existing.note_id !== noteId) {
+        throw new Error('The recipe photo is no longer available.');
+      }
+      const record = {
+        ...existing,
+        id: createAttachmentId(),
+        blob,
+        mime_type: asset.mime_type || blob.type || 'image/jpeg',
+        width: Math.max(1, Math.floor(Number(asset.width) || 1)),
+        height: Math.max(1, Math.floor(Number(asset.height) || 1)),
+        byte_size: Math.max(0, Math.floor(Number(asset.byte_size ?? blob.size) || 0)),
+        cloud_path: null,
+        sync_status: 'pending',
+        updated_at: new Date().toISOString(),
+      };
+      // IndexedDB commits both operations together or keeps the old record.
+      await runTransaction('readwrite', (store) => {
+        store.delete(attachmentId);
+        store.put(record);
+      });
+      revokeUrl(attachmentId);
+      return presentRecord(record);
+    });
   },
 
   async update(id, updates = {}) {

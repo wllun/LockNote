@@ -25,6 +25,8 @@ import NoteBackgroundModal from '../components/note-background-modal';
 import NoteBackgroundLayer from '../components/note-background-layer';
 import { useNoteFeatureVisibility } from '../hooks/use-note-feature-visibility';
 import NoteAttachmentGallery from '../components/note-attachment-gallery';
+import RecipeNoteContent from '../components/recipe-note-content';
+import { getRecipeExportText, isRecipeContentEmpty, RECIPE_CONTENT_MAX_CHARACTERS, serializeRecipeNote } from '../utils/recipe-note.mjs';
 import ManageNoteLockModal from '../components/manage-note-lock-modal';
 import { collaborationService } from '../services/collaborationService';
 import { lockPasswordService } from '../services/lockPasswordService';
@@ -66,6 +68,10 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { noteId, isNewDraft = false, shared = false } = route.params;
+  // Reuse the editor lifecycle, access gates and draft history for recipe content.
+  const isRecipe = route.name === 'RecipeEditor';
+  const noteType = isRecipe ? 'recipe' : 'note';
+  const attachmentLimit = isRecipe ? 1 : MAX_NOTE_ATTACHMENTS;
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
@@ -92,6 +98,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const contentEditorRef = useRef(null);
   const contentLimitDialogShown = useRef(false);
   const insertionOffsetRef = useRef(0);
+  const attachmentOperationRef = useRef(null);
   // Latest values for the unmount cleanup (state in a [] effect is stale).
   const latest = useRef({ noteId, title: '', content: '', attachments: [], hasPassword: false, isPinned: false, color: DEFAULT_NOTE_COLOR, backgroundUri: null, attachmentCount: 0, cloudId: null, readOnly: false, deleted: false });
   const {
@@ -241,6 +248,17 @@ const NoteEditorScreen = ({ route, navigation }) => {
     autoSave(latest.current.title, limited.value);
   };
 
+  const handleRecipeChange = (recipe, groupKey) => {
+    if (latest.current.readOnly) return;
+    const serialized = serializeRecipeNote(recipe);
+    // Reject oversized edits as a whole; slicing JSON would corrupt the recipe.
+    if (serialized.length > RECIPE_CONTENT_MAX_CHARACTERS) {
+      Alert.alert('Recipe limit reached', 'This recipe is full. Shorten an ingredient or step before adding more.');
+      return;
+    }
+    handleContentChange(serialized, latest.current.attachments, groupKey);
+  };
+
   const handleTextBlockChange = (block, value) => {
     const next = replaceInlineTextBlock(
       latest.current.content,
@@ -349,16 +367,22 @@ const NoteEditorScreen = ({ route, navigation }) => {
     return next;
   };
 
-  const handleAddAttachments = async () => {
+  const addAttachments = async ({ replacePhoto = false } = {}) => {
     if (latest.current.readOnly || attachmentBusy) return;
-    if (latest.current.attachmentCount >= MAX_NOTE_ATTACHMENTS) {
-      Alert.alert('Image limit reached', 'A plain note can contain up to 20 images.');
+    const previousPhoto = isRecipe && replacePhoto ? latest.current.attachments[0] : null;
+    if (latest.current.attachmentCount >= attachmentLimit && !previousPhoto) {
+      Alert.alert('Image limit reached', isRecipe ? 'A recipe can contain one photo. Use Change photo to replace it.' : 'A plain note can contain up to 20 images.');
       return;
     }
     setAttachmentBusy(true);
     try {
       const stored = await noteRepo.getById(noteId);
-      if (stored?.share_origin !== 'incoming') await premiumAccessService.require('attachments');
+      if (!stored) throw new Error('This note is no longer available.');
+      if (stored.share_origin !== 'incoming') {
+        // One local recipe photo is a core recipe feature. Cloud uploads remain
+        // independently gated by attachmentCloudService and server policy.
+        if (stored.note_type !== 'recipe') await premiumAccessService.require('attachments');
+      }
       else {
         // Invited editors are funded by the owner's Pro plan, not their own.
         const { data, error } = await supabase.rpc('can_add_note_images', { p_shared_note_id: stored.cloud_id });
@@ -368,12 +392,14 @@ const NoteEditorScreen = ({ route, navigation }) => {
       const result = await pickNoteAttachments(
         noteId,
         latest.current.attachmentCount,
-        Math.min(latest.current.content.length, insertionOffsetRef.current)
+        isRecipe ? 0 : Math.min(latest.current.content.length, insertionOffsetRef.current),
+        { maxAttachments: attachmentLimit, replaceAttachmentId: previousPhoto?.id || null }
       );
       if (!result.canceled) {
         await reloadAttachments();
+        if (previousPhoto) await attachmentCloudService.remove(stored, previousPhoto);
         await noteRepo.update(noteId, { title: latest.current.title });
-        await attachmentCloudService.syncNote(noteId);
+        await attachmentCloudService.syncNote(noteId).catch(() => {});
         await reloadAttachments();
       }
     } catch (error) {
@@ -384,10 +410,17 @@ const NoteEditorScreen = ({ route, navigation }) => {
           : error?.code === 'ATTACHMENT_OPTIMIZE_FAILED'
             ? 'One selected image could not be resized below 1 MB. Choose another image.'
             : 'LockNote could not add the selected images.';
-      Alert.alert('Images not added', message);
+      Alert.alert(previousPhoto ? 'Photo not changed' : 'Images not added', message);
     } finally {
       setAttachmentBusy(false);
     }
+  };
+
+  const handleAddAttachments = (options) => {
+    if (attachmentOperationRef.current) return attachmentOperationRef.current;
+    const operation = addAttachments({ replacePhoto: options?.replacePhoto === true });
+    attachmentOperationRef.current = operation;
+    return operation.finally(() => { attachmentOperationRef.current = null; });
   };
 
   const handleMoveAttachment = async (attachmentId, direction) => {
@@ -512,6 +545,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
 
   const deleteNote = async () => {
     try {
+      await attachmentOperationRef.current;
       if (saveTimeout.current) {
         clearTimeout(saveTimeout.current);
         saveTimeout.current = null;
@@ -530,7 +564,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const confirmDelete = () => {
     confirmDestructiveAction({
       title: 'Delete this note?',
-      details: [createNoteDeleteDetail('note', title)],
+      details: [createNoteDeleteDetail(noteType, title)],
       confirmLabel: 'Delete',
       onConfirm: deleteNote,
     });
@@ -556,8 +590,9 @@ const NoteEditorScreen = ({ route, navigation }) => {
   }, [noteId, isNewDraft, shared]);
 
   const needsExitCleanup = useCallback(() => {
+    if (attachmentOperationRef.current) return true;
     const { title, content, hasPassword, isPinned, color, backgroundUri, attachmentCount, cloudId, deleted } = latest.current;
-    const empty = !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR && !backgroundUri && !attachmentCount;
+    const empty = !cloudId && !title.trim() && (isRecipe ? isRecipeContentEmpty(content) : !content.trim()) && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR && !backgroundUri && !attachmentCount;
     return getEditorExitDisposition({
       loadCompleted: loadCompletedRef.current,
       isNewDraft,
@@ -565,15 +600,18 @@ const NoteEditorScreen = ({ route, navigation }) => {
       isDeleted: deleted,
       hasPendingSave: !!saveTimeout.current,
     }) !== 'none';
-  }, [isNewDraft]);
+  }, [isNewDraft, isRecipe]);
 
   const finalizeExit = useCallback(async () => {
+    // A picker may be open while Back is pressed. Preserve a newly added photo
+    // before deciding whether this is an untouched empty draft.
+    await attachmentOperationRef.current;
     const pending = saveTimeout.current;
     const { title, content, hasPassword, isPinned, color, backgroundUri, attachmentCount, cloudId, deleted } = latest.current;
     const disposition = getEditorExitDisposition({
       loadCompleted: loadCompletedRef.current,
       isNewDraft,
-      isEmpty: !cloudId && !title.trim() && !content.trim() && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR && !backgroundUri && !attachmentCount,
+      isEmpty: !cloudId && !title.trim() && (isRecipe ? isRecipeContentEmpty(content) : !content.trim()) && !hasPassword && !isPinned && color === DEFAULT_NOTE_COLOR && !backgroundUri && !attachmentCount,
       isDeleted: deleted,
       hasPendingSave: !!pending,
     });
@@ -613,7 +651,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
       const note = await noteRepo.getById(noteId);
       await attachmentCloudService.reorder(note, layout).catch(() => {});
     }
-  }, [isNewDraft, noteId]);
+  }, [isNewDraft, noteId, isRecipe]);
 
   useAwaitedEditorExit({ navigation, needsCleanup: needsExitCleanup, cleanup: finalizeExit });
 
@@ -644,10 +682,10 @@ const NoteEditorScreen = ({ route, navigation }) => {
             isTitleFocused && styles.headerTitleFieldFocused,
           ]}
         >
-          <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+          <Ionicons name={isRecipe ? 'restaurant-outline' : 'document-text-outline'} size={18} color={colors.primary} />
           <TextInput
             style={styles.headerTitleInput}
-            placeholder="Note title"
+            placeholder={isRecipe ? 'Recipe title' : 'Note title'}
             placeholderTextColor={colors.textTertiary}
             value={title}
             editable={!isReadOnly}
@@ -657,7 +695,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
             blurOnSubmit
             returnKeyType="next"
             onSubmitEditing={() => contentEditorRef.current?.focus()}
-            accessibilityLabel="Note title"
+            accessibilityLabel={isRecipe ? 'Recipe title' : 'Note title'}
             accessibilityHint={isReadOnly ? 'This note is view only' : 'Edits the title of this note'}
           />
         </View>
@@ -687,7 +725,20 @@ const NoteEditorScreen = ({ route, navigation }) => {
       </View>
 
       <View style={[styles.contentArea, { backgroundColor: features.visibleBackgroundUri ? 'transparent' : noteColorTheme.surface }]}>
-        <NoteAttachmentGallery
+        {isRecipe ? <RecipeNoteContent
+          content={content}
+          attachments={attachments}
+          busy={attachmentBusy}
+          readOnly={isReadOnly}
+          editing={isContentEditing}
+          canAddPhoto={features.canInsertImages}
+          onEdit={() => setIsContentEditing(true)}
+          onDone={() => setIsContentEditing(false)}
+          onChange={handleRecipeChange}
+          onAddPhoto={handleAddAttachments}
+          onChangePhoto={() => handleAddAttachments({ replacePhoto: true })}
+          onRemovePhoto={handleRemoveAttachment}
+        /> : <NoteAttachmentGallery
           ref={contentEditorRef}
           content={content}
           attachments={attachments}
@@ -702,7 +753,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           onDrop={handleDropAttachment}
           onResize={handleResizeAttachment}
           onRemove={handleRemoveAttachment}
-        />
+        />}
       </View>
 
       <CollaborationFooter
@@ -730,14 +781,14 @@ const NoteEditorScreen = ({ route, navigation }) => {
           >
             {features.canInsertImages && (<Pressable
               style={({ pressed }) => [styles.actionsMenuItem, pressed && styles.actionsMenuItemPressed]}
-              onPress={() => { setShowActionsMenu(false); handleAddAttachments(); }}
-              disabled={isReadOnly || attachmentBusy || attachments.length >= MAX_NOTE_ATTACHMENTS}
+              onPress={() => { setShowActionsMenu(false); handleAddAttachments({ replacePhoto: isRecipe && attachments.length > 0 }); }}
+              disabled={isReadOnly || attachmentBusy || (!isRecipe && attachments.length >= attachmentLimit)}
               accessibilityRole="button"
-              accessibilityLabel="Insert images at the text cursor"
-              accessibilityState={{ disabled: isReadOnly || attachmentBusy || attachments.length >= MAX_NOTE_ATTACHMENTS }}
+              accessibilityLabel={isRecipe ? (attachments.length ? 'Change recipe photo' : 'Add recipe photo') : 'Insert images at the text cursor'}
+              accessibilityState={{ disabled: isReadOnly || attachmentBusy || (!isRecipe && attachments.length >= attachmentLimit) }}
             >
               <Ionicons name="images-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.actionsMenuText}>Insert images</Text>
+              <Text style={styles.actionsMenuText}>{isRecipe ? (attachments.length ? 'Change photo' : 'Add photo') : 'Insert images'}</Text>
             </Pressable>)}
 
             {features.showSharing && (<Pressable
@@ -857,7 +908,8 @@ const NoteEditorScreen = ({ route, navigation }) => {
         visible={showExportModal && features.canExport}
         onClose={() => setShowExportModal(false)}
         title={title}
-        content={content}
+        content={isRecipe ? getRecipeExportText(content) : content}
+        type={noteType}
         attachments={attachments}
       />
       <NoteColorModal
@@ -892,7 +944,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         verifyLabel="Delete"
         variant="danger"
         details={[
-          createNoteDeleteDetail('note', title),
+          createNoteDeleteDetail(noteType, title),
         ]}
       />
 

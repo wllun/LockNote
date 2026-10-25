@@ -3,6 +3,7 @@ const NOTE_TYPE_PRESENTATIONS = Object.freeze({
   checklist: Object.freeze({ label: 'Checklist', iconName: 'checkbox-outline' }),
   expense: Object.freeze({ label: 'Expense', iconName: 'receipt-outline' }),
   reminder: Object.freeze({ label: 'Reminder', iconName: 'alarm-outline' }),
+  recipe: Object.freeze({ label: 'Recipe', iconName: 'restaurant-outline' }),
 });
 
 export const getNoteTypePresentation = (noteType) =>

@@ -24,7 +24,7 @@ import { noteColorPreference } from '../utils/note-color-preference';
 import { noteBackgroundPreference } from '../utils/note-background-preference';
 import { isSharedNoteVisible } from '../utils/shared-note-access.mjs';
 
-const routeFor = (note) => note.note_type === EXPENSE_NOTE_TYPE
+const routeFor = (note) => note.note_type === 'recipe' ? 'RecipeEditor' : note.note_type === EXPENSE_NOTE_TYPE
   ? 'ExpenseRecordEditor'
   : note.note_type === CHECKLIST_NOTE_TYPE
     ? 'ChecklistEditor'

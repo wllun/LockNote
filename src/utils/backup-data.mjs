@@ -10,7 +10,7 @@ const MAX_ID_LENGTH = 128;
 const MAX_NAME_LENGTH = 10000;
 const MAX_TITLE_LENGTH = 100000;
 const MAX_CONTENT_LENGTH = 2 * 1024 * 1024;
-const NOTE_TYPES = new Set(['note', 'checklist', 'expense', 'reminder']);
+const NOTE_TYPES = new Set(['note', 'checklist', 'expense', 'reminder', 'recipe']);
 const HASH_PATTERN = /^[a-f0-9]{64}$/i;
 
 const fail = (message) => {

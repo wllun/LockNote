@@ -42,6 +42,13 @@ const NOTE_TYPES = [
     icon: 'alarm-outline',
     available: true,
   },
+  {
+    id: 'recipe',
+    title: 'Recipe Note',
+    description: 'Keep a photo, ingredients, and preparation steps',
+    icon: 'restaurant-outline',
+    available: true,
+  },
 ];
 
 const CreateNoteTypeModal = ({ visible, onClose, onSelect }) => {

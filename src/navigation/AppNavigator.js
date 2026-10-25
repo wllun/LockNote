@@ -62,6 +62,7 @@ const HomeStack = ({ screenOptions }) => (
       component={NoteEditorScreen}
       options={{ headerShown: false }}
     />
+    <Stack.Screen name="RecipeEditor" component={NoteEditorScreen} options={{ headerShown: false }} />
     <Stack.Screen
       name="ChecklistEditor"
       component={ChecklistEditorScreen}
@@ -103,6 +104,7 @@ const SettingsStack = ({ screenOptions }) => (
       options={({ route }) => ({ title: route.params?.folderName || 'Folder' })}
     />
     <Stack.Screen name="NoteEditor" component={NoteEditorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="RecipeEditor" component={NoteEditorScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ChecklistEditor" component={ChecklistEditorScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ExpenseRecordEditor" component={ExpenseRecordEditorScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ headerShown: false }} />
@@ -113,6 +115,7 @@ const SharedStack = ({ screenOptions }) => (
   <Stack.Navigator screenOptions={screenOptions}>
     <Stack.Screen name="SharedMain" component={SharedScreen} options={{ title: 'Shared with me' }} />
     <Stack.Screen name="NoteEditor" component={NoteEditorScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="RecipeEditor" component={NoteEditorScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ChecklistEditor" component={ChecklistEditorScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ExpenseRecordEditor" component={ExpenseRecordEditorScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ReminderEditor" component={ReminderEditorScreen} options={{ headerShown: false }} />

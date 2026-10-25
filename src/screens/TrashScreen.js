@@ -23,6 +23,7 @@ const NOTE_TYPES = {
   checklist: { label: 'Checklist', icon: 'checkbox-outline' },
   expense: { label: 'Expense', icon: 'receipt-outline' },
   reminder: { label: 'Reminder', icon: 'notifications-outline' },
+  recipe: { label: 'Recipe', icon: 'restaurant-outline' },
 };
 
 const itemTitle = (item) => item.title?.trim() || 'Untitled note';

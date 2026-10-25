@@ -38,6 +38,7 @@ export const useNoteFeatureVisibility = (noteId, {
   });
   return {
     ...visibility,
+    canExport: Boolean(current?.note) && visibility.canExport,
     canShare: Boolean(current?.note) && visibility.canShare,
     showSharing: Boolean(current?.note) && visibility.showSharing,
     setOwnerPlan,
