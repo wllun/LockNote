@@ -298,6 +298,13 @@ are persisted through the existing debounced auto-save. Checklist item text
 remains searchable because repository search already checks the serialized
 `content` field.
 
+The checklist progress card offers Hide checked / Show checked. This is a
+session-only view filter, including for viewers: saved content, progress totals,
+exports and sync always retain every row. Checking a row while hidden removes
+it from the current view; Undo/Redo updates that same filtered view. Drag and
+accessible up/down moves reorder visible slots while retaining hidden checked
+rows in their original slots. Opening another note resets the filter to show all.
+
 Users can explicitly save the current commitment list for reuse in another
 Expense Record. This app-level template is stored locally in AsyncStorage under
 `@locknote_monthly_commitment_template`, excludes paid state and note-specific

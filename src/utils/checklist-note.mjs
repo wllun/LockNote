@@ -48,6 +48,27 @@ export const moveChecklistItem = (items, itemId, direction) => {
   return moveChecklistItemToIndex(items, itemId, targetIndex);
 };
 
+export const getChecklistDisplayItems = (items, hideChecked = false) =>
+  hideChecked ? items.filter((item) => !item.completed) : items;
+
+// Reorder only visible slots while keeping hidden checked rows and their data.
+export const moveDisplayedChecklistItemToIndex = (items, itemId, targetIndex, hideChecked = false) => {
+  if (!hideChecked) return moveChecklistItemToIndex(items, itemId, targetIndex);
+  const displayed = getChecklistDisplayItems(items, true);
+  const moved = moveChecklistItemToIndex(displayed, itemId, targetIndex);
+  if (moved === displayed) return items;
+  let cursor = 0;
+  return items.map((item) => item.completed ? item : moved[cursor++]);
+};
+
+export const moveDisplayedChecklistItem = (items, itemId, direction, hideChecked = false) => {
+  const displayed = getChecklistDisplayItems(items, hideChecked);
+  const index = displayed.findIndex((item) => item.id === itemId);
+  const target = index + (direction === 'up' ? -1 : 1);
+  if (index < 0 || target < 0 || target >= displayed.length) return items;
+  return moveDisplayedChecklistItemToIndex(items, itemId, target, hideChecked);
+};
+
 const normalizeChecklistItems = (items) =>
   (Array.isArray(items) ? items : [])
     .filter((item) => item && typeof item === 'object' && !Array.isArray(item))

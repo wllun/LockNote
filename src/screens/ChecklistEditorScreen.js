@@ -41,8 +41,9 @@ import {
   CHECKLIST_MAX_ITEMS,
   createChecklistItem,
   isChecklistNoteEmpty,
-  moveChecklistItem,
-  moveChecklistItemToIndex,
+  getChecklistDisplayItems,
+  moveDisplayedChecklistItem,
+  moveDisplayedChecklistItemToIndex,
   parseChecklistNote,
   sanitizeChecklistItemText,
   serializeChecklistNote,
@@ -257,6 +258,8 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
   const [title, setTitle] = useState('');
   const [items, setItems] = useState([]);
+  const [hideChecked, setHideChecked] = useState(false);
+  const hideCheckedRef = useRef(false);
   const [newItemText, setNewItemText] = useState('');
   const [hasPassword, setHasPassword] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
@@ -323,9 +326,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }), []);
 
   const progress = calculateChecklistProgress(items);
+  const displayedItems = useMemo(() => getChecklistDisplayItems(items, hideChecked), [items, hideChecked]);
   const itemsWithoutDraggedItem = activeDrag
-    ? items.filter((item) => item.id !== activeDrag.itemId)
-    : items;
+    ? displayedItems.filter((item) => item.id !== activeDrag.itemId)
+    : displayedItems;
   const insertionBeforeItemId = activeDrag
     ? itemsWithoutDraggedItem[activeDrag.targetIndex]?.id ?? null
     : null;
@@ -512,7 +516,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
   const moveItem = useCallback((itemId, direction) => {
     if (latest.current.readOnly) return;
-    const nextItems = moveChecklistItem(latest.current.items, itemId, direction);
+    const nextItems = moveDisplayedChecklistItem(latest.current.items, itemId, direction, hideCheckedRef.current);
     if (nextItems === latest.current.items) return;
 
     remember(getUndoSnapshot());
@@ -560,7 +564,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   }, [storeDragAreaBounds]);
 
   const getDragTargetIndex = useCallback((itemId, translationY) => {
-    const currentItems = latest.current.items;
+    const currentItems = getChecklistDisplayItems(latest.current.items, hideCheckedRef.current);
     const sourceIndex = currentItems.findIndex((item) => item.id === itemId);
     if (sourceIndex < 0) return 0;
 
@@ -665,13 +669,14 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     if (latest.current.readOnly) return;
     Keyboard.dismiss();
     measureDragArea();
-    const startIndex = latest.current.items.findIndex((item) => item.id === itemId);
+    const currentItems = getChecklistDisplayItems(latest.current.items, hideCheckedRef.current);
+    const startIndex = currentItems.findIndex((item) => item.id === itemId);
     if (startIndex < 0) return;
 
     deleteTargetBoundsRef.current = null;
     const nextDrag = {
       itemId,
-      item: latest.current.items[startIndex],
+      item: currentItems[startIndex],
       startIndex,
       targetIndex: startIndex,
       overDelete: false,
@@ -729,10 +734,11 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       return;
     }
 
-    const nextItems = moveChecklistItemToIndex(
+    const nextItems = moveDisplayedChecklistItemToIndex(
       latest.current.items,
       itemId,
-      targetIndex
+      targetIndex,
+      hideCheckedRef.current
     );
     if (nextItems === latest.current.items) return;
 
@@ -745,6 +751,13 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     if (activeDragRef.current?.itemId !== itemId) return;
     finishDrag();
   }, [finishDrag]);
+
+  const toggleCheckedVisibility = () => {
+    finishDrag();
+    Keyboard.dismiss();
+    hideCheckedRef.current = !hideCheckedRef.current;
+    setHideChecked(hideCheckedRef.current);
+  };
 
   const addItem = () => {
     if (latest.current.readOnly) return;
@@ -875,6 +888,11 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     loadChecklist();
   }, [loadChecklist]);
 
+  useEffect(() => {
+    hideCheckedRef.current = false;
+    setHideChecked(false);
+  }, [noteId]);
+
   const needsExitCleanup = useCallback(() => {
     const draft = latest.current;
     const empty = !draft.cloudId &&
@@ -954,7 +972,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
       dragAreaY={dragAreaBounds.y}
       isDragging={activeDrag?.itemId === item.id}
       isDropTarget={insertionBeforeItemId === item.id && activeDrag?.itemId !== item.id}
-      itemCount={items.length}
+      itemCount={displayedItems.length}
       readOnly={isReadOnly}
     />
   ), [
@@ -972,7 +990,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     handleItemLayout,
     handleItemTextChange,
     insertionBeforeItemId,
-    items.length,
+    displayedItems.length,
     isReadOnly,
     moveItem,
     styles,
@@ -1049,10 +1067,10 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
 
       <FlatList
         ref={listRef}
-        data={items}
+        data={displayedItems}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        extraData={{ activeDrag, isReadOnly }}
+        extraData={{ activeDrag, isReadOnly, hideChecked }}
         scrollEnabled={!activeDrag}
         removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
@@ -1083,6 +1101,18 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
                 style={[styles.progressFill, { width: `${progress.percent}%` }]}
               />
             </View>
+            <Pressable
+              onPress={toggleCheckedVisibility}
+              disabled={!!activeDrag}
+              accessibilityRole="button"
+              accessibilityLabel={hideChecked ? 'Show checked items' : 'Hide checked items'}
+              accessibilityHint="Changes which items are displayed without deleting them"
+              accessibilityState={{ selected: hideChecked, disabled: !!activeDrag }}
+              style={({ pressed }) => [styles.visibilityButton, hideChecked && styles.visibilityButtonActive, !!activeDrag && styles.headerButtonDisabled, pressed && styles.pressed]}
+            >
+              <Ionicons name={hideChecked ? 'eye-outline' : 'eye-off-outline'} size={18} color={colors.primary} />
+              <Text style={styles.visibilityButtonText}>{hideChecked ? 'Show checked' : 'Hide checked'}</Text>
+            </Pressable>
             {!!saveError && (
               <Text
                 style={styles.saveError}
@@ -1098,8 +1128,8 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
             <View style={styles.emptyIcon}>
               <Ionicons name="checkbox-outline" size={30} color={colors.primary} />
             </View>
-            <Text style={styles.emptyTitle}>No items yet</Text>
-            <Text style={styles.emptyHint}>{isReadOnly ? 'This shared checklist is empty.' : 'Add the first item below.'}</Text>
+            <Text style={styles.emptyTitle}>{hideChecked && items.length ? 'All items checked' : 'No items yet'}</Text>
+            <Text style={styles.emptyHint}>{hideChecked && items.length ? 'Tap Show checked to see completed items.' : isReadOnly ? 'This shared checklist is empty.' : 'Add the first item below.'}</Text>
           </View>
         }
         ListFooterComponent={
@@ -1427,6 +1457,9 @@ const makeStyles = (colors) =>
     progressPercent: { color: colors.primary, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
     progressTrack: { height: 8, borderRadius: radius.full, overflow: 'hidden', backgroundColor: colors.inputBg },
     progressFill: { height: '100%', borderRadius: radius.full, backgroundColor: colors.primary },
+    visibilityButton: { alignSelf: 'flex-start', minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderRadius: radius.sm, backgroundColor: colors.inputBg },
+    visibilityButtonActive: { backgroundColor: colors.primarySoft },
+    visibilityButtonText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
     saveError: { color: colors.danger, fontSize: 12, fontWeight: '600' },
     itemShell: {
       position: 'relative',

@@ -10,6 +10,9 @@ import {
   isChecklistNoteEmpty,
   moveChecklistItem,
   moveChecklistItemToIndex,
+  getChecklistDisplayItems,
+  moveDisplayedChecklistItem,
+  moveDisplayedChecklistItemToIndex,
   parseChecklistNote,
   sanitizeChecklistItemText,
   serializeChecklistNote,
@@ -43,6 +46,26 @@ test('serializes and parses ordered checklist items', () => {
     sourceVersion: 1,
     items,
   });
+});
+
+test('hide checked is a display filter and never removes blank or checked saved items', () => {
+  const items = [createChecklistItem({ id: 'todo', text: 'Next' }), createChecklistItem({ id: 'done', text: 'Done', completed: true }), createChecklistItem({ id: 'blank' })];
+  assert.equal(getChecklistDisplayItems(items), items);
+  assert.deepEqual(getChecklistDisplayItems(items, true).map((item) => item.id), ['todo', 'blank']);
+  assert.equal(parseChecklistNote(serializeChecklistNote(items)).items.length, 3);
+  assert.equal(calculateChecklistProgress(items).completed, 1);
+});
+
+test('filtered drag and accessibility reorder preserve hidden checked slots and every item', () => {
+  const items = ['a', 'done1', 'b', 'done2', 'c'].map((id) => createChecklistItem({ id, text: id, completed: id.startsWith('done') }));
+  const moved = moveDisplayedChecklistItemToIndex(items, 'c', 0, true);
+  assert.deepEqual(moved.map((item) => item.id), ['c', 'done1', 'a', 'done2', 'b']);
+  assert.equal(moved[1], items[1]);
+  assert.equal(moved[3], items[3]);
+  assert.deepEqual(moveDisplayedChecklistItem(items, 'b', 'up', true).map((item) => item.id), ['b', 'done1', 'a', 'done2', 'c']);
+  assert.equal(moveDisplayedChecklistItem(items, 'done1', 'down', true), items);
+  assert.equal(moveDisplayedChecklistItem(items, 'a', 'up', true), items);
+  assert.deepEqual(moveDisplayedChecklistItem(items, 'b', 'up', false).map((item) => item.id), ['a', 'b', 'done1', 'done2', 'c']);
 });
 
 test('treats missing and malformed checklist content as empty', () => {
