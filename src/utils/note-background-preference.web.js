@@ -71,6 +71,13 @@ const recordUri = (record) => {
 const getRecord = (noteId) => runRequest('readonly', (store) => store.get(noteId));
 
 export const noteBackgroundPreference = {
+  async exportAsset(noteId) {
+    const record = await getRecord(noteId);
+    if (!record?.blob) return null;
+    const extension = record.blob.type === 'image/jpeg' ? 'jpg' : record.blob.type.split('/')[1] || 'jpg';
+    return { file: record.blob, name: `background.${extension}`, mimeType: record.blob.type };
+  },
+
   async load(noteId) {
     if (!noteId) return null;
     return recordUri(await getRecord(noteId));

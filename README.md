@@ -63,9 +63,12 @@ Normal editing remains offline-first; automatic sync waits for editors to close
 and save. Binary images retain open-note/manual synchronization. See
 [Background Sync](docs/BACKGROUND_SYNC.md) for native builds and verification.
 
-The portable JSON backup service works without an account. Its **Export Backup**
-Settings action is currently hidden; the implementation remains for developer
-verification. **Settings → Import Backup** is visible on iOS, Android, and web. Import previews the contents
+**Settings → Export Full Backup** works without an account and creates a local
+TAR archive of active personal folders/notes, their images, backgrounds and safe
+preferences. Trash, archived folders (including their contents), archived notes
+and Shared-with-me caches are excluded. Extract its `backup.json` to use
+**Settings → Import Backup** on iOS, Android, and web; that JSON import does not
+automatically restore the archive's images, backgrounds or preferences. Import previews the contents
 and requires choosing Merge or Replace. Replace affects private data only and
 keeps Shared-with-me notes. Reminder registrations remain device-local and are
 disabled on restore.

@@ -230,17 +230,22 @@ const SettingsScreen = ({ navigation }) => {
     if (backupBusy) return;
     setBackupBusy('export');
     try {
-      const result = await backupService.exportBackup();
+      const result = await backupService.exportFullBackup();
       Alert.alert(
-        'Backup ready',
-        'Your portable LockNote JSON backup was created.',
+        result.missingFileCount ? 'Backup needs review' : 'Full backup ready',
+        result.missingFileCount
+          ? `${result.missingFileCount} local file(s) or setting(s) could not be read. Your notes were included; save the archive and check manifest.json before relying on it.`
+          : result.destination === 'share'
+            ? 'The archive was prepared. Make sure you saved or sent a copy outside LockNote using the share sheet.'
+            : 'The backup download was started. Keep the archive in a safe place.',
         [{ text: 'OK' }],
         {
-          variant: 'success',
+          variant: result.missingFileCount ? 'warning' : 'success',
           iconName: 'checkmark-circle-outline',
           details: [
             { label: 'Folders', value: String(result.folderCount) },
             { label: 'Notes', value: String(result.noteCount) },
+            { label: 'Images', value: String(result.mediaCount) },
             { label: 'File', value: result.filename },
           ],
         }
@@ -464,6 +469,24 @@ const SettingsScreen = ({ navigation }) => {
           <TouchableOpacity
             style={[styles.item, backupBusy && styles.itemDisabled]}
             activeOpacity={0.7}
+            onPress={handleExportBackup}
+            disabled={!!backupBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Export full backup"
+            accessibilityHint="Export active personal notes, folders, images, backgrounds and preferences. Excludes Trash and Archive."
+            accessibilityState={{ disabled: !!backupBusy }}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
+              <Ionicons name="download-outline" size={19} color={colors.primary} />
+            </View>
+            <View style={styles.itemContent}><Text style={styles.itemLabel}>Export Full Backup</Text></View>
+            {backupBusy === 'export' ? <ActivityIndicator size="small" color={colors.primary} />
+              : <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />}
+          </TouchableOpacity>
+          <View style={styles.separator} />
+          <TouchableOpacity
+            style={[styles.item, backupBusy && styles.itemDisabled]}
+            activeOpacity={0.7}
             onPress={handleImportBackup}
             disabled={!!backupBusy}
           >
@@ -480,6 +503,7 @@ const SettingsScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
         </View>
+        <Text style={styles.dataNotice}>Backups contain readable notes and images. Keep them private.</Text>
       </View>
 
       <View style={styles.section}>

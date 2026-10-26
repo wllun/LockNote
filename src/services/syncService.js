@@ -52,6 +52,13 @@ const enqueueSync = async (recoverOnly, options = {}) => {
   return await operation;
 };
 export const syncService = {
+  // Local snapshots share the manual/automatic queue without requiring sign-in
+  // or making a network request.
+  withLocalDataLock(operation) {
+    const pending = queue.catch(() => {}).then(operation);
+    queue = pending;
+    return pending;
+  },
   getLastSyncAt: privateSyncService.getLastSyncAt,
   syncAll: (options) => enqueueSync(false, options),
   recoverAll: (options) => enqueueSync(true, options),

@@ -209,7 +209,8 @@ Note colors are presentation preferences, not note data. AsyncStorage key
 (`rose`, `orange`, `yellow`, `green`, `blue`, or `purple`); absence means
 `default`. Screens merge this preference into repository results only for
 rendering. It is device-local and excluded from SQLite note rows, web note
-records, backup, private account sync, and shared-note collaboration. A
+records, portable JSON backup, private account sync, and shared-note collaboration.
+Full TAR backups include colors only for exported active personal notes. A
 non-default local color still makes an otherwise empty draft meaningful on that
 device, so editor exit cleanup does not discard it.
 
@@ -219,9 +220,10 @@ builds copy a selected image (maximum 10 MB) into Expo document storage under
 AsyncStorage. Web stores the image Blob in a local IndexedDB object store and
 creates a temporary object URL for rendering. Editors and note cards place a
 theme-colored translucent layer above the image to preserve text contrast.
-Background images are device-local and excluded from note rows, backups,
+Background images are device-local and excluded from note rows, portable JSON backups,
 private sync, and shared-note collaboration; deleting the note also removes its
-managed local image. A background makes an otherwise empty new draft meaningful.
+managed local image. Full TAR backups include backgrounds for exported active
+personal notes. A background makes an otherwise empty new draft meaningful.
 `NoteBackgroundLayer` gates rendering on resolved, active Pro across all editors,
 cards and settings previews. Editors restore their normal opaque note surfaces
 while the image is hidden. Free/Plus, expiry and sign-out never delete the file,
@@ -509,9 +511,21 @@ Portable backup import and export is a Free, device-local feature. Backup files
 selected by the user are not uploaded to LockNote and do not consume a cloud
 storage quota.
 
-The Settings **Export Backup** action is currently hidden; its handler/service
-remain implemented. Import is visible. Test export through a controlled developer
-harness rather than instructing users to press a nonexistent button.
+Settings **Export Full Backup** creates a streamed TAR archive containing an
+active-only `backup.json`, safe preferences, local attachment/recipe images,
+backgrounds and a manifest mapping media to note IDs. Archived folders and their
+descendants, archived notes, Trash and all deletion tombstones are excluded,
+along with their media and note-specific preferences. Incoming shared caches,
+auth sessions and recovery account bindings are also excluded. Export is
+serialized with sync and requires editors to finish saving first; it does not
+modify source records. Missing assets are listed in the manifest and reported
+as incomplete rather than silently declaring a complete backup.
+
+Import remains JSON-only: extract `backup.json` from the TAR for the existing
+Merge/Replace workflow. Media and preference recovery is developer-assisted;
+there is no automatic full-TAR restore. Native exports use the system share
+sheet (save a copy outside the app); web starts a browser download. Physical
+device/share-sheet and browser acceptance remain required.
 
 ## Shared-note collaboration
 

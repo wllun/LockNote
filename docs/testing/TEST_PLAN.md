@@ -305,14 +305,18 @@ Run on checklist items, daily expense rows and monthly commitments. Run correspo
 | [ ] | OUT-06 | P0 | Free: export ordinary note vs existing premium-content recovery note | Ordinary paid export gated; existing images/backgrounds/subfolder content eligible for recovery export |
 | [ ] | OUT-07 | P1 | Category-only export using Food oracle | Only matching rows; Food (15.50 in note currency), automatic current month/year; no repeated bottom category total |
 
-### O Portable JSON backup and restore
+### O Local backup export and JSON restore
 
-**Export Backup is intentionally hidden in Settings; the function remains.** BACK-01/02 need the developer service harness or an existing generated fixture. Do not require the tester to tap a nonexistent button or enable it in production just to test. Backup import is visible and Free. Binary inline images, custom backgrounds, colors and app preferences are not a complete portable backup.
+**Settings → Export Full Backup** creates a Free, local TAR archive. Trash,
+archived notes and archived folder subtrees (including their media/colors) must
+be absent. Native uses the system share sheet; web downloads the archive. Import
+Backup still accepts JSON only: extract `backup.json` for notes/folders. It does
+not automatically restore images, backgrounds or preferences from the archive.
 
 | Done | ID | Priority | Action | Expected result |
 | --- | --- | --- | --- | --- |
-| [ ] | BACK-01 | P0 | Invoke backup export in developer harness with full fixture | Valid versioned JSON includes private/owned folders/notes, hashes, types, parent/root links, pin/archive and tombstones |
-| [ ] | BACK-02 | P0 | Inspect JSON and export→import comparison | Incoming caches/account IDs/cloud membership IDs/media binaries excluded; no plaintext password; content plaintext clearly understood |
+| [ ] | BACK-01 | P0 | Export Full Backup on native/web with active, Trash, archived-folder/child, locked and media fixtures | Readable TAR contains only active personal folders/notes, their media/colors, safe preferences and manifest; no Trash/archive/tombstones. Root links and hashes preserved; source unchanged |
+| [ ] | BACK-02 | P0 | Extract TAR; inspect manifest and import backup.json; repeat with missing media | Incoming caches/account IDs/auth tokens excluded; missing assets explicitly reported. JSON restores notes/folders only, not binary media/preferences. No plaintext password; content plaintext clearly understood |
 | [ ] | BACK-03 | P0 | Import valid file then cancel preview/confirmation | Counts shown before mutation; cancel leaves original data unchanged |
 | [ ] | BACK-04 | P0 | Merge newer/older notes with same IDs and tombstones | Timestamp policy applied deterministically; no duplicate IDs or deleted-row resurrection; root links preserved |
 | [ ] | BACK-05 | P0 | Replace after explicit confirmation | Private data replaced, Shared-with-me caches preserved; folder references valid; no unrelated data silently reset |

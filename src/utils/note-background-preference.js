@@ -54,6 +54,14 @@ const deleteManagedFile = (uri) => {
 const safeNoteId = (noteId) => String(noteId).replace(/[^a-z0-9_-]/gi, '_');
 
 export const noteBackgroundPreference = {
+  async exportAsset(noteId) {
+    const uri = (await readBackgrounds())[noteId];
+    if (!uri) return null;
+    const file = safeFile(uri);
+    if (!file?.exists) throw new Error('Background file is missing.');
+    return { uri, name: file.name, mimeType: file.type };
+  },
+
   async load(noteId) {
     if (!noteId) return null;
     const backgrounds = await readBackgrounds();
