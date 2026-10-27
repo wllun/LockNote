@@ -4,6 +4,7 @@ import { isSupabaseConfigured, supabase } from './supabaseClient';
 import { prepareDownloadedAttachment, readAttachmentUploadBody } from '../utils/attachment-cloud-file';
 import { MAX_NOTE_ATTACHMENTS } from '../utils/note-attachment.mjs';
 import { attachmentDeleteQueue } from './attachmentDeleteQueue';
+import { createAttachmentDownloadService } from './attachmentDownloadService.mjs';
 
 const BUCKET = 'note-attachments';
 let syncQueue = Promise.resolve();
@@ -114,6 +115,9 @@ const removeCloudRecord = async (item) => {
 };
 
 export const attachmentCloudService = {
+  async downloadNote(noteId, options) {
+    return await enqueueCloud(() => createAttachmentDownloadService({ supabase, noteRepo, attachmentRepo, prepareDownloadedAttachment }).downloadNote(noteId, options));
+  },
   async syncNote(noteOrId) {
     return await enqueueCloud(async () => {
       const note = typeof noteOrId === 'string' ? await noteRepo.getById(noteOrId) : noteOrId;

@@ -234,10 +234,11 @@ export const folderRepo = {
     return { records, tombstones };
   },
 
-  async applySyncSnapshot(records = [], tombstones = []) {
+  async applySyncSnapshot(records = [], tombstones = [], options = {}) {
     const db = getDB();
     await db.withExclusiveTransactionAsync(async (txn) => {
       for (const folder of records) {
+        options.assertCurrent?.();
         await txn.runAsync(
           `INSERT INTO folders (
              id, parent_id, name, password, is_deleted, is_pinned, is_archived, created_at, updated_at
@@ -269,6 +270,7 @@ export const folderRepo = {
         );
       }
       for (const folder of records) {
+        options.assertCurrent?.();
         await txn.runAsync(
           `UPDATE folders SET parent_id = ?
            WHERE id = ? AND is_deleted = 0 AND updated_at <= ?`,
@@ -276,6 +278,7 @@ export const folderRepo = {
         );
       }
       for (const tombstone of tombstones) {
+        options.assertCurrent?.();
         await txn.runAsync(
           `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
            VALUES ('folder', ?, ?)
@@ -291,6 +294,7 @@ export const folderRepo = {
           [tombstone.updated_at, tombstone.id, tombstone.updated_at]
         );
       }
+      options.assertCurrent?.();
     });
   },
 

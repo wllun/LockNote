@@ -11,6 +11,8 @@ import NetInfo from '@react-native-community/netinfo';
 import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen from '../screens/HomeScreen';
+import { useInitialSync } from '../context/InitialSyncContext';
+import InitialSyncScreen from '../components/initial-sync-screen';
 import FolderScreen from '../screens/FolderScreen';
 import NoteEditorScreen from '../screens/NoteEditorScreen';
 import ChecklistEditorScreen from '../screens/ChecklistEditorScreen';
@@ -153,6 +155,7 @@ const ProfileStack = ({ screenOptions }) => (
 );
 
 const AppNavigator = () => {
+  const initialSync = useInitialSync();
   const colors = useTheme();
   const { scheme } = useThemeMode();
   const navigationRef = useNavigationContainerRef();
@@ -318,6 +321,10 @@ const AppNavigator = () => {
           </Tab.Screen>
         </Tab.Navigator>
       </NavigationContainer>
+
+      {initialSync.visible && <InitialSyncScreen sync={initialSync}
+        onCancel={async () => { await initialSync.cancel(); initialSync.dismiss(); navigateHome(); }}
+        onContinue={() => { initialSync.dismiss(); navigateHome(); }} />}
 
       <PasswordModal
         visible={!!lockedReminder}

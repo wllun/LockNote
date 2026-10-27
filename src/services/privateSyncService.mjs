@@ -4,6 +4,7 @@ import {
   cloudNoteForLocal,
   parseSyncResponse,
 } from '../utils/private-sync.mjs';
+import { assertSyncActive, awaitSyncRequest } from '../utils/sync-cancellation.mjs';
 
 const LAST_SYNC_PREFIX = '@locknote_private_sync_last:';
 
@@ -45,7 +46,7 @@ export const createPrivateSyncService = ({
     };
     const assertCurrent = async (stage) => {
       assertIdentity();
-      if (options.signal?.aborted) throw new Error('Sync request timed out or was cancelled.');
+      assertSyncActive(options.signal);
       const current = await requireSession();
       if (current.user.id !== session.user.id || (options.expectedUserId && current.user.id !== options.expectedUserId)) {
         const error = new Error('Your account changed. Sync again from the current account.');
@@ -54,7 +55,7 @@ export const createPrivateSyncService = ({
       }
       await options.guard?.(stage);
       assertIdentity();
-      if (options.signal?.aborted) throw new Error('Sync request timed out or was cancelled.');
+      assertSyncActive(options.signal);
     };
     const rpc = (name, args) => {
       const request = supabase.rpc(name, args);
@@ -62,16 +63,17 @@ export const createPrivateSyncService = ({
       if (session.access_token && typeof request.setHeader === 'function') {
         request.setHeader('Authorization', `Bearer ${session.access_token}`);
       }
-      return options.signal && typeof request.abortSignal === 'function'
-        ? request.abortSignal(options.signal) : request;
+      return awaitSyncRequest(options.signal && typeof request.abortSignal === 'function'
+        ? request.abortSignal(options.signal) : request, options.signal);
     };
     await assertCurrent('snapshot');
     const [folderSnapshot, noteSnapshot] = await Promise.all([
       folderRepo.getSyncSnapshot(),
       noteRepo.getSyncSnapshot(),
     ]);
-    const payload = buildSyncPayload(folderSnapshot, noteSnapshot);
+    const payload = recoverOnly ? null : buildSyncPayload(folderSnapshot, noteSnapshot);
     await assertCurrent('upload');
+    options.onProgress?.({ phase: 'connecting' });
     let { data, error } = recoverOnly ? await rpc('recover_private_data') : await rpc('sync_private_data', {
       p_folders: payload.folders,
       p_notes: payload.notes,
@@ -88,8 +90,20 @@ export const createPrivateSyncService = ({
     if (error) throw error;
 
     const response = parseSyncResponse(data);
+    options.onProgress?.({ phase: 'notes', notes: response.notes.filter((note) => !note.is_deleted).length });
+    const folderDeletes = new Map((folderSnapshot.tombstones || []).map((item) => [item.id, item.updated_at]));
+    const noteDeletes = new Map((noteSnapshot.tombstones || []).map((item) => [item.id, item.updated_at]));
+    const deletedLocally = (item, deletions) => deletions.has(item.id) && new Date(deletions.get(item.id)) >= new Date(item.updated_at);
+    const blockedFolders = new Set(response.folders.filter((folder) => deletedLocally(folder, folderDeletes)).map((folder) => folder.id));
+    for (let changed = true; changed;) {
+      changed = false;
+      for (const folder of response.folders) {
+        if (blockedFolders.has(folder.parent_id) && !blockedFolders.has(folder.id)) { blockedFolders.add(folder.id); changed = true; }
+      }
+    }
+    const activeNotes = response.notes.filter((note) => !note.is_deleted && !deletedLocally(note, noteDeletes) && !blockedFolders.has(note.folder_id));
     const folderRecords = [];
-    for (const remote of response.folders.filter((folder) => !folder.is_deleted)) {
+    for (const remote of response.folders.filter((folder) => !folder.is_deleted && !blockedFolders.has(folder.id))) {
       const existing = await folderRepo.getById(remote.id);
       folderRecords.push(cloudFolderForLocal(remote, existing));
     }
@@ -98,10 +112,11 @@ export const createPrivateSyncService = ({
       .map(({ id, updated_at }) => ({ id, updated_at }));
 
     await assertCurrent('apply-folders');
-    await folderRepo.applySyncSnapshot(folderRecords, folderTombstones);
+    const assertApplicationCurrent = () => { assertIdentity(); assertSyncActive(options.signal); };
+    await folderRepo.applySyncSnapshot(folderRecords, folderTombstones, { assertCurrent: assertApplicationCurrent });
 
     const noteRecords = [];
-    for (const remote of response.notes.filter((note) => !note.is_deleted)) {
+    for (const remote of activeNotes) {
       const existing = await noteRepo.getById(remote.id);
       noteRecords.push(cloudNoteForLocal(remote, existing));
     }
@@ -109,7 +124,7 @@ export const createPrivateSyncService = ({
       .filter((note) => note.is_deleted)
       .map(({ id, updated_at }) => ({ id, updated_at }));
     await assertCurrent('apply-notes');
-    await noteRepo.applySyncSnapshot(noteRecords, noteTombstones);
+    await noteRepo.applySyncSnapshot(noteRecords, noteTombstones, { assertCurrent: assertApplicationCurrent });
 
     const syncedAt = now();
     await assertCurrent('complete');
@@ -120,6 +135,7 @@ export const createPrivateSyncService = ({
       folders: folderRecords.length,
       notes: noteRecords.length,
       deleted: folderTombstones.length + noteTombstones.length,
+      ...(options.includeImageNotes ? { imageNotes: activeNotes.filter((note) => ['note', 'recipe'].includes(note.note_type)).map(({ id, updated_at }) => ({ id, updated_at })) } : {}),
     };
   };
 

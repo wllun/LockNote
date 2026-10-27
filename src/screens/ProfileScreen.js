@@ -9,6 +9,7 @@ import { syncErrorMessage } from '../utils/private-sync.mjs';
 import { radius, shadow, useTheme } from '../theme';
 import { useAutomaticSync } from '../context/AutomaticSyncContext';
 import { subscribeSyncEvents } from '../services/syncActivity.mjs';
+import { useInitialSync } from '../context/InitialSyncContext';
 
 const automaticStatusText = (sync) => {
   if (!sync.loaded) return 'Loading sync preference…';
@@ -47,7 +48,8 @@ const ProfileScreen = () => {
   const [syncing, setSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const automaticSync = useAutomaticSync();
-  const syncBusy = syncing || automaticSync.busy;
+  const initialSync = useInitialSync();
+  const syncBusy = syncing || automaticSync.busy || initialSync.busy || !initialSync.loaded;
 
   useEffect(() => {
     let active = true;
@@ -68,6 +70,7 @@ const ProfileScreen = () => {
 
   const handleSync = async () => {
     if (syncBusy) return;
+    if (initialSync.pending) { initialSync.start(); return; }
     setSyncing(true);
     try {
       const result = await syncService.syncAll();
@@ -110,6 +113,12 @@ const ProfileScreen = () => {
         <Text style={styles.memberSince}>Member since {formatDate(user?.created_at)}</Text>
       </View>
 
+      {initialSync.pending && <TouchableOpacity style={[styles.card, { padding: 16, marginBottom: 16 }]} onPress={initialSync.start}
+        disabled={syncBusy} accessibilityRole="button" accessibilityLabel="Resume initial sync">
+        <Text style={styles.itemLabel}>Finish downloading your notes</Text>
+        <Text style={styles.itemDescription}>Some cloud data is still pending. Tap to resume; completed downloads are kept.</Text>
+      </TouchableOpacity>}
+
       <View style={styles.card}>
         <TouchableOpacity
           style={[styles.item, syncBusy && styles.itemDisabled]}
@@ -126,7 +135,7 @@ const ProfileScreen = () => {
           <View style={styles.itemContent}>
             <Text style={styles.itemLabel}>Sync Notes</Text>
             <Text style={styles.itemDescription} numberOfLines={1}>
-              {syncBusy ? 'Merging local and cloud changes…' : formatSyncDate(automaticSync.lastSyncAt || lastSyncAt)}
+              {syncBusy ? 'Merging local and cloud changes…' : initialSync.pending ? 'Initial download paused — tap to resume' : formatSyncDate(automaticSync.lastSyncAt || lastSyncAt)}
             </Text>
           </View>
           {syncBusy
@@ -134,21 +143,21 @@ const ProfileScreen = () => {
             : <Ionicons name="cloud-upload-outline" size={20} color={colors.textTertiary} />}
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.item, styles.automaticItem, (!automaticSync.loaded || automaticSync.changing) && styles.itemDisabled]}
+          style={[styles.item, styles.automaticItem, (!automaticSync.loaded || automaticSync.changing || initialSync.pending) && styles.itemDisabled]}
           onPress={toggleAutomaticSync}
           activeOpacity={0.7}
-          disabled={!automaticSync.loaded || automaticSync.changing}
+          disabled={!automaticSync.loaded || automaticSync.changing || initialSync.pending}
           accessibilityRole="switch"
           accessibilityLabel="Automatic sync"
           accessibilityHint="Syncs note and folder data to your account with Plus or Pro. Tap to turn on or off."
-          accessibilityState={{ checked: automaticSync.enabled, disabled: !automaticSync.loaded || automaticSync.changing }}
+          accessibilityState={{ checked: automaticSync.enabled, disabled: !automaticSync.loaded || automaticSync.changing || initialSync.pending }}
         >
           <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
             <Ionicons name="sync-outline" size={19} color={colors.primary} />
           </View>
           <View style={styles.itemContent}>
             <Text style={styles.itemLabel}>Automatic Sync</Text>
-            <Text style={styles.itemDescription}>{automaticStatusText(automaticSync)}</Text>
+            <Text style={styles.itemDescription}>{initialSync.pending ? 'Finish your initial download first' : automaticStatusText(automaticSync)}</Text>
           </View>
           {automaticSync.changing ? <ActivityIndicator size="small" color={colors.primary} />
             : <Text style={styles.syncToggleLabel}>{automaticSync.enabled ? 'On' : 'Off'}</Text>}

@@ -39,7 +39,8 @@ Metro resolves `folderRepo.js` on native and `folderRepo.web.js` on web automati
    - **web** — no-op (AsyncStorage is schemaless)
 3. Theme/Auth/Subscription providers wrap `AppRoot`. The spinner waits for
    local initialization and the initial update-policy check. Required updates
-   render `AppUpdateGate`; otherwise `AutomaticSyncProvider` wraps `AppNavigator`.
+   render `AppUpdateGate`; otherwise `InitialSyncProvider` and then
+   `AutomaticSyncProvider` wrap `AppNavigator`.
    These providers coordinate services, not a global store of note data.
 4. Runs best-effort Trash cleanup for soft-deleted records that reached 30 days
    in the background after navigation is available.
@@ -476,6 +477,45 @@ rejects stale snapshots. App users can read only their own subscription and cann
 write it. Production excludes sandbox subscriptions by default. Owner-funded
 sharing stops completely on Free; owned local drafts outside subfolders remain
 editable and pending, while recipients cannot view or edit incoming shared notes.
+
+### First-login cloud download
+
+After auth hydration and outside either password-recovery flow,
+`InitialSyncProvider` checks `@locknote_initial_sync:<user-id>` on this device.
+A new account/device automatically opens `InitialSyncScreen` and runs
+`syncService.restoreAccount()`: read-only `recover_private_data`, then strict
+attachment downloads for its plain/recipe notes. All plans can recover existing
+cloud content. Guest notes are not automatically uploaded or replaced, and the
+step never enables Plus/Pro automatic sync. Previously synced installations
+without the new checkpoint are treated as complete using their saved last-sync
+time, avoiding an unexpected gate on every existing startup.
+
+The initial operation shares the manual/automatic/recovery queue and original
+account guards. Open editors defer it until the user closes the editor. Its
+pending checkpoint is persisted before record transfer and is marked complete
+only after all image-note checks succeed. Cancel, timeout or failure keeps the
+checkpoint pending. Profile exposes Resume initial sync; the existing Sync Notes
+button also resumes initial recovery while pending. Restarting with a pending
+checkpoint offers Resume/Continue later rather than silently restarting a
+cancelled transfer. A 60-second no-progress timeout leaves a retryable screen.
+Foreground and headless automatic sync cannot upload while this step is pending.
+
+Snapshot validation rejects incomplete/duplicate records before application;
+optional repository `assertCurrent` callbacks also recheck cancellation/account
+identity inside the native transaction and before web storage commits. Native
+SQLite and web whole-record writes keep note bodies intact. Timestamp
+merging and local deletion tombstones protect newer local work. Resume refetches
+the canonical snapshot/metadata and upserts stable IDs, so completed notes are
+not duplicated and newly changed cloud data is not skipped. Image recovery skips
+existing attachment IDs, downloads each missing JPEG fully with cancellation,
+checks byte length and JPEG boundaries, then saves its managed file/Blob and
+metadata. Failed copies/inserts are cleaned up; web metadata is committed only
+after the complete Blob is available. No partial remote image is registered as
+downloaded. Resume is at record/file level, not HTTP byte-range continuation.
+Device-local backgrounds/preferences and Shared-with-me caches are not part of
+this private-account download. No new Supabase schema is needed; the existing
+recovery/attachment RPCs, Storage policies and recipe migration must be deployed.
+Physical-device interruption and live two-device acceptance remain pending.
 
 ### Automatic and background scheduling
 

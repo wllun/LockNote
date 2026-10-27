@@ -16,6 +16,7 @@ A local-first note-taking app with folders, password access gates, optional acco
 - Recipe ingredients and numbered preparation steps, with add/remove/reorder controls and one optional local photo
 - Archive, 30-day Trash recovery, PDF/image export, and Undo/Redo
 - Free manual account sync and Plus/Pro opt-in automatic folder/note sync
+- Free first-login cloud download with progress, cancellation and safe retry from Profile
 - Per-email note sharing with View only or Can edit access
 - Portable JSON backup export and validated merge/replace restore
 - Runs on iOS, Android, and web
@@ -55,6 +56,14 @@ Local storage is the primary data source:
 - **iOS / Android** — SQLite (`expo-sqlite`), database file `locknote.db`
 - **Web** — AsyncStorage (localStorage), via `*.web.js` repo variants
 - **Inline images** — SQLite metadata/managed files on native; IndexedDB metadata/Blobs on web
+
+On the first sign-in to an account on a device, a sync screen downloads its
+existing cloud folders, notes and attachment images, including on Free. Cancel
+keeps completed downloads; **Profile → Resume initial sync** retries unfinished
+work without duplicate notes or partial image files. This initial step does not
+upload guest notes, replace newer local edits, or enable paid automatic sync.
+Already-synced devices skip the initial screen. Live backend/device acceptance
+remains required.
 
 Signed-in users can run **Profile → Sync Notes** to merge folders and notes with
 their owner-scoped Supabase snapshot. Manual sync remains Free within 25 MB.

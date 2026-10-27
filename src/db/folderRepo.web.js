@@ -240,9 +240,10 @@ export const folderRepo = {
     };
   },
 
-  async applySyncSnapshot(records = [], tombstones = []) {
+  async applySyncSnapshot(records = [], tombstones = [], options = {}) {
     await mutateStorage((folders, localTombstones) => {
       for (const remote of records) {
+        options.assertCurrent?.();
         const index = folders.findIndex((folder) => folder.id === remote.id);
         if (index === -1) {
           folders.push({
@@ -269,6 +270,7 @@ export const folderRepo = {
       }
 
       for (const tombstone of tombstones) {
+        options.assertCurrent?.();
         upsertTombstone(localTombstones, tombstone.id, tombstone.updated_at);
         const folder = folders.find((item) => item.id === tombstone.id);
         if (folder && new Date(folder.updated_at) <= new Date(tombstone.updated_at)) {
@@ -277,6 +279,7 @@ export const folderRepo = {
           folder.updated_at = tombstone.updated_at;
         }
       }
+      options.assertCurrent?.();
     });
   },
 

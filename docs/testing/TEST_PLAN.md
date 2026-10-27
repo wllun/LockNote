@@ -343,6 +343,11 @@ not automatically restore images, backgrounds or preferences from the archive.
 | [ ] | AUTH-06 | P1 | Network outage, expired link, rate limit and duplicate request | Human-readable error and correct cooldown; no crash or fake success |
 | [ ] | AUTH-07 | P0 | Test native implicit-token and PKCE callback variants where configured | Correct intent/identity; malformed or unrelated URL cannot reset credentials |
 | [ ] | AUTH-08 | P2 | Check hosted sender branding and email on another device | LockNote branding and safe redirects; cross-device recovery limitation documented, not assumed supported |
+| [ ] | AUTH-09 | P0 | New device/Free account with four cloud notes and inline/recipe photos: sign in | Initial sync screen starts automatically; complete note bodies/images become local, guest notes survive, and no guest upload occurs |
+| [ ] | AUTH-10 | P0 | Cancel initial download before response and midway through images; resume from Profile and after app restart | Cancel is responsive; pending state retained; complete records/files remain; no duplicate notes or partial images; Resume finishes the missing work |
+| [ ] | AUTH-11 | P0 | Switch/sign out/recover password while initial sync is delayed, including A→B→A | Original-account checks reject stale results; recovery UI is not blocked; no late image/record writes from cancelled runs |
+| [ ] | AUTH-12 | P1 | Slow network, truncated image/JSON, local quota/write failure, open editor, empty cloud account | Retry/Continue later remain reachable; completion is never claimed prematurely; newer local changes/deletions are preserved; empty cloud result keeps guest notes |
+| [ ] | AUTH-13 | P1 | Existing synced install, Plus auto-sync enabled and pending initial marker; phone/landscape/large text | Existing completed installs skip gate; pending initial work pauses foreground/headless uploads; controls remain safe-area accessible and do not overlap navigation |
 
 ### Q Manual private sync
 

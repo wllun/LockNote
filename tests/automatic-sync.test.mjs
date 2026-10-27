@@ -433,6 +433,7 @@ const renderProfile = async (automatic = {}) => {
     useEffect: () => {}, useMemo: (fn) => fn(), useState: (value) => [value, () => {}],
     useAuth: () => ({ session: { user: { id: 'owner', email: 'test@example.com' } } }),
     useAutomaticSync: () => snapshot, useTheme: () => ({}),
+    useInitialSync: () => ({ loaded: true, pending: false, busy: false }),
     StyleSheet: { create: (styles) => styles, hairlineWidth: 1 }, radius: {}, shadow: { card: {} },
     Ionicons: 'Icon', ActivityIndicator: 'ActivityIndicator', ScrollView: 'ScrollView', View: 'View',
     Text: 'Text', TouchableOpacity: 'TouchableOpacity', Alert: { alert: () => {} }, syncErrorMessage,

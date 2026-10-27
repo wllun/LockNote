@@ -1,4 +1,5 @@
 import { canUsePremiumFeature } from '../utils/premium-access.mjs';
+import { initialSyncKey } from './initialSyncService.mjs';
 
 export const autoSyncPreferenceKey = (userId) => `@locknote_auto_sync_enabled:${userId}`;
 export const autoSyncStatusKey = (userId) => `@locknote_auto_sync_status:${userId}`;
@@ -40,6 +41,12 @@ export const createAutomaticSyncService = ({ supabase, storage, syncService, isE
       };
       let access;
       const guard = async () => {
+        const initial = await storage.getItem(initialSyncKey(userId));
+        if (initial) {
+          let checkpoint;
+          try { checkpoint = JSON.parse(initial); } catch { throw syncDeferredError(); }
+          if (checkpoint?.status !== 'complete') throw syncDeferredError();
+        }
         if (controller.signal.aborted) throw timeoutError();
         if (!isCurrent() || isEditorOpen() || !await readEnabled(userId)) throw syncDeferredError();
         const { data, error } = await supabase.auth.getSession();

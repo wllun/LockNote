@@ -123,6 +123,7 @@ export const attachmentRepo = {
   async add(noteId, asset) {
     if (!noteId || !asset?.uri) throw new Error('No optimized image was provided.');
     const response = await fetch(asset.uri);
+    if (!response.ok) throw new Error('The optimized image could not be read.');
     const blob = await response.blob();
     const id = asset.id || createAttachmentId();
     const timestamp = asset.created_at || new Date().toISOString();
@@ -143,7 +144,10 @@ export const attachmentRepo = {
       created_at: timestamp,
       updated_at: asset.updated_at || timestamp,
     };
-    await mutate(() => runTransaction('readwrite', (store) => store.put(record)));
+    await mutate(async () => {
+      await asset.beforeCommit?.();
+      return runTransaction('readwrite', (store) => store.put(record));
+    });
     revokeUrl(id);
     return presentRecord(record);
   },

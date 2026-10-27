@@ -119,6 +119,18 @@ export const parseSyncResponse = (response) => {
   if (!response || !Array.isArray(response.folders) || !Array.isArray(response.notes)) {
     throw new Error('The sync server returned an invalid response.');
   }
+  for (const [kind, records] of [['folder', response.folders], ['note', response.notes]]) {
+    const ids = new Set();
+    for (const record of records) {
+      if (!record || typeof record.id !== 'string' || !record.id || ids.has(record.id)
+        || !Number.isFinite(Date.parse(record.updated_at))
+        || (!record.is_deleted && (!Number.isFinite(Date.parse(record.created_at))
+          || (kind === 'folder' ? typeof record.name !== 'string' : typeof record.title !== 'string' || typeof record.content !== 'string')))) {
+        throw new Error('The sync server returned an invalid response. No incomplete notes were saved.');
+      }
+      ids.add(record.id);
+    }
+  }
   return response;
 };
 

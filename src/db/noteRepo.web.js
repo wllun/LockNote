@@ -336,9 +336,10 @@ export const noteRepo = {
     };
   },
 
-  async applySyncSnapshot(records = [], tombstones = []) {
+  async applySyncSnapshot(records = [], tombstones = [], options = {}) {
     await mutateStorage((notes, localTombstones) => {
       for (const remote of records) {
+        options.assertCurrent?.();
         const normalized = normalizeNote({
           ...remote,
           is_deleted: 0,
@@ -361,6 +362,7 @@ export const noteRepo = {
       }
 
       for (const tombstone of tombstones) {
+        options.assertCurrent?.();
         upsertTombstone(localTombstones, tombstone.id, tombstone.updated_at);
         const note = notes.find((item) =>
           item.id === tombstone.id && item.share_origin !== 'incoming'
@@ -371,6 +373,7 @@ export const noteRepo = {
           note.updated_at = tombstone.updated_at;
         }
       }
+      options.assertCurrent?.();
     });
   },
 

@@ -11,11 +11,13 @@ import { getNetworkAvailability } from '../utils/network-availability.mjs';
 import { canUsePremiumFeature } from '../utils/premium-access.mjs';
 import { premiumAccessService } from '../services/premiumAccessService';
 import { syncService } from '../services/syncService';
+import { useInitialSync } from './InitialSyncContext';
 
 const AutomaticSyncContext = createContext(null);
 export const AutomaticSyncProvider = ({ children }) => {
   const { session, loading: authLoading, recoveringPassword, recoveringLockPassword } = useAuth();
   const { activePlanId, loading: subscriptionLoading } = useSubscription();
+  const initialSync = useInitialSync();
   const userId = session?.user?.id ?? null;
   const identity = useRef(userId);
   identity.current = userId;
@@ -31,7 +33,7 @@ export const AutomaticSyncProvider = ({ children }) => {
   const loaded = preference.loaded && preference.userId === userId;
   const enabled = loaded && preference.enabled;
   const eligible = canUsePremiumFeature(activePlanId, 'automaticSync');
-  const ready = loaded && !authLoading && !subscriptionLoading && !recoveringPassword && !recoveringLockPassword;
+  const ready = loaded && initialSync.loaded && !initialSync.pending && !authLoading && !subscriptionLoading && !recoveringPassword && !recoveringLockPassword;
 
   useEffect(() => {
     const scheduler = createAutomaticSyncController({

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { parse } from '@babel/parser';
-import { normalizeAttachment } from '../src/utils/note-attachment.mjs';
+import { normalizeAttachment, sortAttachments } from '../src/utils/note-attachment.mjs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const oldPhoto = () => ({ id: 'old', note_id: 'recipe', local_uri: 'file:///documents/note-attachments/recipe/old.jpg',
@@ -28,11 +28,17 @@ const nativeHarness = (failure = '') => {
   }
   const source = read('src/db/attachmentRepo.js').replace(/^import[\s\S]*?;\r?\n/gm, '').replace('export const attachmentRepo', 'const attachmentRepo');
   const repo = vm.runInNewContext(`${source}\nattachmentRepo;`, {
-    Directory, File, Paths: { document: 'file:///documents/' }, createAttachmentId: () => 'new', normalizeAttachment,
+    Directory, File, Paths: { document: 'file:///documents/' }, createAttachmentId: () => 'new', normalizeAttachment, sortAttachments,
     getDB: () => ({
       getFirstAsync: async (_, [id]) => rows.get(id),
-      runAsync: async (_, values) => {
+      getAllAsync: async (_, [noteId]) => [...rows.values()].filter((row) => row.note_id === noteId),
+      runAsync: async (sql, values) => {
         if (failure === 'database') throw new Error('Database write failed');
+        if (sql.includes('INSERT INTO note_attachments')) {
+          const [id, note_id, local_uri, mime_type, width, height, byte_size] = values;
+          rows.set(id, { id, note_id, local_uri, mime_type, width, height, byte_size });
+          return { changes: 1 };
+        }
         const [id, local_uri, mime_type, width, height, byte_size, updated_at, previousId, noteId] = values;
         if (failure === 'missing' || rows.get(previousId)?.note_id !== noteId) return { changes: 0 };
         const updated = { ...rows.get(previousId), id, local_uri, mime_type, width, height, byte_size, updated_at, cloud_path: null, sync_status: 'pending' };
@@ -67,6 +73,41 @@ test('native replacement uses a new image identity and deletes old bytes only af
   const other = nativeHarness();
   await assert.rejects(other.repo.replace('other-note', 'old', newPhoto));
   assert.equal(other.files.has(other.original.local_uri), true);
+});
+
+test('native download insertion cleans incomplete copies and cancelled pre-commit writes without touching existing photos', async () => {
+  for (const failure of ['copy', 'database', 'cancel']) {
+    const app = nativeHarness(failure);
+    await assert.rejects(app.repo.add('recipe', { ...newPhoto, id: 'downloaded', beforeCommit: async () => {
+      if (failure === 'cancel') throw new Error('Sync cancelled');
+    } }), failure === 'copy' ? /Copy failed/ : failure === 'database' ? /Database write failed/ : /Sync cancelled/);
+    assert.equal(app.rows.size, 1);
+    assert.equal(app.files.get(app.original.local_uri), 'old bytes');
+    assert.equal([...app.files.keys()].filter((uri) => uri.includes('note-attachments/')).length, 1);
+  }
+  const app = nativeHarness();
+  const saved = await app.repo.add('recipe', { ...newPhoto, id: 'downloaded' });
+  assert.equal(saved.id, 'downloaded');
+  assert.equal(app.files.get(saved.local_uri), 'new bytes');
+  assert.equal(app.rows.size, 2);
+});
+
+test('web download insertion checks cancellation after reading the entire Blob and before IndexedDB commit', async () => {
+  const source = read('src/db/attachmentRepo.web.js');
+  const ast = parse(source, { sourceType: 'module' });
+  const declaration = ast.program.body.find((node) => node.type === 'ExportNamedDeclaration' && node.declaration?.declarations?.[0]?.id?.name === 'attachmentRepo');
+  const method = declaration.declaration.declarations[0].init.properties.find((node) => node.key.name === 'add');
+  const records = new Map(); let blobRead = false;
+  const add = vm.runInNewContext(`(async function(noteId, asset) ${source.slice(method.body.start, method.body.end)})`, {
+    fetch: async () => ({ ok: true, blob: async () => { blobRead = true; return { type: 'image/jpeg', size: 250 }; } }),
+    mutate: async (operation) => operation(), createAttachmentId: () => 'downloaded',
+    revokeUrl: () => {}, presentRecord: (record) => record,
+    runTransaction: async (_, operation) => operation({ put: (record) => records.set(record.id, record) }),
+  });
+  await assert.rejects(add.call({ listByNoteId: async () => [] }, 'recipe', { ...newPhoto, beforeCommit: async () => { throw new Error('Cancelled'); } }), /Cancelled/);
+  assert.equal(blobRead, true); assert.equal(records.size, 0);
+  await add.call({ listByNoteId: async () => [] }, 'recipe', newPhoto);
+  assert.equal(records.get('downloaded').blob.size, 250);
 });
 
 // Execute the real web method with an IndexedDB-style atomic transaction boundary.

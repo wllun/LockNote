@@ -62,12 +62,13 @@ export const attachmentRepo = {
     const timestamp = asset.created_at || now();
     const noteDirectory = new Directory(attachmentsDirectory, safeSegment(noteId));
     noteDirectory.create({ idempotent: true, intermediates: true });
-    const destination = new File(noteDirectory, `${safeSegment(id)}.jpg`);
-    source.copy(destination);
+    const destination = new File(noteDirectory, `${safeSegment(id)}-${createAttachmentId()}.jpg`);
     const existing = await this.listByNoteId(noteId);
     const displayOrder = asset.display_order ?? existing.length;
 
     try {
+      source.copy(destination);
+      await asset.beforeCommit?.();
       await getDB().runAsync(
         `INSERT INTO note_attachments (
           id, note_id, local_uri, mime_type, width, height, byte_size,

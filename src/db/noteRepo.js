@@ -316,10 +316,11 @@ export const noteRepo = {
     return { records, tombstones };
   },
 
-  async applySyncSnapshot(records = [], tombstones = []) {
+  async applySyncSnapshot(records = [], tombstones = [], options = {}) {
     const db = getDB();
     await db.withExclusiveTransactionAsync(async (txn) => {
       for (const note of records) {
+        options.assertCurrent?.();
         await txn.runAsync(
           `INSERT INTO notes (
              id, folder_id, title, content, note_type, password, is_deleted,
@@ -383,6 +384,7 @@ export const noteRepo = {
         );
       }
       for (const tombstone of tombstones) {
+        options.assertCurrent?.();
         await txn.runAsync(
           `INSERT INTO sync_tombstones (entity_type, entity_id, deleted_at)
            VALUES ('note', ?, ?)
@@ -398,6 +400,7 @@ export const noteRepo = {
           [tombstone.updated_at, tombstone.id, tombstone.updated_at]
         );
       }
+      options.assertCurrent?.();
     });
   },
 
