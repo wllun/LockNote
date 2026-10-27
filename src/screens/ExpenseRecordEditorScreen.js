@@ -1594,7 +1594,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     if (!await lockPasswordService.verifyNotePassword(password, note)) {
       throw new Error('Incorrect LockNote password.');
     }
-    await noteRepo.update(noteId, { password: null });
+    await noteRepo.update(noteId, { password: null }, { preserveModifiedAt: true });
     setHasPassword(false);
     latest.current.hasPassword = false;
   };
@@ -1602,7 +1602,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
   const handleTogglePin = async () => {
     const nextPinned = !isPinned;
     try {
-      await noteRepo.update(noteId, { is_pinned: nextPinned });
+      await noteRepo.update(noteId, { is_pinned: nextPinned }, { preserveModifiedAt: true });
       setIsPinned(nextPinned);
       latest.current.isPinned = nextPinned;
     } catch {

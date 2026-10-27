@@ -312,7 +312,7 @@ const HomeScreen = ({ navigation }) => {
 
   const handleToggleNotePin = async (note) => {
     try {
-      await noteRepo.update(note.id, { is_pinned: !note.is_pinned });
+      await noteRepo.update(note.id, { is_pinned: !note.is_pinned }, { preserveModifiedAt: true });
       refreshCurrent();
     } catch (error) {
       Alert.alert('Error', 'Failed to update pin');
@@ -364,7 +364,7 @@ const HomeScreen = ({ navigation }) => {
     if (!await lockPasswordService.verifyNotePassword(password, note)) {
       throw new Error('Incorrect LockNote password.');
     }
-    await noteRepo.update(lockActionNote.id, { password: null });
+    await noteRepo.update(lockActionNote.id, { password: null }, { preserveModifiedAt: true });
     await refreshCurrent();
   };
 

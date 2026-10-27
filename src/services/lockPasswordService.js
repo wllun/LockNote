@@ -242,7 +242,7 @@ export const lockPasswordService = {
       );
     }
 
-    await noteRepo.update(noteId, { password });
+    await noteRepo.update(noteId, { password }, { preserveModifiedAt: true });
     return credential;
   },
 

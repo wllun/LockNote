@@ -218,7 +218,7 @@ const NoteItem = ({
             importantForAccessibility="no"
           />
           <Text style={styles.updatedAt}>
-            {formatNoteUpdatedAt(note.updated_at)}
+            {formatNoteUpdatedAt(note.last_edited_at || note.updated_at)}
           </Text>
         </View>
       </TouchableOpacity>

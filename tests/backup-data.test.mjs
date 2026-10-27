@@ -13,6 +13,7 @@ import { createBackupService } from '../src/services/backupService.mjs';
 const HASH = 'a'.repeat(64);
 const CREATED = '2026-08-01T10:00:00.000Z';
 const UPDATED = '2026-08-02T10:00:00.000Z';
+const LAST_EDITED = '2026-08-01T18:00:00.000Z';
 
 const folder = (overrides = {}) => ({
   id: 'folder-1',
@@ -57,7 +58,7 @@ test('creates a portable backup without collaboration metadata or incoming notes
     { records: [folder()], tombstones: [{ id: 'old-folder', updated_at: UPDATED }] },
     {
       records: [
-        note({ color: 'blue' }),
+        note({ color: 'blue', last_edited_at: LAST_EDITED }),
         note({ id: 'incoming', share_origin: 'incoming', cloud_id: 'shared-cloud-id' }),
       ],
       tombstones: [{ id: 'old-note', updated_at: UPDATED }],
@@ -70,6 +71,7 @@ test('creates a portable backup without collaboration metadata or incoming notes
   assert.equal(document.folders.records[0].is_archived, 1);
   assert.equal(document.notes.records[0].password, HASH);
   assert.equal(document.notes.records[0].is_archived, 1);
+  assert.equal(document.notes.records[0].last_edited_at, LAST_EDITED);
   assert.equal('cloud_id' in document.notes.records[0], false);
   assert.equal('color' in document.notes.records[0], false);
   assert.deepEqual(document.notes.tombstones, [{ id: 'old-note', updated_at: UPDATED }]);
@@ -109,6 +111,7 @@ test('validates a backup and resets restored notes to private collaboration stat
   assert.equal(restored.cloud_id, null);
   assert.equal(restored.folder_id, 'folder-1');
   assert.equal(restored.is_archived, 1);
+  assert.equal(restored.last_edited_at, UPDATED);
   assert.equal(result.backup.folders.records[0].is_archived, 1);
 });
 

@@ -101,6 +101,7 @@ const portableNote = (note) => ({
   is_archived: note.is_archived ? 1 : 0,
   created_at: note.created_at,
   updated_at: note.updated_at,
+  last_edited_at: note.last_edited_at || note.updated_at,
 });
 
 const portableTombstone = (item) => ({ id: item.id, updated_at: item.updated_at });
@@ -208,6 +209,7 @@ const normalizeNotes = (section, folderIds) => {
     });
     if (!NOTE_TYPES.has(noteType)) fail(`note ${id} has an unsupported note type.`);
     const rawContent = ensureString(note.content, `notes.records[${index}].content`, MAX_CONTENT_LENGTH);
+    const updatedAt = ensureTimestamp(note.updated_at, `notes.records[${index}].updated_at`);
 
     return {
       id,
@@ -219,7 +221,7 @@ const normalizeNotes = (section, folderIds) => {
       is_pinned: ensurePinned(note.is_pinned, `notes.records[${index}].is_pinned`),
       is_archived: ensureArchived(note.is_archived, `notes.records[${index}].is_archived`),
       created_at: ensureTimestamp(note.created_at, `notes.records[${index}].created_at`),
-      updated_at: ensureTimestamp(note.updated_at, `notes.records[${index}].updated_at`),
+      updated_at: updatedAt,
       cloud_id: null,
       cloud_owner_id: null,
       share_origin: 'private',
@@ -228,7 +230,9 @@ const normalizeNotes = (section, folderIds) => {
       server_revision: 0,
       last_edited_by_id: null,
       last_edited_by_email: null,
-      last_edited_at: null,
+      last_edited_at: note.last_edited_at === null || note.last_edited_at === undefined
+        ? updatedAt
+        : ensureTimestamp(note.last_edited_at, `notes.records[${index}].last_edited_at`),
       sync_status: null,
       last_synced_at: null,
     };

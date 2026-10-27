@@ -156,6 +156,14 @@ const initializeDB = async () => {
       await db.execAsync(`ALTER TABLE notes ADD COLUMN ${name} ${definition}`);
     }
   }
+  // Existing private notes used updated_at for both sync ordering and the
+  // user-visible content edit time. Keep that value before metadata-only
+  // actions begin advancing updated_at independently.
+  await db.execAsync(`
+    UPDATE notes
+    SET last_edited_at = updated_at
+    WHERE last_edited_at IS NULL AND share_origin != 'incoming'
+  `);
   await db.execAsync('CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_cloud_id ON notes(cloud_id) WHERE cloud_id IS NOT NULL');
 
   // Preserve deletions made before account sync was introduced so an older

@@ -817,7 +817,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
     if (!await lockPasswordService.verifyNotePassword(password, note)) {
       throw new Error('Incorrect LockNote password.');
     }
-    await noteRepo.update(noteId, { password: null });
+    await noteRepo.update(noteId, { password: null }, { preserveModifiedAt: true });
     setHasPassword(false);
     latest.current.hasPassword = false;
   };
@@ -825,7 +825,7 @@ const ChecklistEditorScreen = ({ route, navigation }) => {
   const handleTogglePin = async () => {
     const next = !isPinned;
     try {
-      await noteRepo.update(noteId, { is_pinned: next });
+      await noteRepo.update(noteId, { is_pinned: next }, { preserveModifiedAt: true });
       setIsPinned(next);
       latest.current.isPinned = next;
     } catch {

@@ -49,13 +49,14 @@ const upsertTombstone = (tombstones, id, updatedAt) => {
 };
 
 const normalizeNote = normalizeCollaborationNote;
+const modifiedAt = (note) => note.last_edited_at || note.updated_at;
 
 export const noteRepo = {
   async getRootNotes() {
     const notes = await getStorage();
     return notes
       .filter((n) => n.folder_id === null && !n.is_deleted && !n.is_archived && n.share_origin !== 'incoming')
-      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at))
+      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(modifiedAt(b)) - new Date(modifiedAt(a)))
       .map(normalizeNote);
   },
 
@@ -63,7 +64,7 @@ export const noteRepo = {
     const notes = await getStorage();
     return notes
       .filter((n) => n.folder_id === folderId && !n.is_deleted && !n.is_archived && n.share_origin !== 'incoming')
-      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at))
+      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(modifiedAt(b)) - new Date(modifiedAt(a)))
       .map(normalizeNote);
   },
 
@@ -88,7 +89,7 @@ export const noteRepo = {
       .filter((note) =>
         note.folder_id === folderId && !note.is_deleted && note.share_origin !== 'incoming'
       )
-      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+      .sort((a, b) => new Date(modifiedAt(b)) - new Date(modifiedAt(a)))
       .map(normalizeNote);
   },
 
@@ -96,7 +97,7 @@ export const noteRepo = {
     const notes = await getStorage();
     return notes
       .filter((note) => !note.is_deleted && !!note.is_archived && note.share_origin !== 'incoming')
-      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+      .sort((a, b) => new Date(modifiedAt(b)) - new Date(modifiedAt(a)))
       .map(normalizeNote);
   },
 
@@ -119,6 +120,7 @@ export const noteRepo = {
       created_at: timestamp,
       updated_at: timestamp,
       ...COLLABORATION_DEFAULTS,
+      last_edited_at: timestamp,
     };
 
     return await mutateStorage((notes) => {
@@ -127,7 +129,7 @@ export const noteRepo = {
     });
   },
 
-  async update(id, updates) {
+  async update(id, updates, options = {}) {
     const passwordHash = updates.password !== undefined
       ? updates.password
         ? await hashPassword(updates.password)
@@ -152,11 +154,19 @@ export const noteRepo = {
       for (const field of [
         'cloud_id', 'cloud_owner_id', 'share_origin', 'share_role',
         'collaborator_count', 'server_revision', 'last_edited_by_id',
-        'last_edited_by_email', 'last_edited_at', 'sync_status', 'last_synced_at',
+        'last_edited_by_email', 'sync_status', 'last_synced_at',
       ]) {
         if (updates[field] !== undefined) notes[index][field] = updates[field];
       }
-      notes[index].updated_at = now();
+      const timestamp = now();
+      if (options.preserveModifiedAt === true) {
+        notes[index].last_edited_at ||= notes[index].updated_at;
+      } else if (updates.last_edited_at !== undefined) {
+        notes[index].last_edited_at = updates.last_edited_at;
+      } else if (updates.title !== undefined || updates.content !== undefined) {
+        notes[index].last_edited_at = timestamp;
+      }
+      notes[index].updated_at = timestamp;
       return normalizeNote(notes[index]);
     });
   },
@@ -174,6 +184,7 @@ export const noteRepo = {
         ) {
           continue;
         }
+        note.last_edited_at ||= note.updated_at;
         note.password = newPasswordHash;
         note.updated_at = timestamp;
         updatedCount += 1;
@@ -236,11 +247,13 @@ export const noteRepo = {
     return await mutateStorage((notes, tombstones) => {
       const note = notes.find((item) => item.id === id && item.is_deleted);
       if (!note || note.share_origin === 'incoming') return null;
+      const lastEditedAt = note.last_edited_at || note.updated_at;
 
       Object.assign(note, COLLABORATION_DEFAULTS, {
         folder_id: folderId,
         is_deleted: 0,
         is_archived: 0,
+        last_edited_at: lastEditedAt,
         updated_at: now(),
       });
       const tombstoneIndex = tombstones.findIndex((item) => item.id === id);
@@ -287,7 +300,7 @@ export const noteRepo = {
           (n.title.toLowerCase().includes(query.toLowerCase()) ||
             n.content.toLowerCase().includes(query.toLowerCase()))
       )
-      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(b.updated_at) - new Date(a.updated_at))
+      .sort((a, b) => (b.is_pinned || 0) - (a.is_pinned || 0) || new Date(modifiedAt(b)) - new Date(modifiedAt(a)))
       .map(normalizeNote);
   },
 
@@ -373,6 +386,7 @@ export const noteRepo = {
           is_pinned: note.is_pinned ? 1 : 0,
           is_archived: note.is_archived ? 1 : 0,
           ...COLLABORATION_DEFAULTS,
+          last_edited_at: note.last_edited_at || note.updated_at,
         }));
       notes.splice(0, notes.length, ...incomingNotes, ...restoredNotes);
       localTombstones.splice(0, localTombstones.length, ...tombstones);

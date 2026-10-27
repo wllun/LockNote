@@ -164,6 +164,12 @@ in IndexedDB. Timestamps are ISO strings; local IDs are client-generated
 
 **notes**: `id, folder_id (nullable → root note), title, content, note_type, password, is_deleted, is_pinned, is_archived, created_at, updated_at` plus collaboration/sync metadata
 
+`updated_at` is the note record's sync/conflict timestamp. `last_edited_at`
+is the user-visible content-modified timestamp and controls ordinary note
+ordering. Metadata-only actions such as pinning, locking, sharing, exporting,
+or changing a local color/background preserve `last_edited_at` even when a
+syncable setting must advance `updated_at`.
+
 Both native note and folder records also contain cloud/origin/role, revision,
 last-editor and sync metadata from `src/db/sqlite.js`; these are not local FKs to
 remote tables. `note_attachments` holds image/note IDs, local URI, MIME,
@@ -351,7 +357,7 @@ reads alongside the existing folder/deletion indexes.
   Locked notes require their password before user-triggered permanent deletion.
   Empty Trash removes unlocked notes and leaves locked ones for individual confirmation.
 - **Root notes** — `folder_id IS NULL` means the note lives on the Home screen, not in a folder.
-- **Ordering** — pinned items first, then folders by `created_at DESC` and notes by `updated_at DESC`.
+- **Ordering** — pinned items first, then folders by `created_at DESC` and notes by `last_edited_at DESC` (falling back to `updated_at` for legacy data).
 
 ## Password protection
 

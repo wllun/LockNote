@@ -12,14 +12,14 @@ export const noteRepo = {
   async getRootNotes() {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE folder_id IS NULL AND is_deleted = 0 AND is_archived = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, updated_at DESC`
+      `SELECT * FROM notes WHERE folder_id IS NULL AND is_deleted = 0 AND is_archived = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, COALESCE(last_edited_at, updated_at) DESC`
     );
   },
 
   async getByFolderId(folderId) {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 AND is_archived = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, updated_at DESC`,
+      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 AND is_archived = 0 AND share_origin != 'incoming' ORDER BY is_pinned DESC, COALESCE(last_edited_at, updated_at) DESC`,
       [folderId]
     );
   },
@@ -43,7 +43,7 @@ export const noteRepo = {
   async getActiveByFolderId(folderId) {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 AND share_origin != 'incoming' ORDER BY updated_at DESC`,
+      `SELECT * FROM notes WHERE folder_id = ? AND is_deleted = 0 AND share_origin != 'incoming' ORDER BY COALESCE(last_edited_at, updated_at) DESC`,
       [folderId]
     );
   },
@@ -51,7 +51,7 @@ export const noteRepo = {
   async getArchived() {
     const db = getDB();
     return await db.getAllAsync(
-      `SELECT * FROM notes WHERE is_deleted = 0 AND is_archived = 1 AND share_origin != 'incoming' ORDER BY updated_at DESC`
+      `SELECT * FROM notes WHERE is_deleted = 0 AND is_archived = 1 AND share_origin != 'incoming' ORDER BY COALESCE(last_edited_at, updated_at) DESC`
     );
   },
 
@@ -64,14 +64,17 @@ export const noteRepo = {
     const passwordHash = password ? await hashPassword(password) : null;
 
     await db.runAsync(
-      `INSERT INTO notes (id, folder_id, title, content, note_type, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, folderId, title, content, noteType, passwordHash, timestamp, timestamp]
+      `INSERT INTO notes (
+         id, folder_id, title, content, note_type, password,
+         created_at, updated_at, last_edited_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, folderId, title, content, noteType, passwordHash, timestamp, timestamp, timestamp]
     );
 
     return await this.getById(id);
   },
 
-  async update(id, updates) {
+  async update(id, updates, options = {}) {
     const db = getDB();
     const { hashPassword } = require('../utils/crypto');
     const fields = [];
@@ -109,7 +112,7 @@ export const noteRepo = {
     for (const field of [
       'cloud_id', 'cloud_owner_id', 'share_origin', 'share_role',
       'collaborator_count', 'server_revision', 'last_edited_by_id',
-      'last_edited_by_email', 'last_edited_at', 'sync_status', 'last_synced_at',
+      'last_edited_by_email', 'sync_status', 'last_synced_at',
     ]) {
       if (updates[field] !== undefined) {
         fields.push(`${field} = ?`);
@@ -117,10 +120,22 @@ export const noteRepo = {
       }
     }
 
-    if (fields.length === 0) return await this.getById(id);
+    if (fields.length === 0 && updates.last_edited_at === undefined) {
+      return await this.getById(id);
+    }
 
+    const timestamp = now();
+    if (options.preserveModifiedAt === true) {
+      fields.push('last_edited_at = COALESCE(last_edited_at, updated_at)');
+    } else if (updates.last_edited_at !== undefined) {
+      fields.push('last_edited_at = ?');
+      values.push(updates.last_edited_at);
+    } else if (updates.title !== undefined || updates.content !== undefined) {
+      fields.push('last_edited_at = ?');
+      values.push(timestamp);
+    }
     fields.push('updated_at = ?');
-    values.push(now());
+    values.push(timestamp);
     values.push(id);
 
     await db.runAsync(
@@ -135,7 +150,9 @@ export const noteRepo = {
     const db = getDB();
     const result = await db.runAsync(
       `UPDATE notes
-       SET password = ?, updated_at = ?
+       SET password = ?,
+           last_edited_at = COALESCE(last_edited_at, updated_at),
+           updated_at = ?
        WHERE password IS NOT NULL
          AND is_deleted = 0
          AND share_origin != 'incoming'
@@ -205,7 +222,7 @@ export const noteRepo = {
            cloud_id = NULL, cloud_owner_id = NULL, share_origin = 'private',
            share_role = NULL, collaborator_count = 0, server_revision = 0,
            last_edited_by_id = NULL, last_edited_by_email = NULL,
-           last_edited_at = NULL, sync_status = NULL, last_synced_at = NULL
+           sync_status = NULL, last_synced_at = NULL
          WHERE id = ? AND is_deleted = 1 AND share_origin != 'incoming'`,
         [folderId, timestamp, id]
       );
@@ -253,7 +270,7 @@ export const noteRepo = {
          AND notes.is_archived = 0
          AND notes.share_origin != 'incoming'
          AND (notes.title LIKE ? OR notes.content LIKE ?)
-       ORDER BY notes.is_pinned DESC, notes.updated_at DESC`,
+       ORDER BY notes.is_pinned DESC, COALESCE(notes.last_edited_at, notes.updated_at) DESC`,
       [`%${query}%`, `%${query}%`]
       ),
       db.getAllAsync(`SELECT * FROM folders WHERE is_deleted = 0`),
@@ -399,7 +416,7 @@ export const noteRepo = {
              last_edited_by_id, last_edited_by_email, last_edited_at,
              sync_status, last_synced_at
            ) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, NULL, NULL, 'private', NULL, 0, 0,
-             NULL, NULL, NULL, NULL, NULL)
+             NULL, NULL, ?, NULL, NULL)
            ON CONFLICT(id) DO NOTHING`,
           [
             note.id,
@@ -412,6 +429,7 @@ export const noteRepo = {
             note.is_archived ? 1 : 0,
             note.created_at,
             note.updated_at,
+            note.last_edited_at || note.updated_at,
           ]
         );
       }

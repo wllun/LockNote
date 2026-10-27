@@ -153,7 +153,7 @@ const ArchiveScreen = ({ navigation }) => {
         { label: 'Note', value: itemTitle(note, 'note'), iconName: 'document-text-outline' },
         {
           label: 'Last updated',
-          value: formatNoteUpdatedAt(note.updated_at).replace(/^Updated /, ''),
+          value: formatNoteUpdatedAt(note.last_edited_at || note.updated_at).replace(/^Updated /, ''),
         },
       ],
       onConfirm: () => moveNoteToTrash(note),
@@ -202,7 +202,7 @@ const ArchiveScreen = ({ navigation }) => {
     if (!await lockPasswordService.verifyNotePassword(password, note)) {
       throw new Error('Incorrect LockNote password.');
     }
-    await noteRepo.update(lockActionNote.id, { password: null });
+    await noteRepo.update(lockActionNote.id, { password: null }, { preserveModifiedAt: true });
     await loadArchive();
   };
 

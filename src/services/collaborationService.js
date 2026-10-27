@@ -280,7 +280,7 @@ export const collaborationService = {
       ...remoteNoteToLocal({ ...remote, is_owner: true, role: 'owner' }),
       share_origin: 'owned',
       cloud_owner_id: session.user.id,
-    });
+    }, { preserveModifiedAt: true });
   },
 
   async acquireEditLease(noteId) {
@@ -415,7 +415,7 @@ export const collaborationService = {
       collaborator_count: data.collaboratorCount,
       sync_status: 'synced',
       last_synced_at: new Date().toISOString(),
-    });
+    }, { preserveModifiedAt: true });
     return data;
   },
 
@@ -522,7 +522,11 @@ export const collaborationService = {
       p_note_id: note.cloud_id,
       p_user_id: userId,
     }));
-    await noteRepo.update(noteId, { collaborator_count: Number(result?.collaborator_count) || 0 });
+    await noteRepo.update(
+      noteId,
+      { collaborator_count: Number(result?.collaborator_count) || 0 },
+      { preserveModifiedAt: true }
+    );
     return result;
   },
 

@@ -402,7 +402,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
     if (!await lockPasswordService.verifyNotePassword(password, note)) {
       throw new Error('Incorrect LockNote password.');
     }
-    await noteRepo.update(noteId, { password: null });
+    await noteRepo.update(noteId, { password: null }, { preserveModifiedAt: true });
     latest.current.hasPassword = false;
     setHasPassword(false);
     try { await rescheduleForPrivacy(false); }
@@ -411,7 +411,7 @@ const ReminderEditorScreen = ({ route, navigation }) => {
 
   const handleTogglePin = async () => {
     const next = !isPinned;
-    try { await noteRepo.update(noteId, { is_pinned: next }); latest.current.isPinned = next; setIsPinned(next); }
+    try { await noteRepo.update(noteId, { is_pinned: next }, { preserveModifiedAt: true }); latest.current.isPinned = next; setIsPinned(next); }
     catch { Alert.alert('Error', 'Failed to update pin'); }
   };
 
