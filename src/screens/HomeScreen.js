@@ -16,6 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
 import { useSyncRefresh } from '../hooks/use-sync-refresh';
+import { useFolderSort } from '../hooks/use-folder-sort';
+import FolderSortModal, { FolderSortButton } from '../components/folder-sort-modal';
+import { sortFolders } from '../utils/folder-sort.mjs';
 import { hashPassword } from '../utils/crypto';
 import { lockPasswordService } from '../services/lockPasswordService';
 import FolderItem from '../components/FolderItem';
@@ -109,6 +112,8 @@ const HomeScreen = ({ navigation }) => {
   const [folderNoteCounts, setFolderNoteCounts] = useState({});
   const [folderViewMode, setFolderViewMode] = useState('list');
   const [noteViewMode, setNoteViewMode] = useState('list');
+  const [showFolderSort, setShowFolderSort] = useState(false);
+  const { preferences: folderSort, ready: folderSortReady } = useFolderSort(navigation);
 
   useEffect(() => subscribeToViewModePreferences((change) => {
     if (change.folderViewMode) setFolderViewMode(change.folderViewMode);
@@ -570,7 +575,7 @@ const HomeScreen = ({ navigation }) => {
   );
 
   const renderFolderItems = (folderList) => {
-    const items = folderList.map((folder, index) => (
+    const items = sortFolders(folderList, folderSort, folderNoteCounts).map((folder, index) => (
       <View
         key={folder.id}
         style={folderViewMode === 'strip' ? styles.folderStripItem : undefined}
@@ -695,6 +700,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Folders</Text>
           <View style={styles.sectionHeaderActions}>
+            <FolderSortButton onPress={() => setShowFolderSort(true)} disabled={!folderSortReady} />
             {renderViewControl({
               scope: 'Folders',
               modes: FOLDER_VIEW_MODES,
@@ -789,6 +795,9 @@ const HomeScreen = ({ navigation }) => {
           <Ionicons name="add" size={28} color={colors.card} />
         </TouchableOpacity>
       )}
+
+      {showFolderSort && <FolderSortModal folders={folders} counts={folderNoteCounts} preferences={folderSort}
+        onClose={() => setShowFolderSort(false)} />}
 
       <CreateNoteTypeModal
         visible={showNoteTypeModal}

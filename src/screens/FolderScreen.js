@@ -24,6 +24,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
 import { noteRepo } from '../db/noteRepo';
 import { useSyncRefresh } from '../hooks/use-sync-refresh';
+import { useFolderSort } from '../hooks/use-folder-sort';
+import FolderSortModal, { FolderSortButton } from '../components/folder-sort-modal';
+import { sortFolders } from '../utils/folder-sort.mjs';
 import NoteItem from '../components/NoteItem';
 import FolderItem from '../components/FolderItem';
 import PasswordModal from '../components/PasswordModal';
@@ -174,6 +177,8 @@ const FolderScreen = ({ route, navigation }) => {
   const { activePlanId, loading: subscriptionLoading } = useSubscription();
   const folderFeatures = getSubfolderVisibility(subscriptionLoading ? 'free' : activePlanId, isSubfolder, childFolders.length);
   const [folderNoteCounts, setFolderNoteCounts] = useState({});
+  const [showFolderSort, setShowFolderSort] = useState(false);
+  const { preferences: folderSort, ready: folderSortReady } = useFolderSort(navigation);
   const [notes, setNotes] = useState([]);
   const requestedFolderViewMode = route.params?.folderViewMode;
   const requestedNoteViewMode = route.params?.noteViewMode ?? route.params?.viewMode;
@@ -690,7 +695,7 @@ const FolderScreen = ({ route, navigation }) => {
   );
 
   const renderFolderItems = () => {
-    const items = childFolders.map((folder, index) => (
+    const items = sortFolders(childFolders, folderSort, folderNoteCounts).map((folder, index) => (
       <View
         key={folder.id}
         style={folderViewMode === 'strip' ? styles.folderStripItem : undefined}
@@ -775,6 +780,7 @@ const FolderScreen = ({ route, navigation }) => {
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>Folders</Text>
                   <View style={styles.sectionHeaderActions}>
+                    <FolderSortButton onPress={() => setShowFolderSort(true)} disabled={!folderSortReady} />
                     {renderViewControl({
                       scope: 'Folders',
                       modes: FOLDER_VIEW_MODES,
@@ -844,6 +850,9 @@ const FolderScreen = ({ route, navigation }) => {
       >
         <Ionicons name="add" size={28} color={colors.card} />
       </TouchableOpacity>)}
+
+      {showFolderSort && <FolderSortModal key={folderId} folders={childFolders} counts={folderNoteCounts} parentId={folderId} preferences={folderSort}
+        onClose={() => setShowFolderSort(false)} />}
 
       <CreateNoteTypeModal
         visible={showNoteTypeModal}

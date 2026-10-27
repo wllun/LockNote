@@ -132,6 +132,24 @@ in AsyncStorage under `@locknote_folder_view_mode` and
 preference remains a migration fallback; its grid value maps to folder strip and
 note grid. List is the fallback when no valid preference has been saved.
 
+Folder section headers on Home and inside folders also expose **Sort folders**.
+The sheet offers Name, Date created, Last updated and Number of notes with
+ascending/descending direction and optional pinned-first grouping. Custom order
+opens an in-modal reorder screen; a one-second handle hold starts dragging,
+with UI-thread transforms and edge scrolling. Keyboard arrows on web and native
+accessibility adjustment actions offer non-drag alternatives. Apply/Done saves;
+Cancel, backdrop dismissal and Back leave the saved preference unchanged.
+
+`@locknote_folder_sort_v1` stores device-local sort settings and separate custom
+sibling-ID orders for Home and each parent folder. Both List and Strip use the
+same ordering, independent of note sorting/view mode. Missing/deleted/moved IDs
+are ignored; new folders append to custom order using newest-first fallback.
+Pinned folders stay in their top group during custom moves unless pinned-first
+is disabled. Screen listeners/focus reloads refresh preferences only, not a
+global note store. Sorting does not change repository rows, parent links,
+timestamps, backup schemas or cloud synchronization, and needs no migration.
+No saved setting preserves the existing pinned-first/newest-first order.
+
 App-wide messages and confirmations are presented by `AppDialogHost`, mounted
 beside the navigator in `App.js`. Screens and components call the `AppAlert`
 adapter with the same title/message/button shape as React Native's `Alert`, so

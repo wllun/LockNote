@@ -218,6 +218,10 @@ Use the expense oracle above and compare calculated values, not screenshots alon
 | [ ] | NAV-10 | P1 | Move root note to folder, folder to root, child note to parent/root | Correct relationships and counts; no duplicated or lost note |
 | [ ] | NAV-11 | P1 | Pro: move folder under parent then move it back to Home | Whole valid subtree preserved; no invalid extra level or cycle |
 | [ ] | NAV-12 | P2 | Native long-press vs web three-dot actions, empty states and pull-to-refresh | Correct controls per platform; focus/refresh reloads without stale cards |
+| [ ] | NAV-13 | P1 | Sort folders by name, creation/update date and count in both directions; switch List/Strip and restart | Order persists locally in both views; note ordering/content/timestamps remain unchanged. Pinned-first can be turned off |
+| [ ] | NAV-14 | P1 | Open Custom order; hold handle for 1 second, drag upward/downward and near list edges; test keyboard/TalkBack alternatives | Correct sibling moves with smooth tracking and bounded edge scrolling; pin groups stay separate when enabled; Done saves while Cancel/Back discards |
+| [ ] | NAV-15 | P1 | Save different custom orders in Home and a parent folder, then create/move/archive/delete folders | Sibling orders remain independent; absent IDs do not resurrect data; new folders append; no schema/cloud writes |
+| [ ] | NAV-16 | P1 | Sort modal at 375px, landscape, large font, reduced motion and both themes; inject preference write failure | Actions stay above system navigation, scroll when needed, selected controls are readable; failed save keeps draft and reports retryable error |
 
 ### I Locks passwords and recovery
 

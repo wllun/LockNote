@@ -5,6 +5,7 @@ A local-first note-taking app with folders, password access gates, optional acco
 ## Features
 
 - Folders and notes, with notes nested in folders or at the root
+- Device-local folder sorting by name, dates or note count, plus custom drag ordering and optional pinned-first grouping
 - Optional locks: one shared LockNote password for all locked notes, plus individual folder passwords (SHA-256 gated — see [Security](#security))
 - Auto-save while editing (debounced)
 - Search across folders and note titles/content on native and web
