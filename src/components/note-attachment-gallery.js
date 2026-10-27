@@ -28,6 +28,56 @@ const SETTLE_SPRING = { duration: 400, dampingRatio: 0.8, reduceMotion: ReduceMo
 const IMAGE_ROW_GAP = 8;
 const PREVIEW_TEXT_VERTICAL_PADDING = 8;
 
+const PlainNoteTextInput = ({
+  block,
+  colors,
+  contentLength,
+  isTrailing,
+  maxLength,
+  onChangeTextBlock,
+  onSelectionChange,
+  registerInput,
+  saveBlockLayout,
+  styles,
+}) => {
+  // Keep the native text prop unchanged for the lifetime of this input. Android IMEs
+  // can move the caret or replay Enter when defaultValue changes during composition.
+  const initialText = useRef(block.text).current;
+  const [height, setHeight] = useState(52);
+  const assignInputRef = useCallback((input) => {
+    registerInput(block.id, input);
+  }, [block.id, registerInput]);
+
+  return (
+    <TextInput
+      ref={assignInputRef}
+      defaultValue={initialText}
+      editable
+      multiline
+      scrollEnabled={false}
+      maxLength={Math.max(0, (Number(maxLength) || 50000) - (contentLength - block.text.length))}
+      placeholder={block.id === 'text:start:end' ? 'Start writing...' : ''}
+      placeholderTextColor={colors.textTertiary}
+      textAlignVertical="top"
+      textBreakStrategy="simple"
+      style={[
+        styles.textBlock,
+        isTrailing && styles.trailingTextBlock,
+        { height },
+      ]}
+      onLayout={(event) => saveBlockLayout(block.id, event.nativeEvent.layout)}
+      onChangeText={(value) => onChangeTextBlock?.(block.id, value)}
+      onSelectionChange={(event) => onSelectionChange?.(block.id, event.nativeEvent.selection)}
+      onContentSizeChange={(event) => {
+        const nextHeight = Math.max(52, Math.ceil(event.nativeEvent.contentSize.height));
+        setHeight((current) => Math.abs(current - nextHeight) < 2 ? current : nextHeight);
+      }}
+      accessibilityLabel="Note text"
+      accessibilityHint="Type text around the images in this note"
+    />
+  );
+};
+
 const getCharacterWidthWeight = (character) => {
   if (/\s/u.test(character)) return 0.35;
   if (/[ilI1.,'`:;|!]/u.test(character)) return 0.32;
@@ -299,7 +349,6 @@ const NoteAttachmentGallery = forwardRef(({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [selectedId, setSelectedId] = useState(null);
-  const [inputHeights, setInputHeights] = useState({});
   const inputRefs = useRef(new Map());
   const pendingTextFocusRef = useRef(null);
   const previewTapRef = useRef(null);
@@ -321,16 +370,23 @@ const NoteAttachmentGallery = forwardRef(({
   const selected = selectedIndex >= 0 ? orderedAttachments[selectedIndex] : null;
   const baseImageWidth = Math.max(112, Math.min(width - 40, 720) - IMAGE_ROW_GAP);
 
+  const registerInput = useCallback((blockId, input) => {
+    if (input) inputRefs.current.set(blockId, input);
+    else inputRefs.current.delete(blockId);
+  }, []);
+
   const placeTextCursor = useCallback((blockId, cursorOffset) => {
     const input = inputRefs.current.get(blockId);
     if (!input) return;
     input.focus?.();
     if (!Number.isInteger(cursorOffset)) return;
-    if (typeof input.setSelectionRange === 'function') {
-      input.setSelectionRange(cursorOffset, cursorOffset);
+    if (typeof input.setSelection === 'function') {
+      input.setSelection(cursorOffset, cursorOffset);
       return;
     }
-    input.setNativeProps?.({ selection: { start: cursorOffset, end: cursorOffset } });
+    if (typeof input.setSelectionRange === 'function') {
+      input.setSelectionRange(cursorOffset, cursorOffset);
+    }
   }, []);
 
   const requestTextEditing = useCallback((block, cursorOffset = null) => {
@@ -472,39 +528,18 @@ const NoteAttachmentGallery = forwardRef(({
       >
         {renderBlocks.map((block) => block.type === 'text' ? (
           editing && !readOnly ? (
-            <TextInput
+            <PlainNoteTextInput
               key={`${block.id}:${textInputRevision}`}
-              ref={(input) => {
-                if (input) inputRefs.current.set(block.id, input);
-                else inputRefs.current.delete(block.id);
-              }}
-              // Let the native input retain ownership while an IME is composing. Replaying a
-              // controlled value during a multiline layout update can duplicate predictive text.
-              defaultValue={block.text}
-              editable
-              multiline
-              scrollEnabled={false}
-              maxLength={Math.max(0, (Number(maxLength) || 50000) - (content.length - block.text.length))}
-              placeholder={blocks.length === 1 ? 'Start writing...' : ''}
-              placeholderTextColor={colors.textTertiary}
-              textAlignVertical="top"
-              textBreakStrategy="simple"
-              style={[
-                styles.textBlock,
-                block.id === blocks[blocks.length - 1]?.id && styles.trailingTextBlock,
-                { height: Math.max(52, inputHeights[block.id] || 52) },
-              ]}
-              onLayout={(event) => saveBlockLayout(block.id, event.nativeEvent.layout)}
-              onChangeText={(value) => onChangeTextBlock?.(block, value)}
-              onSelectionChange={(event) => onSelectionChange?.(block, event.nativeEvent.selection)}
-              onContentSizeChange={(event) => {
-                const nextHeight = Math.max(52, Math.ceil(event.nativeEvent.contentSize.height));
-                setInputHeights((current) => Math.abs((current[block.id] || 52) - nextHeight) < 2
-                  ? current
-                  : { ...current, [block.id]: nextHeight });
-              }}
-              accessibilityLabel="Note text"
-              accessibilityHint="Type text around the images in this note"
+              block={block}
+              colors={colors}
+              contentLength={content.length}
+              isTrailing={block.id === blocks[blocks.length - 1]?.id}
+              maxLength={maxLength}
+              onChangeTextBlock={onChangeTextBlock}
+              onSelectionChange={onSelectionChange}
+              registerInput={registerInput}
+              saveBlockLayout={saveBlockLayout}
+              styles={styles}
             />
           ) : (
             <View

@@ -54,6 +54,7 @@ import { pickNoteAttachments } from '../utils/note-attachment-picker';
 import { premiumAccessService } from '../services/premiumAccessService';
 import { supabase } from '../services/supabaseClient';
 import {
+  getInlineTextBlockById,
   MAX_NOTE_ATTACHMENTS,
   moveInlineAttachment,
   normalizeAttachmentDisplayWidthRatio,
@@ -261,7 +262,13 @@ const NoteEditorScreen = ({ route, navigation }) => {
     handleContentChange(serialized, latest.current.attachments, groupKey);
   };
 
-  const handleTextBlockChange = (block, value) => {
+  const handleTextBlockChange = (blockId, value) => {
+    const block = getInlineTextBlockById(
+      latest.current.content,
+      latest.current.attachments,
+      blockId
+    );
+    if (!block) return;
     const next = replaceInlineTextBlock(
       latest.current.content,
       latest.current.attachments,
@@ -272,7 +279,13 @@ const NoteEditorScreen = ({ route, navigation }) => {
     handleContentChange(next.content, next.attachments, block.id);
   };
 
-  const handleTextSelection = (block, selection) => {
+  const handleTextSelection = (blockId, selection) => {
+    const block = getInlineTextBlockById(
+      latest.current.content,
+      latest.current.attachments,
+      blockId
+    );
+    if (!block) return;
     insertionOffsetRef.current = Math.max(
       block.start,
       Math.min(block.end, block.start + (Number(selection?.start) || 0))

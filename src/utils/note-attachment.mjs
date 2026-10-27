@@ -132,6 +132,11 @@ export const groupInlineNoteBlocks = (blocks = []) => {
   return grouped;
 };
 
+export const getInlineTextBlockById = (content, attachments, blockId) =>
+  buildInlineNoteBlocks(content, attachments).find(
+    (block) => block.type === 'text' && block.id === blockId
+  ) || null;
+
 export const replaceInlineTextBlock = (content, attachments, block, nextText) => {
   const text = String(content ?? '');
   const replacement = String(nextText ?? '');

@@ -5,6 +5,7 @@ import {
   MAX_ATTACHMENT_SOURCE_BYTES,
   MAX_ATTACHMENT_STORED_BYTES,
   getAttachmentSelectionLimit,
+  getInlineTextBlockById,
   getResizeDimensions,
   isAttachmentOptimized,
   isAttachmentSourceTooLarge,
@@ -33,7 +34,8 @@ test('plain-note editing does not replay controlled text during IME composition'
   const gallery = read('src/components/note-attachment-gallery.js');
   const editor = read('src/screens/NoteEditorScreen.js');
 
-  assert.match(gallery, /defaultValue=\{block\.text\}/);
+  assert.match(gallery, /const initialText = useRef\(block\.text\)\.current/);
+  assert.match(gallery, /defaultValue=\{initialText\}/);
   assert.doesNotMatch(gallery, /value=\{block\.text\}/);
   assert.match(gallery, /key=\{`\$\{block\.id\}:\$\{textInputRevision\}`\}/);
   assert.match(editor, /textInputRevision=\{textInputRevision\}/);
@@ -42,6 +44,26 @@ test('plain-note editing does not replay controlled text during IME composition'
     2,
     'loaded and history-restored content must remount the uncontrolled input'
   );
+});
+
+test('rapid native events resolve the current text block before applying another edit', () => {
+  let content = '第一行';
+  const attachments = [];
+  const blockId = getInlineTextBlockById(content, attachments, 'text:start:end').id;
+
+  for (const nativeValue of ['第一行\n', '第一行\n', '第一行\n第']) {
+    const currentBlock = getInlineTextBlockById(content, attachments, blockId);
+    content = replaceInlineTextBlock(content, attachments, currentBlock, nativeValue).content;
+  }
+
+  assert.equal(content, '第一行\n第');
+});
+
+test('plain-note cursor placement uses the one-shot TextInput selection command', () => {
+  const gallery = read('src/components/note-attachment-gallery.js');
+
+  assert.match(gallery, /input\.setSelection\(cursorOffset, cursorOffset\)/);
+  assert.doesNotMatch(gallery, /setNativeProps\?\.\(\{ selection:/);
 });
 
 test('limits plain notes to twenty attachments', () => {
