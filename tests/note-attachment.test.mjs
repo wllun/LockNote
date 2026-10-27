@@ -29,6 +29,21 @@ test('plain-note editing keeps a stable greedy line-break strategy', () => {
   );
 });
 
+test('plain-note editing does not replay controlled text during IME composition', () => {
+  const gallery = read('src/components/note-attachment-gallery.js');
+  const editor = read('src/screens/NoteEditorScreen.js');
+
+  assert.match(gallery, /defaultValue=\{block\.text\}/);
+  assert.doesNotMatch(gallery, /value=\{block\.text\}/);
+  assert.match(gallery, /key=\{`\$\{block\.id\}:\$\{textInputRevision\}`\}/);
+  assert.match(editor, /textInputRevision=\{textInputRevision\}/);
+  assert.equal(
+    (editor.match(/setTextInputRevision\(\(current\) => current \+ 1\)/g) || []).length,
+    2,
+    'loaded and history-restored content must remount the uncontrolled input'
+  );
+});
+
 test('limits plain notes to twenty attachments', () => {
   assert.equal(getAttachmentSelectionLimit(0), 20);
   assert.equal(getAttachmentSelectionLimit(18), 2);

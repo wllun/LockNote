@@ -290,6 +290,7 @@ const InlineAttachment = ({
 
 const NoteAttachmentGallery = forwardRef(({
   content = '', attachments = [], busy = false, readOnly = false, editing = false, maxLength,
+  textInputRevision = 0,
   onRequestEdit,
   onChangeTextBlock, onSelectionChange, onMove, onDrop, onResize, onRemove,
 }, ref) => {
@@ -472,12 +473,14 @@ const NoteAttachmentGallery = forwardRef(({
         {renderBlocks.map((block) => block.type === 'text' ? (
           editing && !readOnly ? (
             <TextInput
-              key={block.id}
+              key={`${block.id}:${textInputRevision}`}
               ref={(input) => {
                 if (input) inputRefs.current.set(block.id, input);
                 else inputRefs.current.delete(block.id);
               }}
-              value={block.text}
+              // Let the native input retain ownership while an IME is composing. Replaying a
+              // controlled value during a multiline layout update can duplicate predictive text.
+              defaultValue={block.text}
               editable
               multiline
               scrollEnabled={false}

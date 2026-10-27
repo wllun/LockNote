@@ -93,6 +93,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [isContentEditing, setIsContentEditing] = useState(isNewDraft && !shared);
+  const [textInputRevision, setTextInputRevision] = useState(0);
   const saveTimeout = useRef(null);
   const loadCompletedRef = useRef(false);
   const contentEditorRef = useRef(null);
@@ -122,6 +123,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
         ]);
         setTitle(note.title);
         setContent(note.content);
+        setTextInputRevision((current) => current + 1);
         setHasPassword(!!note.password);
         setIsPinned(!!note.is_pinned);
         setNoteColor(localColor);
@@ -295,6 +297,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
 
     setTitle(snapshot.title);
     setContent(snapshot.content);
+    setTextInputRevision((current) => current + 1);
     const layoutById = new Map((snapshot.attachmentLayout || []).map((item) => [item.id, item]));
     const restoredAttachments = latest.current.attachments.map((item) => ({
       ...item,
@@ -745,6 +748,7 @@ const NoteEditorScreen = ({ route, navigation }) => {
           busy={attachmentBusy}
           readOnly={isReadOnly}
           editing={isContentEditing}
+          textInputRevision={textInputRevision}
           onRequestEdit={() => setIsContentEditing(true)}
           maxLength={NORMAL_NOTE_CONTENT_MAX_CHARACTERS}
           onChangeTextBlock={handleTextBlockChange}
