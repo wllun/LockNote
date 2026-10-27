@@ -4,6 +4,7 @@ import React, {
   useLayoutEffect,
   useCallback,
   useMemo,
+  useRef,
 } from 'react';
 import {
   View,
@@ -17,6 +18,7 @@ import {
   ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { usePreventRemove } from '@react-navigation/native';
 import { AppAlert as Alert } from '../utils/app-alert';
 import { Ionicons } from '@expo/vector-icons';
 import { folderRepo } from '../db/folderRepo';
@@ -66,7 +68,14 @@ const editorRouteFor = (note) => {
   return 'NoteEditor';
 };
 
-const FolderHeaderTitle = ({ name, onSave, colors, styles }) => {
+const FolderHeaderTitle = ({
+  name,
+  onSave,
+  onDraftChange,
+  onEditingChange,
+  colors,
+  styles,
+}) => {
   const [draftName, setDraftName] = useState(name);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -82,11 +91,13 @@ const FolderHeaderTitle = ({ name, onSave, colors, styles }) => {
     setIsEditing(false);
     if (!nextName) {
       setDraftName(name);
+      onEditingChange(false);
       Alert.alert('Error', 'Please enter a folder name');
       return;
     }
     if (nextName === name) {
       setDraftName(name);
+      onEditingChange(false);
       return;
     }
 
@@ -94,6 +105,19 @@ const FolderHeaderTitle = ({ name, onSave, colors, styles }) => {
     const didSave = await onSave(nextName);
     setIsSaving(false);
     if (!didSave) setDraftName(name);
+    onEditingChange(false);
+  };
+
+  const startEditing = () => {
+    setDraftName(name);
+    onDraftChange(name);
+    onEditingChange(true);
+    setIsEditing(true);
+  };
+
+  const changeDraftName = (nextName) => {
+    setDraftName(nextName);
+    onDraftChange(nextName);
   };
 
   if (isEditing) {
@@ -102,7 +126,7 @@ const FolderHeaderTitle = ({ name, onSave, colors, styles }) => {
         <TextInput
           style={styles.headerTitleInput}
           value={draftName}
-          onChangeText={setDraftName}
+          onChangeText={changeDraftName}
           onBlur={finishEditing}
           autoFocus
           selectTextOnFocus
@@ -120,7 +144,7 @@ const FolderHeaderTitle = ({ name, onSave, colors, styles }) => {
     <TouchableOpacity
       style={styles.headerTitleButton}
       activeOpacity={0.65}
-      onPress={() => setIsEditing(true)}
+      onPress={startEditing}
       accessibilityRole="button"
       accessibilityLabel={`Rename folder ${name}`}
       accessibilityHint="Edits the folder name in the title"
@@ -139,6 +163,11 @@ const FolderScreen = ({ route, navigation }) => {
 
   const { folderId, folderName } = route.params;
   const [currentFolderName, setCurrentFolderName] = useState(folderName || 'Folder');
+  const pendingFolderNameRef = useRef(folderName || 'Folder');
+  const renameSavePromiseRef = useRef(null);
+  const pendingRenameExitActionRef = useRef(null);
+  const [hasPendingFolderRename, setHasPendingFolderRename] = useState(false);
+  const [renameRemovalAllowed, setRenameRemovalAllowed] = useState(false);
   const [isSubfolder, setIsSubfolder] = useState(!!route.params?.isSubfolder);
   const [folderPath, setFolderPath] = useState([]);
   const [childFolders, setChildFolders] = useState([]);
@@ -258,17 +287,67 @@ const FolderScreen = ({ route, navigation }) => {
     }
   }, [folderId, navigation]);
 
-  const handleRenameFolder = useCallback(async (nextName) => {
-    try {
-      await folderRepo.update(folderId, { name: nextName });
-      setCurrentFolderName(nextName);
-      navigation.setParams({ folderName: nextName });
-      return true;
-    } catch (error) {
-      Alert.alert('Error', 'Failed to rename folder');
+  const handleRenameFolder = useCallback((nextName) => {
+    if (renameSavePromiseRef.current) return renameSavePromiseRef.current;
+
+    const operation = (async () => {
+      try {
+        const updatedFolder = await folderRepo.update(folderId, { name: nextName });
+        if (!updatedFolder) throw new Error('Folder no longer exists');
+        setCurrentFolderName(nextName);
+        pendingFolderNameRef.current = nextName;
+        navigation.setParams({ folderName: nextName });
+        return true;
+      } catch (error) {
+        Alert.alert('Error', 'Failed to rename folder');
+        return false;
+      }
+    })();
+
+    renameSavePromiseRef.current = operation;
+    operation.finally(() => {
+      if (renameSavePromiseRef.current === operation) renameSavePromiseRef.current = null;
+    });
+    return operation;
+  }, [folderId, navigation]);
+
+  const commitPendingFolderRename = useCallback(async () => {
+    const nextName = pendingFolderNameRef.current.trim();
+    if (!nextName) {
+      Alert.alert('Error', 'Please enter a folder name');
       return false;
     }
-  }, [folderId, navigation]);
+    if (nextName === currentFolderName) return true;
+    return await handleRenameFolder(nextName);
+  }, [currentFolderName, handleRenameFolder]);
+
+  usePreventRemove(hasPendingFolderRename && !renameRemovalAllowed, ({ data }) => {
+    if (pendingRenameExitActionRef.current) return;
+    pendingRenameExitActionRef.current = data.action;
+    Promise.resolve(commitPendingFolderRename()).then((didSave) => {
+      if (!didSave) {
+        pendingRenameExitActionRef.current = null;
+        return;
+      }
+      setHasPendingFolderRename(false);
+      setRenameRemovalAllowed(true);
+    });
+  });
+
+  useEffect(() => {
+    if (!renameRemovalAllowed || !pendingRenameExitActionRef.current) return;
+    const action = pendingRenameExitActionRef.current;
+    pendingRenameExitActionRef.current = null;
+    navigation.dispatch(action);
+  }, [navigation, renameRemovalAllowed]);
+
+  const handleFolderNameDraftChange = useCallback((nextName) => {
+    pendingFolderNameRef.current = nextName;
+  }, []);
+
+  const handleFolderNameEditingChange = useCallback((isEditing) => {
+    setHasPendingFolderRename(isEditing);
+  }, []);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -277,12 +356,22 @@ const FolderScreen = ({ route, navigation }) => {
         <FolderHeaderTitle
           name={currentFolderName}
           onSave={handleRenameFolder}
+          onDraftChange={handleFolderNameDraftChange}
+          onEditingChange={handleFolderNameEditingChange}
           colors={colors}
           styles={styles}
         />
       ),
     });
-  }, [colors, currentFolderName, handleRenameFolder, navigation, styles]);
+  }, [
+    colors,
+    currentFolderName,
+    handleFolderNameDraftChange,
+    handleFolderNameEditingChange,
+    handleRenameFolder,
+    navigation,
+    styles,
+  ]);
 
   const handleCreateNote = async (type = 'note') => {
     try {
