@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   MAX_ATTACHMENT_SOURCE_BYTES,
   MAX_ATTACHMENT_STORED_BYTES,
@@ -16,6 +17,17 @@ import {
   placeInlineAttachment,
   replaceInlineTextBlock,
 } from '../src/utils/note-attachment.mjs';
+
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+test('plain-note editing keeps a stable greedy line-break strategy', () => {
+  const gallery = read('src/components/note-attachment-gallery.js');
+  assert.equal(
+    (gallery.match(/textBreakStrategy="simple"/g) || []).length,
+    2,
+    'editing and preview text must wrap with the same stable strategy'
+  );
+});
 
 test('limits plain notes to twenty attachments', () => {
   assert.equal(getAttachmentSelectionLimit(0), 20);

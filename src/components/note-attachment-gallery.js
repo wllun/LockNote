@@ -485,6 +485,7 @@ const NoteAttachmentGallery = forwardRef(({
               placeholder={blocks.length === 1 ? 'Start writing...' : ''}
               placeholderTextColor={colors.textTertiary}
               textAlignVertical="top"
+              textBreakStrategy="simple"
               style={[
                 styles.textBlock,
                 block.id === blocks[blocks.length - 1]?.id && styles.trailingTextBlock,
@@ -519,6 +520,7 @@ const NoteAttachmentGallery = forwardRef(({
               <Text
                 style={[styles.previewText, readOnly && styles.readOnlyText]}
                 selectable={Boolean(block.text)}
+                textBreakStrategy="simple"
                 onPress={(event) => handlePreviewTextPress(block, event)}
                 onTextLayout={(event) => {
                   previewTextLinesRef.current.set(block.id, event.nativeEvent.lines);
