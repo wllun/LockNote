@@ -73,6 +73,7 @@ The example totals are:
 - `Add monthly bill` adds a commitment without affecting existing expense rows.
 - `Save for next note` stores a reusable copy of the current bill names, due days, and amounts in local app storage. Paid state and note-specific IDs are not stored in the reusable copy.
 - When an Expense Record has no monthly commitments, `Apply` offers the last saved bill list. Applying creates new local IDs and marks every copied bill unpaid without changing the source Expense Record.
+- When bills already exist, the saved-list callout stays available with `Replace`. Confirmation is required before replacing the complete set; new copies start unpaid. `Clear all` also requires confirmation and removes only this note's monthly bills, leaving the saved template and daily expenses intact. Undo/Redo restores either action, including the previous paid states; both actions use normal autosave and final-save-on-exit. Read-only notes cannot use these actions.
 - Reordering and deletion reuse the existing expense-row gestures: a full-width insertion gap previews the drop position, and releasing over the large recycle-bin target opens a confirmation before deleting the bill.
 - There is no long-press-to-delete interaction.
 - Checkbox and row actions must keep at least a 44 × 44 point touch target and have descriptive accessibility labels.

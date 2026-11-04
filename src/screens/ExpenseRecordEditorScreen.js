@@ -1081,10 +1081,47 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
     });
     if (!applied.length) return;
 
-    updateMonthlyCommitments(applied);
-    setCommitmentTemplateMessage(
-      `Applied ${applied.length} ${applied.length === 1 ? 'bill' : 'bills'} with all paid boxes cleared.`
-    );
+    const apply = () => {
+      if (latest.current.readOnly) return;
+      updateMonthlyCommitments(applied);
+      setCommitmentTemplateMessage(
+        `Applied ${applied.length} ${applied.length === 1 ? 'bill' : 'bills'} with all paid boxes cleared.`
+      );
+    };
+    if (!latest.current.monthlyCommitments.length) {
+      apply();
+      return;
+    }
+
+    confirmDestructiveAction({
+      title: 'Replace monthly bills?',
+      message: 'Replace all monthly bills in this note with your saved list? The applied bills will all be unpaid. Daily expenses stay unchanged.',
+      confirmLabel: 'Replace',
+      variant: 'warning',
+      iconName: 'copy-outline',
+      details: [
+        { label: 'Current bills', value: String(latest.current.monthlyCommitments.length) },
+        { label: 'Saved bills', value: String(applied.length) },
+      ],
+      onConfirm: apply,
+    });
+  };
+
+  const clearMonthlyCommitments = () => {
+    if (latest.current.readOnly || !latest.current.monthlyCommitments.length) return;
+    confirmDestructiveAction({
+      title: 'Clear monthly bills?',
+      message: 'Remove all monthly bills from this note? Your saved bill list and daily expenses stay unchanged.',
+      confirmLabel: 'Clear all',
+      details: [
+        { label: 'Monthly bills', value: String(latest.current.monthlyCommitments.length) },
+      ],
+      onConfirm: () => {
+        if (latest.current.readOnly) return;
+        updateMonthlyCommitments([]);
+        setCommitmentTemplateMessage('');
+      },
+    });
   };
 
   const removeCommitment = (commitmentId) => {
@@ -1991,7 +2028,7 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
               </View>
             )}
 
-            {!isReadOnly && !monthlyCommitments.length && !!savedCommitmentTemplate.length && (
+            {!isReadOnly && !!savedCommitmentTemplate.length && (
               <View style={styles.savedTemplateCallout}>
                 <View style={styles.savedTemplateIcon}>
                   <Ionicons name="copy-outline" size={20} color={colors.primary} />
@@ -2011,9 +2048,9 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                   ]}
                   onPress={applySavedCommitments}
                   accessibilityRole="button"
-                  accessibilityLabel={`Apply ${savedCommitmentTemplate.length} saved monthly bills, all unpaid`}
+                  accessibilityLabel={`${monthlyCommitments.length ? 'Replace monthly bills with' : 'Apply'} ${savedCommitmentTemplate.length} saved monthly bills, all unpaid`}
                 >
-                  <Text style={styles.applyTemplateText}>Apply</Text>
+                  <Text style={styles.applyTemplateText}>{monthlyCommitments.length ? 'Replace' : 'Apply'}</Text>
                 </Pressable>
               </View>
             )}
@@ -2140,6 +2177,20 @@ const ExpenseRecordEditorScreen = ({ route, navigation }) => {
                 <Ionicons name="add-circle" size={23} color={colors.primary} />
                 <Text style={styles.addCommitmentText}>Add</Text>
               </TouchableOpacity>
+              {!!monthlyCommitments.length && (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.clearCommitmentsButton,
+                    pressed && styles.actionsMenuItemPressed,
+                  ]}
+                  onPress={clearMonthlyCommitments}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear all monthly bills"
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                  <Text style={styles.clearCommitmentsText}>Clear all</Text>
+                </Pressable>
+              )}
               {!!monthlyCommitments.length && (
                 <Pressable
                   style={({ pressed }) => [
@@ -3108,6 +3159,7 @@ const makeStyles = (colors) =>
     commitmentActions: {
       minHeight: 44,
       flexDirection: 'row',
+      flexWrap: 'wrap',
       alignItems: 'center',
       justifyContent: 'flex-end',
       gap: 8,
@@ -3139,6 +3191,23 @@ const makeStyles = (colors) =>
     },
     saveTemplateButtonComplete: {
       backgroundColor: colors.primarySoft,
+    },
+    clearCommitmentsButton: {
+      minHeight: 48,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      paddingHorizontal: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.full,
+      backgroundColor: colors.card,
+    },
+    clearCommitmentsText: {
+      color: colors.danger,
+      fontSize: 14,
+      fontWeight: '700',
     },
     commitmentTemplateMessage: {
       color: colors.textSecondary,
